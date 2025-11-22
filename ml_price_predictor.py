@@ -70,68 +70,79 @@ class MLPricePredictor:
             df['close_open_ratio'] = df['Close'] / df['Open']
             return df
 
-        # Calculate all technical indicators
-        features = df.copy()
+        try:
+            # Calculate all technical indicators
+            features = df.copy()
 
-        # Momentum indicators
-        features['RSI'] = AdvancedIndicators.rsi(df, period=14)
-        features['RSI_fast'] = AdvancedIndicators.rsi(df, period=7)
-        features['Stoch_K'], features['Stoch_D'] = AdvancedIndicators.stochastic(df)
-        features['CCI'] = AdvancedIndicators.cci(df, period=20)
-        features['Williams_R'] = AdvancedIndicators.williams_r(df, period=14)
-        features['ROC'] = AdvancedIndicators.roc(df, period=12)
-        features['MFI'] = AdvancedIndicators.mfi(df, period=14)
+            # Momentum indicators
+            features['RSI'] = AdvancedIndicators.rsi(df, period=14)
+            features['RSI_fast'] = AdvancedIndicators.rsi(df, period=7)
+            features['Stoch_K'], features['Stoch_D'] = AdvancedIndicators.stochastic(df)
+            features['CCI'] = AdvancedIndicators.cci(df, period=20)
+            features['Williams_R'] = AdvancedIndicators.williams_r(df, period=14)
+            features['ROC'] = AdvancedIndicators.roc(df, period=12)
+            features['MFI'] = AdvancedIndicators.mfi(df, period=14)
 
-        # Trend indicators
-        features['SMA_20'] = AdvancedIndicators.sma(df, period=20)
-        features['SMA_50'] = AdvancedIndicators.sma(df, period=50)
-        features['EMA_12'] = AdvancedIndicators.ema(df, period=12)
-        features['EMA_26'] = AdvancedIndicators.ema(df, period=26)
+            # Trend indicators
+            features['SMA_20'] = AdvancedIndicators.sma(df, period=20)
+            features['SMA_50'] = AdvancedIndicators.sma(df, period=50)
+            features['EMA_12'] = AdvancedIndicators.ema(df, period=12)
+            features['EMA_26'] = AdvancedIndicators.ema(df, period=26)
 
-        macd_result = AdvancedIndicators.macd(df)
-        features['MACD'] = macd_result['macd']
-        features['MACD_signal'] = macd_result['signal']
-        features['MACD_hist'] = macd_result['histogram']
+            macd_result = AdvancedIndicators.macd(df)
+            features['MACD'] = macd_result['MACD']
+            features['MACD_signal'] = macd_result['MACD_Signal']
+            features['MACD_hist'] = macd_result['MACD_Hist']
 
-        features['ADX'] = AdvancedIndicators.adx(df, period=14)
+            features['ADX'] = AdvancedIndicators.adx(df, period=14)
 
-        aroon = AdvancedIndicators.aroon(df, period=25)
-        features['Aroon_Up'] = aroon['aroon_up']
-        features['Aroon_Down'] = aroon['aroon_down']
+            aroon = AdvancedIndicators.aroon(df, period=25)
+            features['Aroon_Up'] = aroon['Aroon_Up']
+            features['Aroon_Down'] = aroon['Aroon_Down']
 
-        # Volatility indicators
-        features['ATR'] = AdvancedIndicators.atr(df, period=14)
+            # Volatility indicators
+            features['ATR'] = AdvancedIndicators.atr(df, period=14)
 
-        bb = AdvancedIndicators.bollinger_bands(df, period=20)
-        features['BB_upper'] = bb['upper']
-        features['BB_middle'] = bb['middle']
-        features['BB_lower'] = bb['lower']
-        features['BB_width'] = (bb['upper'] - bb['lower']) / bb['middle']
+            bb = AdvancedIndicators.bollinger_bands(df, period=20)
+            features['BB_upper'] = bb['BB_Upper']
+            features['BB_middle'] = bb['BB_Middle']
+            features['BB_lower'] = bb['BB_Lower']
+            features['BB_width'] = (bb['BB_Upper'] - bb['BB_Lower']) / bb['BB_Middle']
 
-        # Volume indicators
-        features['OBV'] = AdvancedIndicators.obv(df)
-        features['CMF'] = AdvancedIndicators.cmf(df, period=20)
-        features['VWAP'] = AdvancedIndicators.vwap(df)
+            # Volume indicators
+            features['OBV'] = AdvancedIndicators.obv(df)
+            features['CMF'] = AdvancedIndicators.cmf(df, period=20)
+            features['VWAP'] = AdvancedIndicators.vwap(df)
 
-        # Price-based features
-        features['returns'] = df['Close'].pct_change()
-        features['log_returns'] = np.log(df['Close'] / df['Close'].shift(1))
-        features['high_low_ratio'] = df['High'] / df['Low']
-        features['close_open_ratio'] = df['Close'] / df['Open']
-        features['volume_change'] = df['Volume'].pct_change()
+            # Price-based features
+            features['returns'] = df['Close'].pct_change()
+            features['log_returns'] = np.log(df['Close'] / df['Close'].shift(1))
+            features['high_low_ratio'] = df['High'] / df['Low']
+            features['close_open_ratio'] = df['Close'] / df['Open']
+            features['volume_change'] = df['Volume'].pct_change()
 
-        # Lagged features (past N days)
-        for lag in [1, 2, 3, 5, 10]:
-            features[f'returns_lag_{lag}'] = features['returns'].shift(lag)
-            features[f'volume_lag_{lag}'] = features['volume_change'].shift(lag)
+            # Lagged features (past N days)
+            for lag in [1, 2, 3, 5, 10]:
+                features[f'returns_lag_{lag}'] = features['returns'].shift(lag)
+                features[f'volume_lag_{lag}'] = features['volume_change'].shift(lag)
 
-        # Rolling statistics
-        for window in [5, 10, 20]:
-            features[f'returns_mean_{window}'] = features['returns'].rolling(window).mean()
-            features[f'returns_std_{window}'] = features['returns'].rolling(window).std()
-            features[f'volume_mean_{window}'] = features['Volume'].rolling(window).mean()
+            # Rolling statistics
+            for window in [5, 10, 20]:
+                features[f'returns_mean_{window}'] = features['returns'].rolling(window).mean()
+                features[f'returns_std_{window}'] = features['returns'].rolling(window).std()
+                features[f'volume_mean_{window}'] = features['Volume'].rolling(window).mean()
 
-        return features
+            return features
+
+        except Exception as e:
+            print(f"Error calculating indicators: {str(e)}")
+            # Return basic features on error
+            features = df.copy()
+            features['returns'] = df['Close'].pct_change()
+            features['high_low_ratio'] = df['High'] / df['Low']
+            features['close_open_ratio'] = df['Close'] / df['Open']
+            features['volume_change'] = df['Volume'].pct_change()
+            return features
 
     def prepare_target(self, df: pd.DataFrame, horizon: int = 1) -> pd.Series:
         """
