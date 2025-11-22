@@ -26,6 +26,10 @@ st.set_page_config(
 # For local: Use localhost
 API_BASE_URL = os.getenv("API_BASE_URL", st.secrets.get("API_BASE_URL", "http://localhost:8000"))
 
+# Initialize session state for persistent values across page navigations
+if 'tickers' not in st.session_state:
+    st.session_state.tickers = "SPY,QQQ,AAPL"
+
 # Custom CSS
 st.markdown("""
 <style>
@@ -499,7 +503,7 @@ elif page == "Generate Strategies":
         with col1:
             tickers_input = st.text_input(
                 "Tickers (comma-separated)",
-                value="AAPL, MSFT, GOOGL, TSLA, NVDA",
+                value=st.session_state.tickers,
                 help="Enter stock tickers separated by commas"
             )
 
@@ -526,8 +530,9 @@ elif page == "Generate Strategies":
         submitted = st.form_submit_button("🚀 Generate Strategies", use_container_width=True)
 
         if submitted:
-            # Parse tickers
+            # Parse tickers and save to session state
             tickers = [t.strip().upper() for t in tickers_input.split(",")]
+            st.session_state.tickers = tickers_input  # Save for persistence
 
             with st.spinner("Generating AI strategies... This may take a minute."):
                 # Make API request
@@ -1149,7 +1154,7 @@ elif page == "🤖 Autonomous Agent":
             with st.form("start_agent_form"):
                 tickers_input = st.text_input(
                     "Tickers (comma-separated)",
-                    value="SPY,QQQ,AAPL",
+                    value=st.session_state.tickers,
                     help="Which stocks to focus on"
                 )
 
@@ -1187,6 +1192,7 @@ elif page == "🤖 Autonomous Agent":
 
                 if start_button:
                     tickers = [t.strip().upper() for t in tickers_input.split(",")]
+                    st.session_state.tickers = tickers_input  # Save for persistence
 
                     with st.spinner("Starting autonomous agent..."):
                         response = make_api_request(
