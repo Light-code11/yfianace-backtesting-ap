@@ -743,7 +743,8 @@ async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
 
 class AutonomousAgentConfig(BaseModel):
     tickers: List[str] = ['SPY', 'QQQ', 'AAPL']
-    interval_hours: int = 6
+    interval_hours: int = None
+    interval_minutes: int = None
     strategies_per_cycle: int = 3
 
 
@@ -758,9 +759,10 @@ async def start_autonomous_learning(config: AutonomousAgentConfig):
             "message": "Autonomous learning agent is already running"
         }
 
-    # Create agent
+    # Create agent with either minutes or hours
     autonomous_agent = AutonomousLearningAgent(
         tickers=config.tickers,
+        learning_interval_minutes=config.interval_minutes,
         learning_interval_hours=config.interval_hours,
         strategies_per_cycle=config.strategies_per_cycle,
         min_quality_score=60.0
@@ -779,8 +781,29 @@ async def start_autonomous_learning(config: AutonomousAgentConfig):
         "config": {
             "tickers": config.tickers,
             "interval_hours": config.interval_hours,
+            "interval_minutes": config.interval_minutes,
             "strategies_per_cycle": config.strategies_per_cycle
         }
+    }
+
+
+@app.post("/autonomous/stop")
+async def stop_autonomous_learning():
+    """Stop the autonomous learning agent"""
+    global autonomous_agent, autonomous_agent_thread
+
+    if not autonomous_agent or not autonomous_agent_thread or not autonomous_agent_thread.is_alive():
+        return {
+            "success": False,
+            "message": "Autonomous learning agent is not running"
+        }
+
+    # Signal the agent to stop
+    autonomous_agent.stop()
+
+    return {
+        "success": True,
+        "message": "Stop signal sent to autonomous learning agent. It will stop after the current cycle."
     }
 
 

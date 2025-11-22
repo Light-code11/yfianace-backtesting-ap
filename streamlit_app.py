@@ -1006,13 +1006,35 @@ elif page == "🤖 Autonomous Agent":
                     help="Which stocks to focus on"
                 )
 
-                interval_hours = st.slider(
-                    "Learning Interval (hours)",
-                    min_value=1,
-                    max_value=24,
-                    value=6,
-                    help="How often to run learning cycles"
+                # Interval type selection
+                interval_type = st.radio(
+                    "Interval Type",
+                    ["Hours", "Minutes"],
+                    horizontal=True,
+                    help="Choose whether to set interval in hours or minutes"
                 )
+
+                # Show appropriate slider based on selection
+                if interval_type == "Hours":
+                    interval_hours = st.slider(
+                        "Learning Interval (hours)",
+                        min_value=1,
+                        max_value=24,
+                        value=6,
+                        help="How often to run learning cycles"
+                    )
+                    interval_minutes = None
+                    interval_display = f"{interval_hours} hours"
+                else:
+                    interval_minutes = st.slider(
+                        "Learning Interval (minutes)",
+                        min_value=1,
+                        max_value=120,
+                        value=30,
+                        help="How often to run learning cycles (1-120 minutes)"
+                    )
+                    interval_hours = None
+                    interval_display = f"{interval_minutes} minutes"
 
                 strategies_per_cycle = st.slider(
                     "Strategies Per Cycle",
@@ -1034,13 +1056,14 @@ elif page == "🤖 Autonomous Agent":
                             data={
                                 "tickers": tickers,
                                 "interval_hours": interval_hours,
+                                "interval_minutes": interval_minutes,
                                 "strategies_per_cycle": strategies_per_cycle
                             }
                         )
 
                         if response and response.get('success'):
                             st.success(f"✅ {response['message']}")
-                            st.info(f"Agent will run every {interval_hours} hours, generating {strategies_per_cycle} strategies per cycle")
+                            st.info(f"Agent will run every {interval_display}, generating {strategies_per_cycle} strategies per cycle")
                             st.rerun()
                         elif response:
                             st.error(f"❌ {response.get('message', 'Failed to start agent')}")
@@ -1048,10 +1071,28 @@ elif page == "🤖 Autonomous Agent":
                             st.error("❌ Failed to start agent - no response from server")
 
         with col2:
-            # Manual trigger
+            # Manual Controls
             st.write("**Manual Controls**")
-            st.write("Trigger one learning cycle manually")
 
+            # Stop Agent button
+            if st.button("⏹️ Stop Agent", use_container_width=True, type="secondary"):
+                with st.spinner("Stopping autonomous agent..."):
+                    response = make_api_request("/autonomous/stop", method="POST")
+
+                    if response and response.get('success'):
+                        st.success("✅ " + response['message'])
+                        st.info("The agent will finish its current cycle and then stop.")
+                        time.sleep(2)
+                        st.rerun()
+                    elif response:
+                        st.warning(f"⚠️ {response.get('message', 'Agent is not running')}")
+                    else:
+                        st.error("❌ Failed to stop agent - no response from server")
+
+            st.write("")  # Spacer
+
+            # Trigger cycle button
+            st.write("Trigger one learning cycle manually")
             if st.button("⚡ Trigger One Cycle Now", use_container_width=True):
                 with st.spinner("Running learning cycle..."):
                     response = make_api_request("/autonomous/trigger", method="POST")

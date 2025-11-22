@@ -25,7 +25,8 @@ class AutonomousLearningAgent:
 
     def __init__(self,
                  tickers: List[str] = None,
-                 learning_interval_hours: int = 6,
+                 learning_interval_minutes: int = None,
+                 learning_interval_hours: int = None,
                  strategies_per_cycle: int = 3,
                  min_quality_score: float = 60.0):
         """
@@ -33,20 +34,34 @@ class AutonomousLearningAgent:
 
         Args:
             tickers: List of tickers to focus on (default: ['SPY', 'QQQ', 'AAPL'])
-            learning_interval_hours: How often to run learning cycle
+            learning_interval_minutes: How often to run learning cycle (in minutes)
+            learning_interval_hours: How often to run learning cycle (in hours)
             strategies_per_cycle: Number of strategies to generate each cycle
             min_quality_score: Minimum quality score to keep a strategy
         """
         self.tickers = tickers or ['SPY', 'QQQ', 'AAPL']
-        self.learning_interval_hours = learning_interval_hours
+
+        # Support both minutes and hours, prioritize minutes if provided
+        if learning_interval_minutes is not None:
+            self.interval_seconds = learning_interval_minutes * 60
+            self.interval_display = f"{learning_interval_minutes} minutes"
+        elif learning_interval_hours is not None:
+            self.interval_seconds = learning_interval_hours * 3600
+            self.interval_display = f"{learning_interval_hours} hours"
+        else:
+            # Default to 6 hours
+            self.interval_seconds = 6 * 3600
+            self.interval_display = "6 hours"
+
         self.strategies_per_cycle = strategies_per_cycle
         self.min_quality_score = min_quality_score
         self.ai_generator = AIStrategyGenerator()
         self.backtest_engine = BacktestingEngine()
+        self.should_stop = False  # Flag to stop the agent
 
         logger.info(f"Autonomous Learning Agent initialized")
         logger.info(f"Tickers: {self.tickers}")
-        logger.info(f"Learning interval: {learning_interval_hours} hours")
+        logger.info(f"Learning interval: {self.interval_display}")
         logger.info(f"Strategies per cycle: {strategies_per_cycle}")
 
     def fetch_market_data(self, tickers: List[str], period: str = "1y"):
@@ -286,14 +301,19 @@ class AutonomousLearningAgent:
         finally:
             db.close()
 
+    def stop(self):
+        """Stop the learning agent"""
+        self.should_stop = True
+        logger.info("🛑 Stop signal received. Agent will stop after current cycle.")
+
     def run_forever(self):
         """Run the learning agent continuously"""
         logger.info("🤖 Autonomous Learning Agent started!")
-        logger.info(f"Will run learning cycle every {self.learning_interval_hours} hours")
+        logger.info(f"Will run learning cycle every {self.interval_display}")
 
         cycle_count = 0
 
-        while True:
+        while not self.should_stop:
             try:
                 cycle_count += 1
                 logger.info(f"\n{'='*60}")
@@ -302,11 +322,19 @@ class AutonomousLearningAgent:
 
                 self.learning_cycle()
 
-                # Wait for next cycle
-                logger.info(f"\n⏰ Next cycle in {self.learning_interval_hours} hours...")
-                logger.info(f"Next run at: {(datetime.now() + timedelta(hours=self.learning_interval_hours)).strftime('%Y-%m-%d %H:%M:%S')}")
+                if self.should_stop:
+                    break
 
-                time.sleep(self.learning_interval_hours * 3600)
+                # Wait for next cycle
+                logger.info(f"\n⏰ Next cycle in {self.interval_display}...")
+                logger.info(f"Next run at: {(datetime.now() + timedelta(seconds=self.interval_seconds)).strftime('%Y-%m-%d %H:%M:%S')}")
+
+                # Sleep in small intervals to check stop flag frequently
+                sleep_intervals = int(self.interval_seconds / 10)  # Check every 1/10th of interval
+                for _ in range(sleep_intervals):
+                    if self.should_stop:
+                        break
+                    time.sleep(10)
 
             except KeyboardInterrupt:
                 logger.info("\n🛑 Autonomous Learning Agent stopped by user")
@@ -315,6 +343,8 @@ class AutonomousLearningAgent:
                 logger.error(f"Unexpected error: {e}")
                 logger.info("Will retry in 1 hour...")
                 time.sleep(3600)
+
+        logger.info("🛑 Autonomous Learning Agent stopped.")
 
 
 if __name__ == "__main__":
