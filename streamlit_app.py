@@ -470,7 +470,7 @@ if page == "Dashboard":
             backtest_df = pd.DataFrame(backtest_data['results'])
             st.dataframe(
                 backtest_df[[
-                    'strategy_name', 'total_return_pct', 'sharpe_ratio',
+                    'strategy_name', 'total_trades', 'total_return_pct', 'sharpe_ratio',
                     'win_rate', 'max_drawdown_pct', 'quality_score'
                 ]],
                 use_container_width=True

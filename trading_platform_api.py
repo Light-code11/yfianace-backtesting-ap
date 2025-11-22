@@ -976,8 +976,10 @@ async def get_dashboard_analytics(db=Depends(get_db)):
     total_backtests = db.query(BacktestResult).count()
     paper_trades = db.query(PaperTrade).count()
 
-    # Best performing strategy
-    best_backtest = db.query(BacktestResult).order_by(BacktestResult.quality_score.desc()).first()
+    # Best performing strategy (exclude 0-trade strategies)
+    best_backtest = db.query(BacktestResult).filter(
+        BacktestResult.total_trades > 0
+    ).order_by(BacktestResult.quality_score.desc()).first()
 
     return {
         "summary": {
