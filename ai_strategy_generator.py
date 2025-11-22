@@ -12,7 +12,9 @@ import httpx
 
 class AIStrategyGenerator:
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        # Strip whitespace and newlines from API key (Railway adds these sometimes)
+        raw_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = raw_key.strip() if raw_key else None
 
         # Create HTTP client with proper timeout settings
         http_client = httpx.Client(

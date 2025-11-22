@@ -15,7 +15,14 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-print(f"DEBUG: OPENAI_API_KEY loaded: {os.getenv('OPENAI_API_KEY')[:20] if os.getenv('OPENAI_API_KEY') else 'NOT FOUND'}...")
+# Strip whitespace from API key (Railway sometimes adds trailing newlines)
+raw_api_key = os.getenv('OPENAI_API_KEY')
+if raw_api_key:
+    clean_api_key = raw_api_key.strip()
+    os.environ['OPENAI_API_KEY'] = clean_api_key
+    print(f"DEBUG: OPENAI_API_KEY loaded and cleaned: {clean_api_key[:20]}...")
+else:
+    print("DEBUG: OPENAI_API_KEY NOT FOUND")
 
 from database import (
     init_db, get_db, Strategy, BacktestResult, PaperTrade,
