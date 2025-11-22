@@ -577,7 +577,11 @@ async def list_backtest_results(
                 "max_drawdown_pct": r.max_drawdown_pct,
                 "total_trades": r.total_trades,
                 "quality_score": r.quality_score,
-                "created_at": r.created_at.isoformat()
+                "created_at": r.created_at.isoformat(),
+                # Kelly Criterion fields
+                "kelly_criterion": r.kelly_criterion,
+                "kelly_position_pct": r.kelly_position_pct,
+                "kelly_risk_level": r.kelly_risk_level
             }
             for r in results
         ]
@@ -613,7 +617,11 @@ async def get_backtest_result(backtest_id: int, db=Depends(get_db)):
             "profit_factor": result.profit_factor,
             "avg_win": result.avg_win,
             "avg_loss": result.avg_loss,
-            "quality_score": result.quality_score
+            "quality_score": result.quality_score,
+            # Kelly Criterion optimal position sizing
+            "kelly_criterion": result.kelly_criterion,
+            "kelly_position_pct": result.kelly_position_pct,
+            "kelly_risk_level": result.kelly_risk_level
         },
         "trades": result.trades,
         "equity_curve": result.equity_curve
