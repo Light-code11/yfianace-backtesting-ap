@@ -123,10 +123,11 @@ def fetch_market_data(tickers: List[str], period: str = "6mo") -> pd.DataFrame:
 async def root():
     return {
         "message": "AI Trading Platform API",
-        "version": "2.0.0",
+        "version": "2.1.0",  # Updated for Kelly Criterion
         "docs": "/docs",
         "features": {
             "ai_strategy_generation": "/strategies/generate",
+            "kelly_criterion_enabled": True,  # NEW FEATURE FLAG
             "backtesting": "/backtest",
             "paper_trading": "/paper-trading",
             "portfolio_optimization": "/portfolio/optimize",
