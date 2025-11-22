@@ -222,10 +222,17 @@ async def generate_strategies(
         saved_strategies = []
         for i, strategy in enumerate(strategies):
             print(f"DEBUG: Saving strategy {i+1}: {strategy.get('name', 'Unknown')}")
+
+            # Ensure tickers are set - use input tickers if AI didn't provide them
+            strategy_tickers = strategy.get('tickers', [])
+            if not strategy_tickers:
+                strategy_tickers = request.tickers
+                print(f"DEBUG: No tickers in AI response, using input tickers: {strategy_tickers}")
+
             db_strategy = Strategy(
                 name=strategy['name'],
                 description=strategy.get('description', ''),
-                tickers=strategy.get('tickers', []),
+                tickers=strategy_tickers,
                 entry_conditions=strategy.get('entry_conditions', {}),
                 exit_conditions=strategy.get('exit_conditions', {}),
                 stop_loss_pct=strategy.get('risk_management', {}).get('stop_loss_pct', 5.0),

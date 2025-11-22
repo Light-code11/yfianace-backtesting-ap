@@ -198,7 +198,7 @@ AI LEARNING INSIGHTS:
 {json.dumps(learning_insights, indent=2)}
 """
 
-        prompt += """
+        prompt += f"""
 REQUIREMENTS:
 Generate diverse strategies using different approaches:
 1. Momentum-based strategies
@@ -206,14 +206,16 @@ Generate diverse strategies using different approaches:
 3. Breakout strategies
 4. Trend following strategies
 
+IMPORTANT: Each strategy MUST use the tickers: {', '.join(tickers)}
+
 For EACH strategy, provide:
-{
+{{
   "strategies": [
-    {
+    {{
       "name": "Strategy name (descriptive)",
       "description": "Brief description of the strategy",
       "strategy_type": "momentum|mean_reversion|breakout|trend_following",
-      "tickers": ["AAPL", "MSFT"],
+      "tickers": {json.dumps(tickers)},
       "indicators": [
         {"name": "SMA", "period": 20},
         {"name": "RSI", "period": 14}
