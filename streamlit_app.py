@@ -1018,8 +1018,10 @@ elif page == "🤖 Autonomous Agent":
                             st.success(f"✅ {response['message']}")
                             st.info(f"Agent will run every {interval_hours} hours, generating {strategies_per_cycle} strategies per cycle")
                             st.rerun()
-                        else:
+                        elif response:
                             st.error(f"❌ {response.get('message', 'Failed to start agent')}")
+                        else:
+                            st.error("❌ Failed to start agent - no response from server")
 
         with col2:
             # Manual trigger
@@ -1032,8 +1034,10 @@ elif page == "🤖 Autonomous Agent":
 
                     if response and response.get('success'):
                         st.success("✅ Learning cycle started! Check status in a few minutes.")
+                    elif response:
+                        st.error(f"❌ {response.get('message', 'Failed to trigger cycle')}")
                     else:
-                        st.error("❌ Failed to trigger cycle")
+                        st.error("❌ Failed to trigger cycle - no response from server")
 
         st.markdown("---")
 

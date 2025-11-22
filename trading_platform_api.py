@@ -741,12 +741,14 @@ async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
 # AUTONOMOUS LEARNING ENDPOINTS
 # =======================
 
-@app.post("/autonomous/start")
-async def start_autonomous_learning(
-    tickers: List[str] = None,
-    interval_hours: int = 6,
+class AutonomousAgentConfig(BaseModel):
+    tickers: List[str] = ['SPY', 'QQQ', 'AAPL']
+    interval_hours: int = 6
     strategies_per_cycle: int = 3
-):
+
+
+@app.post("/autonomous/start")
+async def start_autonomous_learning(config: AutonomousAgentConfig):
     """Start the autonomous learning agent"""
     global autonomous_agent, autonomous_agent_thread
 
@@ -758,9 +760,9 @@ async def start_autonomous_learning(
 
     # Create agent
     autonomous_agent = AutonomousLearningAgent(
-        tickers=tickers or ['SPY', 'QQQ', 'AAPL'],
-        learning_interval_hours=interval_hours,
-        strategies_per_cycle=strategies_per_cycle,
+        tickers=config.tickers,
+        learning_interval_hours=config.interval_hours,
+        strategies_per_cycle=config.strategies_per_cycle,
         min_quality_score=60.0
     )
 
@@ -775,9 +777,9 @@ async def start_autonomous_learning(
         "success": True,
         "message": "Autonomous learning agent started successfully",
         "config": {
-            "tickers": tickers or ['SPY', 'QQQ', 'AAPL'],
-            "interval_hours": interval_hours,
-            "strategies_per_cycle": strategies_per_cycle
+            "tickers": config.tickers,
+            "interval_hours": config.interval_hours,
+            "strategies_per_cycle": config.strategies_per_cycle
         }
     }
 
