@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import json
 import os
 from dotenv import load_dotenv
@@ -34,6 +35,21 @@ from paper_trading import PaperTradingSimulator
 from portfolio_optimizer import PortfolioOptimizer
 from autonomous_learning import AutonomousLearningAgent
 import threading
+
+# Helper function to convert numpy types to Python types for PostgreSQL
+def convert_numpy_types(obj):
+    """Recursively convert numpy types to native Python types"""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: convert_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_numpy_types(item) for item in obj]
+    return obj
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -393,6 +409,11 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
         engine = BacktestingEngine(initial_capital=request.initial_capital)
         results = engine.backtest_strategy(strategy_config, market_data)
 
+        # Convert numpy types to Python types for PostgreSQL compatibility
+        trades_clean = convert_numpy_types(results['trades'])
+        equity_curve_clean = convert_numpy_types(results['equity_curve'])
+        metrics_clean = convert_numpy_types(results['metrics'])
+
         # Save backtest results
         backtest_result = BacktestResult(
             strategy_id=request.strategy_id,
@@ -401,20 +422,20 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
             end_date=datetime.now(),
             initial_capital=request.initial_capital,
             tickers_tested=results['tickers'],
-            total_return_pct=results['metrics']['total_return_pct'],
-            total_trades=results['metrics']['total_trades'],
-            winning_trades=results['metrics']['winning_trades'],
-            losing_trades=results['metrics']['losing_trades'],
-            win_rate=results['metrics']['win_rate'],
-            sharpe_ratio=results['metrics']['sharpe_ratio'],
-            sortino_ratio=results['metrics']['sortino_ratio'],
-            max_drawdown_pct=results['metrics']['max_drawdown_pct'],
-            profit_factor=results['metrics']['profit_factor'],
-            avg_win=results['metrics']['avg_win'],
-            avg_loss=results['metrics']['avg_loss'],
-            trades=results['trades'],
-            equity_curve=results['equity_curve'],
-            quality_score=results['metrics']['quality_score']
+            total_return_pct=metrics_clean['total_return_pct'],
+            total_trades=metrics_clean['total_trades'],
+            winning_trades=metrics_clean['winning_trades'],
+            losing_trades=metrics_clean['losing_trades'],
+            win_rate=metrics_clean['win_rate'],
+            sharpe_ratio=metrics_clean['sharpe_ratio'],
+            sortino_ratio=metrics_clean['sortino_ratio'],
+            max_drawdown_pct=metrics_clean['max_drawdown_pct'],
+            profit_factor=metrics_clean['profit_factor'],
+            avg_win=metrics_clean['avg_win'],
+            avg_loss=metrics_clean['avg_loss'],
+            trades=trades_clean,
+            equity_curve=equity_curve_clean,
+            quality_score=metrics_clean['quality_score']
         )
         db.add(backtest_result)
         db.commit()
