@@ -36,6 +36,7 @@ from portfolio_optimizer import PortfolioOptimizer
 from advanced_portfolio_optimizer import AdvancedPortfolioOptimizer
 from autonomous_learning import AutonomousLearningAgent
 from strategy_visualizer import StrategyVisualizer
+from ml_price_predictor import MLPricePredictor
 import threading
 
 # Helper function to convert numpy types to Python types for PostgreSQL
@@ -927,6 +928,124 @@ async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
             for l in learnings
         ]
     }
+
+
+# =======================
+# ML PREDICTION ENDPOINTS
+# =======================
+
+class MLTrainingRequest(BaseModel):
+    ticker: str
+    period: str = "2y"  # Historical data period
+    test_size: float = 0.2  # Fraction for testing
+    horizon: int = 1  # Days ahead to predict
+
+
+@app.post("/ml/train")
+async def train_ml_model(request: MLTrainingRequest):
+    """
+    Train XGBoost model to predict price movements
+
+    Args:
+        ticker: Stock ticker symbol
+        period: Historical data period (default 2 years)
+        test_size: Fraction of data for testing (default 0.2)
+        horizon: Days ahead to predict (default 1)
+
+    Returns:
+        Training results with model performance metrics
+    """
+    try:
+        predictor = MLPricePredictor()
+
+        # Train model
+        result = predictor.train_model(
+            ticker=request.ticker,
+            period=request.period,
+            test_size=request.test_size,
+            horizon=request.horizon
+        )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ml/predict/{ticker}")
+async def get_ml_prediction(ticker: str):
+    """
+    Get ML prediction for next-day price movement
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        Prediction with confidence scores
+    """
+    try:
+        predictor = MLPricePredictor()
+
+        # Get prediction
+        result = predictor.predict(ticker, return_proba=True)
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ml/models")
+async def list_ml_models():
+    """
+    List all trained ML models
+
+    Returns:
+        List of trained models with metadata
+    """
+    try:
+        predictor = MLPricePredictor()
+        models = predictor.list_models()
+
+        return {
+            "success": True,
+            "models": models,
+            "count": len(models)
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/ml/model/{ticker}")
+async def delete_ml_model(ticker: str):
+    """
+    Delete a trained ML model
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        Success status
+    """
+    try:
+        predictor = MLPricePredictor()
+        model_path = predictor.model_dir / f"{ticker}_model.pkl"
+
+        if model_path.exists():
+            model_path.unlink()
+            return {
+                "success": True,
+                "message": f"Model for {ticker} deleted successfully"
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"No model found for {ticker}"
+            }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =======================

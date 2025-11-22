@@ -373,7 +373,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -1264,6 +1264,316 @@ elif page == "Portfolio Optimizer":
         - Go to the **Generate Strategies** page to create strategies manually
         - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
         """)
+
+
+# =======================
+# ML PREDICTIONS PAGE
+# =======================
+
+elif page == "🤖 ML Predictions":
+    st.markdown('<div class="main-header">🤖 Machine Learning Price Predictions</div>', unsafe_allow_html=True)
+
+    st.write("""
+    **Train XGBoost models** to predict next-day price movements using 50+ technical indicators.
+
+    **How it works:**
+    - 📊 Trains on historical price data + technical indicators
+    - 🎯 Predicts UP or DOWN for next trading day
+    - 📈 Provides confidence scores for each prediction
+    - 🔍 Shows which features matter most (feature importance)
+    """)
+
+    tab1, tab2, tab3 = st.tabs(["📚 Train Model", "🔮 Get Predictions", "📊 Trained Models"])
+
+    # =======================
+    # TAB 1: TRAIN MODEL
+    # =======================
+    with tab1:
+        st.subheader("Train ML Model")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            train_ticker = st.text_input(
+                "Ticker Symbol",
+                value="NVDA",
+                help="Stock ticker to train model on"
+            ).upper()
+
+        with col2:
+            train_period = st.selectbox(
+                "Training Period",
+                ["1y", "2y", "3y", "5y"],
+                index=1,
+                help="More data = better model, but slower training"
+            )
+
+        with col3:
+            test_size = st.slider(
+                "Test Set Size (%)",
+                min_value=10,
+                max_value=40,
+                value=20,
+                step=5,
+                help="% of data reserved for testing model performance"
+            )
+
+        st.markdown("---")
+
+        if st.button("🚀 Train Model", use_container_width=True):
+            with st.spinner(f"Training XGBoost model for {train_ticker}... This may take 30-60 seconds..."):
+                response = make_api_request(
+                    "/ml/train",
+                    method="POST",
+                    data={
+                        "ticker": train_ticker,
+                        "period": train_period,
+                        "test_size": test_size / 100,
+                        "horizon": 1
+                    }
+                )
+
+                if response and response.get('success'):
+                    st.success(f"✅ Model trained successfully for {train_ticker}!")
+
+                    # Display metrics
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("### 📊 Training Metrics")
+                        train_metrics = response['train_metrics']
+                        st.metric("Accuracy", f"{train_metrics['accuracy'] * 100:.1f}%")
+                        st.metric("Precision", f"{train_metrics['precision'] * 100:.1f}%")
+                        st.metric("Recall", f"{train_metrics['recall'] * 100:.1f}%")
+                        st.metric("F1 Score", f"{train_metrics['f1_score']:.3f}")
+                        if train_metrics['roc_auc'] > 0:
+                            st.metric("ROC AUC", f"{train_metrics['roc_auc']:.3f}")
+
+                    with col2:
+                        st.markdown("### 🎯 Test Metrics (Out-of-Sample)")
+                        test_metrics = response['test_metrics']
+                        st.metric("Accuracy", f"{test_metrics['accuracy'] * 100:.1f}%")
+                        st.metric("Precision", f"{test_metrics['precision'] * 100:.1f}%")
+                        st.metric("Recall", f"{test_metrics['recall'] * 100:.1f}%")
+                        st.metric("F1 Score", f"{test_metrics['f1_score']:.3f}")
+                        if test_metrics['roc_auc'] > 0:
+                            st.metric("ROC AUC", f"{test_metrics['roc_auc']:.3f}")
+
+                    # Dataset info
+                    st.markdown("### 📈 Dataset Information")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Samples", response['samples']['total'])
+                    with col2:
+                        st.metric("Training Samples", response['samples']['train'])
+                    with col3:
+                        st.metric("Test Samples", response['samples']['test'])
+
+                    # Class balance
+                    st.markdown("### ⚖️ Class Balance")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Train: UP days", f"{response['class_balance']['train_positive_pct']:.1f}%")
+                    with col2:
+                        st.metric("Test: UP days", f"{response['class_balance']['test_positive_pct']:.1f}%")
+
+                    # Feature importance
+                    st.markdown("### 🔍 Top 10 Most Important Features")
+                    features_df = pd.DataFrame(response['top_features'])
+
+                    import plotly.express as px
+                    fig = px.bar(
+                        features_df,
+                        x='importance',
+                        y='feature',
+                        orientation='h',
+                        title="Feature Importance",
+                        labels={'importance': 'Importance Score', 'feature': 'Feature'}
+                    )
+                    fig.update_layout(height=400, yaxis={'categoryorder':'total ascending'})
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Interpretation guide
+                    with st.expander("ℹ️ How to interpret these metrics"):
+                        st.markdown("""
+                        **Accuracy**: % of correct predictions (UP vs DOWN)
+                        - 50% = random guessing
+                        - 60%+ = decent model
+                        - 70%+ = strong model
+
+                        **Precision**: When model says UP, how often is it right?
+                        - Higher = fewer false positives
+
+                        **Recall**: Of all actual UP days, how many did model catch?
+                        - Higher = fewer missed opportunities
+
+                        **F1 Score**: Balanced metric (0.0-1.0, higher is better)
+
+                        **ROC AUC**: Overall classifier quality (0.5-1.0)
+                        - 0.5 = random
+                        - 0.7+ = good
+                        - 0.8+ = excellent
+
+                        **⚠️ Important**: Test metrics matter more than train metrics!
+                        - If train accuracy >> test accuracy → overfitting (model memorized training data)
+                        - Look for test accuracy 55%+ to beat random chance
+                        """)
+
+                elif response:
+                    st.error(f"❌ Training failed: {response.get('error', 'Unknown error')}")
+                else:
+                    st.error("❌ Failed to connect to API")
+
+    # =======================
+    # TAB 2: GET PREDICTIONS
+    # =======================
+    with tab2:
+        st.subheader("Get Price Prediction")
+
+        predict_ticker = st.text_input(
+            "Ticker Symbol for Prediction",
+            value="NVDA",
+            help="Must have a trained model for this ticker"
+        ).upper()
+
+        if st.button("🔮 Get Prediction", use_container_width=True):
+            with st.spinner(f"Getting prediction for {predict_ticker}..."):
+                response = make_api_request(f"/ml/predict/{predict_ticker}")
+
+                if response and response.get('success'):
+                    st.success("✅ Prediction generated!")
+
+                    # Main prediction
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        st.metric("Current Price", f"${response['current_price']:.2f}")
+
+                    with col2:
+                        prediction = response['prediction']
+                        delta_color = "normal" if prediction == "UP" else "inverse"
+                        st.metric("Prediction", prediction, delta=prediction)
+
+                    with col3:
+                        confidence = response['confidence']['confidence_score']
+                        st.metric("Confidence", f"{confidence * 100:.1f}%")
+
+                    # Probability breakdown
+                    st.markdown("### 📊 Probability Breakdown")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        up_prob = response['confidence']['up_probability']
+                        st.metric("UP Probability", f"{up_prob * 100:.1f}%")
+
+                    with col2:
+                        down_prob = response['confidence']['down_probability']
+                        st.metric("DOWN Probability", f"{down_prob * 100:.1f}%")
+
+                    # Visual gauge
+                    import plotly.graph_objects as go
+
+                    fig = go.Figure(go.Indicator(
+                        mode = "gauge+number+delta",
+                        value = up_prob * 100,
+                        domain = {'x': [0, 1], 'y': [0, 1]},
+                        title = {'text': "UP Probability"},
+                        delta = {'reference': 50},
+                        gauge = {
+                            'axis': {'range': [None, 100]},
+                            'bar': {'color': "green" if up_prob > 0.5 else "red"},
+                            'steps' : [
+                                {'range': [0, 50], 'color': "lightgray"},
+                                {'range': [50, 100], 'color': "lightgreen"}
+                            ],
+                            'threshold': {
+                                'line': {'color': "black", 'width': 4},
+                                'thickness': 0.75,
+                                'value': 50
+                            }
+                        }
+                    ))
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Trading recommendation
+                    st.markdown("### 💡 Trading Recommendation")
+                    if confidence > 0.7:
+                        if prediction == "UP":
+                            st.success(f"🟢 **STRONG BUY SIGNAL** - Model predicts UP with {confidence*100:.1f}% confidence")
+                        else:
+                            st.error(f"🔴 **STRONG SELL SIGNAL** - Model predicts DOWN with {confidence*100:.1f}% confidence")
+                    elif confidence > 0.6:
+                        if prediction == "UP":
+                            st.info(f"🟡 **MODERATE BUY** - Model predicts UP with {confidence*100:.1f}% confidence")
+                        else:
+                            st.warning(f"🟡 **MODERATE SELL** - Model predicts DOWN with {confidence*100:.1f}% confidence")
+                    else:
+                        st.warning(f"⚪ **LOW CONFIDENCE** - Prediction: {prediction} ({confidence*100:.1f}%). Consider waiting for higher confidence.")
+
+                    st.info("""
+                    **⚠️ Disclaimer**: ML predictions are not guarantees. Always:
+                    - Use proper position sizing (Kelly Criterion)
+                    - Set stop losses
+                    - Diversify across strategies
+                    - Only trade with capital you can afford to lose
+                    """)
+
+                elif response:
+                    st.error(f"❌ Prediction failed: {response.get('error', 'Unknown error')}")
+                    st.info("💡 Make sure you've trained a model for this ticker first (use the 'Train Model' tab)")
+                else:
+                    st.error("❌ Failed to connect to API")
+
+    # =======================
+    # TAB 3: TRAINED MODELS
+    # =======================
+    with tab3:
+        st.subheader("Trained Models")
+
+        response = make_api_request("/ml/models")
+
+        if response and response.get('success'):
+            models = response.get('models', [])
+
+            if models:
+                st.write(f"**{len(models)} trained models found**")
+
+                # Create DataFrame
+                models_df = pd.DataFrame(models)
+                models_df['trained_at'] = pd.to_datetime(models_df['trained_at']).dt.strftime('%Y-%m-%d %H:%M')
+
+                # Display as table
+                st.dataframe(
+                    models_df[['ticker', 'horizon', 'features_count', 'trained_at']],
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                # Delete model option
+                st.markdown("---")
+                st.subheader("Delete Model")
+
+                ticker_to_delete = st.selectbox(
+                    "Select model to delete",
+                    options=[m['ticker'] for m in models]
+                )
+
+                if st.button(f"🗑️ Delete {ticker_to_delete} model", use_container_width=True):
+                    response = make_api_request(
+                        f"/ml/model/{ticker_to_delete}",
+                        method="DELETE"
+                    )
+
+                    if response and response.get('success'):
+                        st.success(f"✅ {response['message']}")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {response.get('error', 'Delete failed')}")
+            else:
+                st.info("📋 No trained models yet. Train your first model in the 'Train Model' tab!")
+        else:
+            st.error("❌ Failed to load models")
 
 
 # =======================
