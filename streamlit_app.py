@@ -1105,15 +1105,23 @@ elif page == "Paper Trading":
 # =======================
 
 elif page == "Portfolio Optimizer":
-    st.markdown('<div class="main-header">💼 Portfolio Optimizer</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">💼 Advanced Portfolio Optimizer</div>', unsafe_allow_html=True)
 
-    st.write("Optimize capital allocation across multiple strategies.")
+    st.write("""
+    **Optimize capital allocation** across multiple strategies using advanced mathematical optimization.
+
+    Instead of picking one strategy, combine multiple strategies for:
+    - 📈 Better risk-adjusted returns (higher Sharpe ratio)
+    - 📉 Lower volatility through diversification
+    - 🛡️ Reduced drawdowns when strategies are uncorrelated
+    """)
 
     # Get strategies with backtest results
     strategies_data = make_api_request("/strategies")
 
     if strategies_data and strategies_data.get('strategies'):
-        st.subheader("Select Strategies to Include")
+        st.markdown("---")
+        st.subheader("🎯 Step 1: Select Strategies")
 
         # Multi-select for strategies
         # Format: "NVDA, AAPL - Strategy Name"
@@ -1129,34 +1137,79 @@ elif page == "Portfolio Optimizer":
             format_strategy_name_simple(s): s['id']
             for s in strategies_data['strategies']
         }
-        selected_strategies = st.multiselect(
-            "Strategies",
-            options=list(strategy_options.keys()),
-            default=list(strategy_options.keys())[:3] if len(strategy_options) >= 3 else list(strategy_options.keys())
-        )
 
-        col1, col2 = st.columns(2)
-
-        with col1:
-            total_capital = st.number_input(
-                "Total Capital ($)",
-                min_value=1000,
-                max_value=10000000,
-                value=100000,
-                step=10000
+        if len(strategy_options) < 2:
+            st.warning("⚠️ Need at least 2 strategies with backtest results for portfolio optimization.")
+            st.info("Go to **Backtest** page to create backtest results for your strategies.")
+        else:
+            selected_strategies = st.multiselect(
+                "Select 2-5 strategies to combine (choose strategies with different types for better diversification)",
+                options=list(strategy_options.keys()),
+                default=list(strategy_options.keys())[:min(3, len(strategy_options))],
+                help="Tip: Mix different strategy types (momentum + mean reversion + breakout) for lower correlation"
             )
 
-        with col2:
-            optimization_method = st.selectbox(
-                "Optimization Method",
-                ["sharpe", "min_variance", "max_return", "risk_parity"],
-                format_func=lambda x: {
-                    "sharpe": "Maximize Sharpe Ratio",
-                    "min_variance": "Minimize Variance",
-                    "max_return": "Maximize Return",
-                    "risk_parity": "Risk Parity"
-                }[x]
-            )
+            st.markdown("---")
+            st.subheader("⚙️ Step 2: Configure Optimization")
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                total_capital = st.number_input(
+                    "Total Capital ($)",
+                    min_value=1000,
+                    max_value=10000000,
+                    value=100000,
+                    step=10000,
+                    help="Total capital to allocate across selected strategies"
+                )
+
+            with col2:
+                optimization_method = st.selectbox(
+                    "Optimization Method",
+                    ["max_sharpe", "min_volatility", "max_return", "risk_parity"],
+                    format_func=lambda x: {
+                        "max_sharpe": "🏆 Maximize Sharpe Ratio",
+                        "min_volatility": "🛡️ Minimize Risk",
+                        "max_return": "📈 Maximize Returns",
+                        "risk_parity": "⚖️ Risk Parity"
+                    }[x],
+                    help="max_sharpe = best risk-adjusted returns (recommended)"
+                )
+
+            with col3:
+                max_allocation = st.slider(
+                    "Max Allocation per Strategy",
+                    min_value=10,
+                    max_value=100,
+                    value=40,
+                    step=5,
+                    help="Maximum % of capital in any single strategy (prevents over-concentration)"
+                )
+
+            # Method explanation
+            with st.expander("ℹ️ What do these optimization methods do?"):
+                st.markdown("""
+                **🏆 Maximize Sharpe Ratio** (Recommended)
+                - Best risk-adjusted returns
+                - Balances return vs volatility
+                - Good for most portfolios
+
+                **🛡️ Minimize Volatility**
+                - Lowest risk portfolio
+                - Favors stable, low-volatility strategies
+                - Good for conservative investors
+
+                **📈 Maximize Returns**
+                - Highest expected returns
+                - May have higher volatility
+                - Good for aggressive investors
+
+                **⚖️ Risk Parity**
+                - Equal risk contribution from each strategy
+                - Balanced approach
+                - Good when all strategies are quality
+                """)
 
         if st.button("🎯 Optimize Portfolio", use_container_width=True):
             if not selected_strategies:
@@ -1171,7 +1224,10 @@ elif page == "Portfolio Optimizer":
                         data={
                             "strategy_ids": strategy_ids,
                             "total_capital": total_capital,
-                            "method": optimization_method
+                            "method": optimization_method,
+                            "constraints": {
+                                "max_allocation": max_allocation / 100  # Convert % to decimal
+                            }
                         }
                     )
 

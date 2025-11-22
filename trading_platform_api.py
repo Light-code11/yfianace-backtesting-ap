@@ -33,6 +33,7 @@ from ai_strategy_generator import AIStrategyGenerator
 from backtesting_engine import BacktestingEngine
 from paper_trading import PaperTradingSimulator
 from portfolio_optimizer import PortfolioOptimizer
+from advanced_portfolio_optimizer import AdvancedPortfolioOptimizer
 from autonomous_learning import AutonomousLearningAgent
 from strategy_visualizer import StrategyVisualizer
 import threading
@@ -756,9 +757,17 @@ async def get_paper_trading_positions(db=Depends(get_db)):
 
 @app.post("/portfolio/optimize")
 async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(get_db)):
-    """Optimize portfolio allocation across strategies"""
+    """
+    Optimize portfolio allocation across strategies using advanced optimization
+
+    Supports:
+    - max_sharpe: Maximize Sharpe ratio (best risk-adjusted returns)
+    - min_volatility: Minimize portfolio risk
+    - max_return: Maximize returns
+    - risk_parity: Equal risk contribution from each strategy
+    """
     try:
-        # Get strategies
+        # Get strategies and backtest results
         strategies = []
         backtest_results = []
 
@@ -788,18 +797,23 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
                 "sharpe_ratio": backtest.sharpe_ratio
             })
 
-        if not strategies:
-            raise HTTPException(status_code=400, detail="No valid strategies with backtest results found")
+        if len(strategies) < 2:
+            return {"success": False, "error": "Need at least 2 strategies with backtest results"}
 
-        # Optimize
-        optimizer = PortfolioOptimizer()
-        optimization_result = optimizer.optimize_allocations(
+        # Use advanced optimizer
+        optimizer = AdvancedPortfolioOptimizer(risk_free_rate=0.02)
+
+        # Run optimization
+        optimization_result = optimizer.optimize_portfolio(
             strategies=strategies,
             backtest_results=backtest_results,
             total_capital=request.total_capital,
             method=request.method,
-            constraints=request.constraints
+            constraints=request.constraints or {}
         )
+
+        if not optimization_result.get('success'):
+            return optimization_result  # Return error from optimizer
 
         # Save optimization
         portfolio = PortfolioAllocation(

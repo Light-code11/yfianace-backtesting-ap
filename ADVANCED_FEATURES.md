@@ -70,16 +70,27 @@
 
 **Impact**: HIGH - AI strategies are now 50%+ more sophisticated
 
-### 3. Portfolio Optimization
-**Status**: Library installed, integration pending
+### 3. Portfolio Optimization ✅
+**Status**: DEPLOYED - Advanced portfolio optimizer now live!
 
-**What's coming**:
-- Combine top 5 strategies into one optimized portfolio
-- Markowitz optimization (maximize Sharpe, minimize variance)
-- Risk Parity allocation
-- Backtesting of portfolio vs individual strategies
+**What it does**:
+- Combines multiple strategies into one optimized portfolio
+- 4 optimization methods:
+  - **Max Sharpe**: Best risk-adjusted returns (recommended)
+  - **Min Volatility**: Lowest risk portfolio
+  - **Max Return**: Highest expected returns
+  - **Risk Parity**: Equal risk contribution from each strategy
+- Constraint controls: Max allocation per strategy (prevents over-concentration)
+- Uses PyPortfolioOpt for advanced math (with scipy fallback)
 
-**Impact**: HIGH - Reduces risk through diversification
+**What changed**:
+- Portfolio Optimizer page in Streamlit UI
+- API endpoint: POST /portfolio/optimize
+- Shows expected return, volatility, and Sharpe ratio
+- Pie chart visualization of capital allocation
+- Detailed breakdown by strategy with performance metrics
+
+**Impact**: HIGH - Reduces risk through diversification, better risk-adjusted returns
 
 ### 4. Machine Learning Price Prediction
 **Status**: Library installed, model training pending
@@ -212,10 +223,10 @@ Based on quantitative finance research:
 | Kelly Criterion | ✅ Deployed | HIGH | Done |
 | Technical Indicators (35+) | ✅ Deployed | HIGH | Done |
 | Strategy Visualization | ✅ Deployed | HIGH | Done |
-| Portfolio Optimization | 📦 Ready | HIGH | Next |
-| ML Price Prediction | 📦 Ready | MEDIUM | Week 2 |
+| Portfolio Optimization | ✅ Deployed | HIGH | Done |
+| ML Price Prediction | 📦 Ready | MEDIUM | Next |
 | Advanced Risk Metrics | 📦 Ready | MEDIUM | Week 2 |
-| HMM Regime Detection | 📦 Ready | MEDIUM | Week 3 |
+| HMM Regime Detection | 📦 Ready | MEDIUM | Week 2 |
 | Vectorized Backtesting | 📦 Ready | LOW | Week 3 |
 
 ## 💡 How to Use Kelly Criterion (Available Now!)
@@ -241,21 +252,62 @@ After backtesting, check the new fields:
 - Quarter Kelly (what we use) reduces risk of ruin
 - If a strategy shows > 15% Kelly position, we cap it at 15%
 
+## 💼 How to Use Portfolio Optimization (Available Now!)
+
+1. **Create Multiple Strategies**:
+   - Generate 3-5 strategies with different approaches (momentum, mean reversion, breakout)
+   - Different strategy types = lower correlation = better diversification
+
+2. **Backtest All Strategies**:
+   - Run backtests on each strategy
+   - Look for strategies with positive returns and good Sharpe ratios
+
+3. **Go to Portfolio Optimizer Page**:
+   - Select 2-5 strategies to combine
+   - Set total capital to allocate
+   - Choose optimization method:
+     - **Max Sharpe** (recommended): Best risk-adjusted returns
+     - **Min Volatility**: Conservative, lowest risk
+     - **Max Return**: Aggressive, highest returns
+     - **Risk Parity**: Balanced approach
+   - Set max allocation (default 40%) to prevent over-concentration
+
+4. **Review Results**:
+   - Expected annual return, volatility, and Sharpe ratio
+   - Capital allocation breakdown by strategy
+   - Compare portfolio metrics vs individual strategies
+
+**Why This Matters**:
+- Single strategy: All your eggs in one basket
+- Portfolio: Diversified exposure, reduced risk
+- Example: Strategy A (-10%), Strategy B (+15%), Strategy C (+5%)
+  - If you picked Strategy A: Lost 10%
+  - If you used portfolio: Maybe +3% (weighted average with risk optimization)
+
+**Best Practices**:
+- Mix different strategy types (momentum + mean reversion)
+- Use strategies with different tickers (NVDA + AAPL + SPY)
+- Reoptimize monthly as performance changes
+- Don't over-allocate to any single strategy (keep max at 30-40%)
+
 ## 🎯 Next Steps for You
 
-1. **Current Features**:
-   - Start backtesting - Kelly Criterion is automatically calculated
-   - Look for strategies with Kelly position > 5% and LOW/MODERATE risk
-   - Use Kelly recommendation instead of fixed 10% positions
+1. **Current Features** (Available Now!):
+   - ✅ **Kelly Criterion**: Automatically calculated in backtests - tells you optimal position size
+   - ✅ **35+ Technical Indicators**: AI generates sophisticated multi-indicator strategies
+   - ✅ **Strategy Visualization**: See exactly what your strategy is doing with interactive charts
+   - ✅ **Portfolio Optimization**: Combine multiple strategies for better risk-adjusted returns
 
-2. **Coming Soon**:
-   - More technical indicators for AI (next deployment)
-   - Portfolio optimization (combine top strategies)
-   - ML-based predictions
+2. **How to Get Started**:
+   - Generate 3-5 different strategies (use Autonomous Agent for automated generation)
+   - Backtest each strategy - check Kelly position % and Sharpe ratio
+   - Use Portfolio Optimizer to combine top strategies with optimal weights
+   - Paper trade the portfolio to validate before going live
 
-3. **Advanced** (Weeks 2-4):
-   - HMM regime detection
-   - Walk-forward optimization
-   - Monte Carlo simulations
+3. **Coming Next** (High Priority):
+   - ML-based price prediction with XGBoost
+   - Advanced risk metrics (VaR, CVaR, Ulcer Index)
+   - HMM regime detection (auto-detect bull/bear/consolidation)
+   - Vectorized backtesting (1000x faster parameter optimization)
 
-Let the platform find the edge, then Kelly Criterion will tell you exactly how much to risk!
+Let the platform find the edge, Kelly Criterion tells you how much to risk, and Portfolio Optimization combines everything optimally!
