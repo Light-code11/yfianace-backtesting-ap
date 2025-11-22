@@ -1,0 +1,705 @@
+"""
+Trading Platform API - Extended FastAPI server with AI strategy generation,
+backtesting, paper trading, and portfolio optimization
+"""
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+import yfinance as yf
+import pandas as pd
+import json
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+print(f"DEBUG: OPENAI_API_KEY loaded: {os.getenv('OPENAI_API_KEY')[:20] if os.getenv('OPENAI_API_KEY') else 'NOT FOUND'}...")
+
+from database import (
+    init_db, get_db, Strategy, BacktestResult, PaperTrade,
+    PortfolioAllocation, AILearning, PerformanceLog
+)
+from ai_strategy_generator import AIStrategyGenerator
+from backtesting_engine import BacktestingEngine
+from paper_trading import PaperTradingSimulator
+from portfolio_optimizer import PortfolioOptimizer
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="AI Trading Platform API",
+    description="AI-powered trading strategy generator with backtesting and portfolio optimization",
+    version="2.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize database
+init_db()
+
+# Pydantic models
+class StrategyGenerationRequest(BaseModel):
+    tickers: List[str]
+    period: str = "6mo"
+    num_strategies: int = 3
+    use_past_performance: bool = True
+
+
+class BacktestRequest(BaseModel):
+    strategy_id: Optional[int] = None
+    strategy_config: Optional[Dict] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    initial_capital: float = 100000
+
+
+class PaperTradeRequest(BaseModel):
+    strategy_id: int
+    auto_execute: bool = True
+
+
+class PortfolioOptimizationRequest(BaseModel):
+    strategy_ids: List[int]
+    total_capital: float = 100000
+    method: str = "sharpe"  # sharpe, min_variance, max_return, risk_parity
+    constraints: Optional[Dict] = None
+
+
+# Helper function to fetch market data
+def fetch_market_data(tickers: List[str], period: str = "6mo") -> pd.DataFrame:
+    """Fetch market data for multiple tickers"""
+    ticker_string = " ".join(tickers)
+    data = yf.download(ticker_string, period=period, progress=False)
+    return data
+
+
+# Endpoints
+@app.get("/")
+async def root():
+    return {
+        "message": "AI Trading Platform API",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "features": {
+            "ai_strategy_generation": "/strategies/generate",
+            "backtesting": "/backtest",
+            "paper_trading": "/paper-trading",
+            "portfolio_optimization": "/portfolio/optimize",
+            "learning": "/ai/learning"
+        }
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+
+# =======================
+# STRATEGY ENDPOINTS
+# =======================
+
+@app.post("/strategies/generate")
+async def generate_strategies(
+    request: StrategyGenerationRequest,
+    db=Depends(get_db)
+):
+    """Generate AI trading strategies"""
+    import traceback
+    try:
+        print(f"DEBUG: Received request with tickers={request.tickers}, period={request.period}")
+        # Fetch market data
+        market_data = fetch_market_data(request.tickers, request.period)
+        print(f"DEBUG: Market data fetched, shape={market_data.shape if not market_data.empty else 'EMPTY'}")
+
+        if market_data.empty:
+            raise HTTPException(status_code=400, detail="No market data available for tickers")
+
+        # Get past performance if requested
+        past_performance = []
+        learning_insights = []
+
+        if request.use_past_performance:
+            past_results = db.query(BacktestResult).order_by(BacktestResult.created_at.desc()).limit(20).all()
+            past_performance = [
+                {
+                    "strategy_name": r.strategy_name,
+                    "sharpe_ratio": r.sharpe_ratio,
+                    "total_return_pct": r.total_return_pct,
+                    "win_rate": r.win_rate,
+                    "max_drawdown_pct": r.max_drawdown_pct
+                }
+                for r in past_results
+            ]
+
+            learnings = db.query(AILearning).order_by(AILearning.created_at.desc()).limit(5).all()
+            learning_insights = [
+                {
+                    "type": l.learning_type,
+                    "description": l.description,
+                    "insights": l.key_insights
+                }
+                for l in learnings
+            ]
+
+        # Generate strategies using AI
+        print(f"DEBUG: Creating AI generator")
+        ai_generator = AIStrategyGenerator()
+        print(f"DEBUG: Calling generate_strategies with {request.num_strategies} strategies")
+        strategies = ai_generator.generate_strategies(
+            market_data=market_data,
+            tickers=request.tickers,
+            num_strategies=request.num_strategies,
+            past_performance=past_performance,
+            learning_insights=learning_insights
+        )
+        print(f"DEBUG: Strategies generated: {len(strategies)}")
+
+        # Save strategies to database
+        print(f"DEBUG: Saving {len(strategies)} strategies to database")
+        saved_strategies = []
+        for i, strategy in enumerate(strategies):
+            print(f"DEBUG: Saving strategy {i+1}: {strategy.get('name', 'Unknown')}")
+            db_strategy = Strategy(
+                name=strategy['name'],
+                description=strategy.get('description', ''),
+                tickers=strategy.get('tickers', []),
+                entry_conditions=strategy.get('entry_conditions', {}),
+                exit_conditions=strategy.get('exit_conditions', {}),
+                stop_loss_pct=strategy.get('risk_management', {}).get('stop_loss_pct', 5.0),
+                take_profit_pct=strategy.get('risk_management', {}).get('take_profit_pct', 10.0),
+                position_size_pct=strategy.get('risk_management', {}).get('position_size_pct', 10.0),
+                holding_period_days=strategy.get('holding_period_days', 5),
+                rationale=strategy.get('rationale', ''),
+                market_analysis=strategy.get('market_analysis', ''),
+                risk_assessment=strategy.get('risk_assessment', ''),
+                strategy_type=strategy.get('strategy_type', 'unknown'),
+                indicators=strategy.get('indicators', []),
+                is_active=True
+            )
+            db.add(db_strategy)
+            db.commit()
+            db.refresh(db_strategy)
+
+            saved_strategies.append({
+                "id": db_strategy.id,
+                "name": db_strategy.name,
+                "description": db_strategy.description,
+                "strategy_type": db_strategy.strategy_type,
+                "tickers": db_strategy.tickers,
+                "indicators": db_strategy.indicators,
+                "risk_management": {
+                    "stop_loss_pct": db_strategy.stop_loss_pct,
+                    "take_profit_pct": db_strategy.take_profit_pct,
+                    "position_size_pct": db_strategy.position_size_pct
+                }
+            })
+
+        print(f"DEBUG: Successfully saved {len(saved_strategies)} strategies")
+        return {
+            "success": True,
+            "strategies_generated": len(saved_strategies),
+            "strategies": saved_strategies
+        }
+
+    except Exception as e:
+        error_msg = f"ERROR in generate_strategies: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/strategies")
+async def list_strategies(
+    active_only: bool = True,
+    limit: int = 50,
+    db=Depends(get_db)
+):
+    """List all strategies"""
+    query = db.query(Strategy)
+
+    if active_only:
+        query = query.filter(Strategy.is_active == True)
+
+    strategies = query.order_by(Strategy.created_at.desc()).limit(limit).all()
+
+    return {
+        "strategies": [
+            {
+                "id": s.id,
+                "name": s.name,
+                "description": s.description,
+                "strategy_type": s.strategy_type,
+                "tickers": s.tickers,
+                "created_at": s.created_at.isoformat(),
+                "is_active": s.is_active
+            }
+            for s in strategies
+        ]
+    }
+
+
+@app.get("/strategies/{strategy_id}")
+async def get_strategy(strategy_id: int, db=Depends(get_db)):
+    """Get strategy details"""
+    strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    return {
+        "id": strategy.id,
+        "name": strategy.name,
+        "description": strategy.description,
+        "strategy_type": strategy.strategy_type,
+        "tickers": strategy.tickers,
+        "indicators": strategy.indicators,
+        "entry_conditions": strategy.entry_conditions,
+        "exit_conditions": strategy.exit_conditions,
+        "risk_management": {
+            "stop_loss_pct": strategy.stop_loss_pct,
+            "take_profit_pct": strategy.take_profit_pct,
+            "position_size_pct": strategy.position_size_pct
+        },
+        "holding_period_days": strategy.holding_period_days,
+        "rationale": strategy.rationale,
+        "market_analysis": strategy.market_analysis,
+        "risk_assessment": strategy.risk_assessment,
+        "created_at": strategy.created_at.isoformat(),
+        "is_active": strategy.is_active
+    }
+
+
+# =======================
+# BACKTESTING ENDPOINTS
+# =======================
+
+@app.post("/backtest")
+async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
+    """Backtest a strategy"""
+    try:
+        # Get strategy configuration
+        if request.strategy_id:
+            strategy_db = db.query(Strategy).filter(Strategy.id == request.strategy_id).first()
+            if not strategy_db:
+                raise HTTPException(status_code=404, detail="Strategy not found")
+
+            strategy_config = {
+                "id": strategy_db.id,
+                "name": strategy_db.name,
+                "tickers": strategy_db.tickers,
+                "indicators": strategy_db.indicators,
+                "strategy_type": strategy_db.strategy_type,
+                "risk_management": {
+                    "stop_loss_pct": strategy_db.stop_loss_pct,
+                    "take_profit_pct": strategy_db.take_profit_pct,
+                    "position_size_pct": strategy_db.position_size_pct
+                }
+            }
+        elif request.strategy_config:
+            strategy_config = request.strategy_config
+        else:
+            raise HTTPException(status_code=400, detail="Either strategy_id or strategy_config required")
+
+        # Fetch historical data
+        tickers = strategy_config.get('tickers', [])
+        period = "1y"  # Use 1 year for backtesting
+        market_data = fetch_market_data(tickers, period)
+
+        if market_data.empty:
+            raise HTTPException(status_code=400, detail="No market data available")
+
+        # Run backtest
+        engine = BacktestingEngine(initial_capital=request.initial_capital)
+        results = engine.backtest_strategy(strategy_config, market_data)
+
+        # Save backtest results
+        backtest_result = BacktestResult(
+            strategy_id=request.strategy_id,
+            strategy_name=results['strategy_name'],
+            start_date=datetime.now() - timedelta(days=365),
+            end_date=datetime.now(),
+            initial_capital=request.initial_capital,
+            tickers_tested=results['tickers'],
+            total_return_pct=results['metrics']['total_return_pct'],
+            total_trades=results['metrics']['total_trades'],
+            winning_trades=results['metrics']['winning_trades'],
+            losing_trades=results['metrics']['losing_trades'],
+            win_rate=results['metrics']['win_rate'],
+            sharpe_ratio=results['metrics']['sharpe_ratio'],
+            sortino_ratio=results['metrics']['sortino_ratio'],
+            max_drawdown_pct=results['metrics']['max_drawdown_pct'],
+            profit_factor=results['metrics']['profit_factor'],
+            avg_win=results['metrics']['avg_win'],
+            avg_loss=results['metrics']['avg_loss'],
+            trades=results['trades'],
+            equity_curve=results['equity_curve'],
+            quality_score=results['metrics']['quality_score']
+        )
+        db.add(backtest_result)
+        db.commit()
+        db.refresh(backtest_result)
+
+        return {
+            "success": True,
+            "backtest_id": backtest_result.id,
+            "strategy_name": results['strategy_name'],
+            "metrics": results['metrics'],
+            "total_trades": len(results['trades']),
+            "equity_curve_points": len(results['equity_curve'])
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/backtest/results")
+async def list_backtest_results(
+    limit: int = 50,
+    min_sharpe: float = None,
+    db=Depends(get_db)
+):
+    """List backtest results"""
+    query = db.query(BacktestResult)
+
+    if min_sharpe is not None:
+        query = query.filter(BacktestResult.sharpe_ratio >= min_sharpe)
+
+    results = query.order_by(BacktestResult.created_at.desc()).limit(limit).all()
+
+    return {
+        "results": [
+            {
+                "id": r.id,
+                "strategy_name": r.strategy_name,
+                "total_return_pct": r.total_return_pct,
+                "sharpe_ratio": r.sharpe_ratio,
+                "win_rate": r.win_rate,
+                "max_drawdown_pct": r.max_drawdown_pct,
+                "total_trades": r.total_trades,
+                "quality_score": r.quality_score,
+                "created_at": r.created_at.isoformat()
+            }
+            for r in results
+        ]
+    }
+
+
+@app.get("/backtest/results/{backtest_id}")
+async def get_backtest_result(backtest_id: int, db=Depends(get_db)):
+    """Get detailed backtest result"""
+    result = db.query(BacktestResult).filter(BacktestResult.id == backtest_id).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Backtest result not found")
+
+    return {
+        "id": result.id,
+        "strategy_id": result.strategy_id,
+        "strategy_name": result.strategy_name,
+        "created_at": result.created_at.isoformat(),
+        "start_date": result.start_date.isoformat(),
+        "end_date": result.end_date.isoformat(),
+        "initial_capital": result.initial_capital,
+        "tickers_tested": result.tickers_tested,
+        "metrics": {
+            "total_return_pct": result.total_return_pct,
+            "total_trades": result.total_trades,
+            "winning_trades": result.winning_trades,
+            "losing_trades": result.losing_trades,
+            "win_rate": result.win_rate,
+            "sharpe_ratio": result.sharpe_ratio,
+            "sortino_ratio": result.sortino_ratio,
+            "max_drawdown_pct": result.max_drawdown_pct,
+            "profit_factor": result.profit_factor,
+            "avg_win": result.avg_win,
+            "avg_loss": result.avg_loss,
+            "quality_score": result.quality_score
+        },
+        "trades": result.trades,
+        "equity_curve": result.equity_curve
+    }
+
+
+# =======================
+# PAPER TRADING ENDPOINTS
+# =======================
+
+@app.post("/paper-trading/execute")
+async def execute_paper_trading(request: PaperTradeRequest, db=Depends(get_db)):
+    """Execute paper trading for a strategy"""
+    try:
+        strategy = db.query(Strategy).filter(Strategy.id == request.strategy_id).first()
+
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        strategy_config = {
+            "id": strategy.id,
+            "name": strategy.name,
+            "tickers": strategy.tickers,
+            "indicators": strategy.indicators,
+            "strategy_type": strategy.strategy_type,
+            "risk_management": {
+                "stop_loss_pct": strategy.stop_loss_pct,
+                "take_profit_pct": strategy.take_profit_pct,
+                "position_size_pct": strategy.position_size_pct,
+                "max_positions": 3
+            }
+        }
+
+        simulator = PaperTradingSimulator()
+        results = simulator.execute_strategy(strategy_config)
+
+        return {
+            "success": True,
+            "strategy_name": results['strategy_name'],
+            "timestamp": results['timestamp'],
+            "actions_taken": results['actions_taken'],
+            "open_positions": len(results['positions']),
+            "portfolio_value": results['portfolio_value'],
+            "cash": results['cash'],
+            "total_return_pct": results['total_return_pct']
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/paper-trading/performance")
+async def get_paper_trading_performance(db=Depends(get_db)):
+    """Get paper trading performance summary"""
+    simulator = PaperTradingSimulator()
+    summary = simulator.get_performance_summary()
+    return summary
+
+
+@app.get("/paper-trading/positions")
+async def get_paper_trading_positions(db=Depends(get_db)):
+    """Get current paper trading positions"""
+    positions = db.query(PaperTrade).filter(PaperTrade.is_open == True).all()
+
+    return {
+        "open_positions": [
+            {
+                "id": p.id,
+                "strategy_name": p.strategy_name,
+                "ticker": p.ticker,
+                "quantity": p.quantity,
+                "entry_price": p.entry_price,
+                "entry_date": p.entry_date.isoformat(),
+                "position_size_usd": p.position_size_usd,
+                "stop_loss_price": p.stop_loss_price,
+                "take_profit_price": p.take_profit_price
+            }
+            for p in positions
+        ]
+    }
+
+
+# =======================
+# PORTFOLIO OPTIMIZATION
+# =======================
+
+@app.post("/portfolio/optimize")
+async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(get_db)):
+    """Optimize portfolio allocation across strategies"""
+    try:
+        # Get strategies
+        strategies = []
+        backtest_results = []
+
+        for strategy_id in request.strategy_ids:
+            strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+            if not strategy:
+                continue
+
+            # Get latest backtest result
+            backtest = db.query(BacktestResult).filter(
+                BacktestResult.strategy_id == strategy_id
+            ).order_by(BacktestResult.created_at.desc()).first()
+
+            if not backtest:
+                continue
+
+            strategies.append({
+                "id": strategy.id,
+                "name": strategy.name,
+                "strategy_type": strategy.strategy_type
+            })
+
+            backtest_results.append({
+                "strategy_name": strategy.name,
+                "equity_curve": backtest.equity_curve,
+                "total_return_pct": backtest.total_return_pct,
+                "sharpe_ratio": backtest.sharpe_ratio
+            })
+
+        if not strategies:
+            raise HTTPException(status_code=400, detail="No valid strategies with backtest results found")
+
+        # Optimize
+        optimizer = PortfolioOptimizer()
+        optimization_result = optimizer.optimize_allocations(
+            strategies=strategies,
+            backtest_results=backtest_results,
+            total_capital=request.total_capital,
+            method=request.method,
+            constraints=request.constraints
+        )
+
+        # Save optimization
+        portfolio = PortfolioAllocation(
+            name=f"Portfolio {request.method} {datetime.now().strftime('%Y-%m-%d')}",
+            total_capital=request.total_capital,
+            strategies=request.strategy_ids,
+            optimization_method=request.method,
+            constraints=request.constraints or {},
+            expected_return=optimization_result['expected_return'],
+            expected_volatility=optimization_result['expected_volatility'],
+            expected_sharpe=optimization_result['expected_sharpe'],
+            allocations=optimization_result['allocations'],
+            is_active=True
+        )
+        db.add(portfolio)
+        db.commit()
+        db.refresh(portfolio)
+
+        return {
+            "success": True,
+            "portfolio_id": portfolio.id,
+            **optimization_result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =======================
+# AI LEARNING ENDPOINTS
+# =======================
+
+@app.post("/ai/learn")
+async def ai_learn_from_results(db=Depends(get_db)):
+    """Analyze results and extract learning insights"""
+    try:
+        # Get recent strategies and backtest results
+        strategies = db.query(Strategy).order_by(Strategy.created_at.desc()).limit(10).all()
+        backtest_results = db.query(BacktestResult).order_by(BacktestResult.created_at.desc()).limit(10).all()
+
+        if not strategies or not backtest_results:
+            raise HTTPException(status_code=400, detail="Not enough data to learn from")
+
+        # Prepare data
+        strategies_data = [
+            {
+                "name": s.name,
+                "strategy_type": s.strategy_type,
+                "indicators": s.indicators,
+                "stop_loss_pct": s.stop_loss_pct,
+                "take_profit_pct": s.take_profit_pct
+            }
+            for s in strategies
+        ]
+
+        results_data = [
+            {
+                "strategy_name": r.strategy_name,
+                "sharpe_ratio": r.sharpe_ratio,
+                "total_return_pct": r.total_return_pct,
+                "win_rate": r.win_rate,
+                "max_drawdown_pct": r.max_drawdown_pct,
+                "quality_score": r.quality_score
+            }
+            for r in backtest_results
+        ]
+
+        # Use AI to learn
+        ai_generator = AIStrategyGenerator()
+        learning = ai_generator.learn_from_results(strategies_data, results_data)
+
+        # Save learning
+        ai_learning = AILearning(
+            learning_type="performance_analysis",
+            description="AI analyzed strategy performance and extracted insights",
+            strategy_ids=[s.id for s in strategies],
+            performance_data=results_data,
+            key_insights=learning,
+            recommendations=learning.get('recommendations_for_next_generation', []),
+            confidence_score=0.8
+        )
+        db.add(ai_learning)
+        db.commit()
+
+        return {
+            "success": True,
+            "learning_id": ai_learning.id,
+            "insights": learning
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ai/learning")
+async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
+    """Get AI learning insights"""
+    learnings = db.query(AILearning).order_by(AILearning.created_at.desc()).limit(limit).all()
+
+    return {
+        "insights": [
+            {
+                "id": l.id,
+                "learning_type": l.learning_type,
+                "description": l.description,
+                "key_insights": l.key_insights,
+                "recommendations": l.recommendations,
+                "confidence_score": l.confidence_score,
+                "created_at": l.created_at.isoformat()
+            }
+            for l in learnings
+        ]
+    }
+
+
+# =======================
+# ANALYTICS ENDPOINTS
+# =======================
+
+@app.get("/analytics/dashboard")
+async def get_dashboard_analytics(db=Depends(get_db)):
+    """Get dashboard analytics"""
+    total_strategies = db.query(Strategy).count()
+    active_strategies = db.query(Strategy).filter(Strategy.is_active == True).count()
+    total_backtests = db.query(BacktestResult).count()
+    paper_trades = db.query(PaperTrade).count()
+
+    # Best performing strategy
+    best_backtest = db.query(BacktestResult).order_by(BacktestResult.quality_score.desc()).first()
+
+    return {
+        "summary": {
+            "total_strategies": total_strategies,
+            "active_strategies": active_strategies,
+            "total_backtests": total_backtests,
+            "total_paper_trades": paper_trades
+        },
+        "best_strategy": {
+            "name": best_backtest.strategy_name if best_backtest else None,
+            "quality_score": best_backtest.quality_score if best_backtest else None,
+            "sharpe_ratio": best_backtest.sharpe_ratio if best_backtest else None,
+            "total_return_pct": best_backtest.total_return_pct if best_backtest else None
+        } if best_backtest else None
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

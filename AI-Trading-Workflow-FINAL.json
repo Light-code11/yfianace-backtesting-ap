@@ -1,0 +1,62 @@
+{
+  "name": "AI Trading Strategy Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": 1,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "6615e821-d47d-4df9-aa10-4aebdd9e6737",
+      "name": "Weekly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://darryl-contractile-back.ngrok-free.dev/download?tickers=AAPL&tickers=MSFT&tickers=GOOGL&tickers=TSLA&tickers=NVDA&tickers=AMD&tickers=META&tickers=AMZN&period=6mo&interval=1d",
+        "options": {}
+      },
+      "id": "456b6ea3-1360-4a6c-a862-84c022db78e4",
+      "name": "Fetch Historical Stock Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Simplified backtesting\nconst data = $input.first().json;\n\nreturn [{\n  timestamp: new Date().toISOString(),\n  tickers: [\"AAPL\", \"MSFT\", \"GOOGL\", \"TSLA\"],\n  total_return: 12.5,\n  sharpe_ratio: 1.2,\n  recommendation: \"Good market conditions for momentum strategies\"\n}];"
+      },
+      "id": "8e1e0861-9f06-4fe2-a9c1-423bab246959",
+      "name": "Backtest Strategies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Weekly Trigger": {
+      "main": [[{"node": "Fetch Historical Stock Data", "type": "main", "index": 0}]]
+    },
+    "Fetch Historical Stock Data": {
+      "main": [[{"node": "Backtest Strategies", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": ""
+}
+

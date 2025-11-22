@@ -1,0 +1,470 @@
+"""
+Advanced backtesting engine with technical indicators
+"""
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Any, Tuple
+from datetime import datetime, timedelta
+
+
+class TechnicalIndicators:
+    """Calculate technical indicators for trading strategies"""
+
+    @staticmethod
+    def sma(data: pd.Series, period: int) -> pd.Series:
+        """Simple Moving Average"""
+        return data.rolling(window=period).mean()
+
+    @staticmethod
+    def ema(data: pd.Series, period: int) -> pd.Series:
+        """Exponential Moving Average"""
+        return data.ewm(span=period, adjust=False).mean()
+
+    @staticmethod
+    def rsi(data: pd.Series, period: int = 14) -> pd.Series:
+        """Relative Strength Index"""
+        delta = data.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+    @staticmethod
+    def macd(data: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """MACD, Signal Line, and Histogram"""
+        ema_fast = data.ewm(span=fast, adjust=False).mean()
+        ema_slow = data.ewm(span=slow, adjust=False).mean()
+        macd_line = ema_fast - ema_slow
+        signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+        histogram = macd_line - signal_line
+        return macd_line, signal_line, histogram
+
+    @staticmethod
+    def bollinger_bands(data: pd.Series, period: int = 20, std_dev: int = 2) -> Tuple[pd.Series, pd.Series, pd.Series]:
+        """Bollinger Bands (Upper, Middle, Lower)"""
+        middle = data.rolling(window=period).mean()
+        std = data.rolling(window=period).std()
+        upper = middle + (std * std_dev)
+        lower = middle - (std * std_dev)
+        return upper, middle, lower
+
+    @staticmethod
+    def atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+        """Average True Range"""
+        tr1 = high - low
+        tr2 = abs(high - close.shift())
+        tr3 = abs(low - close.shift())
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+        atr = tr.rolling(window=period).mean()
+        return atr
+
+    @staticmethod
+    def stochastic(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> Tuple[pd.Series, pd.Series]:
+        """Stochastic Oscillator (%K and %D)"""
+        lowest_low = low.rolling(window=period).min()
+        highest_high = high.rolling(window=period).max()
+        k_percent = 100 * ((close - lowest_low) / (highest_high - lowest_low))
+        d_percent = k_percent.rolling(window=3).mean()
+        return k_percent, d_percent
+
+    @staticmethod
+    def adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
+        """Average Directional Index"""
+        plus_dm = high.diff()
+        minus_dm = -low.diff()
+        plus_dm[plus_dm < 0] = 0
+        minus_dm[minus_dm < 0] = 0
+
+        tr1 = high - low
+        tr2 = abs(high - close.shift())
+        tr3 = abs(low - close.shift())
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+        atr = tr.rolling(window=period).mean()
+        plus_di = 100 * (plus_dm.rolling(window=period).mean() / atr)
+        minus_di = 100 * (minus_dm.rolling(window=period).mean() / atr)
+
+        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+        adx = dx.rolling(window=period).mean()
+        return adx
+
+
+class BacktestingEngine:
+    """Advanced backtesting engine for trading strategies"""
+
+    def __init__(self, initial_capital: float = 100000):
+        self.initial_capital = initial_capital
+        self.indicators = TechnicalIndicators()
+
+    def backtest_strategy(
+        self,
+        strategy: Dict[str, Any],
+        market_data: pd.DataFrame,
+        commission: float = 0.001  # 0.1% commission
+    ) -> Dict[str, Any]:
+        """
+        Backtest a trading strategy
+
+        Args:
+            strategy: Strategy dictionary with entry/exit rules
+            market_data: Historical OHLCV data
+            commission: Transaction commission as decimal
+
+        Returns:
+            Dictionary with backtest results
+        """
+        results = {
+            "strategy_name": strategy.get("name", "Unknown"),
+            "tickers": strategy.get("tickers", []),
+            "trades": [],
+            "equity_curve": [],
+            "metrics": {}
+        }
+
+        # Extract strategy parameters
+        tickers = strategy.get("tickers", [])
+        indicators_config = strategy.get("indicators", [])
+        stop_loss_pct = strategy.get("risk_management", {}).get("stop_loss_pct", 5.0)
+        take_profit_pct = strategy.get("risk_management", {}).get("take_profit_pct", 10.0)
+        position_size_pct = strategy.get("risk_management", {}).get("position_size_pct", 10.0)
+        max_positions = strategy.get("risk_management", {}).get("max_positions", 3)
+
+        # Initialize portfolio
+        capital = self.initial_capital
+        positions = {}  # {ticker: {qty, entry_price, entry_date}}
+        trades = []
+
+        # Process each ticker
+        for ticker in tickers:
+            if ticker not in market_data.columns.levels[1]:
+                continue
+
+            # Get ticker data
+            ticker_data = market_data.xs(ticker, level=1, axis=1)
+
+            # Calculate indicators
+            indicators_data = self._calculate_indicators(ticker_data, indicators_config)
+
+            # Simulate trading
+            for i in range(len(ticker_data)):
+                current_date = ticker_data.index[i]
+                current_price = ticker_data['Close'].iloc[i]
+
+                # Check exit conditions for existing positions
+                if ticker in positions:
+                    position = positions[ticker]
+                    entry_price = position['entry_price']
+                    pnl_pct = ((current_price - entry_price) / entry_price) * 100
+
+                    # Check stop loss
+                    if pnl_pct <= -stop_loss_pct:
+                        trade = self._close_position(
+                            ticker, position, current_price, current_date,
+                            commission, "stop_loss"
+                        )
+                        trades.append(trade)
+                        capital += trade['profit_loss_usd']
+                        del positions[ticker]
+
+                    # Check take profit
+                    elif pnl_pct >= take_profit_pct:
+                        trade = self._close_position(
+                            ticker, position, current_price, current_date,
+                            commission, "take_profit"
+                        )
+                        trades.append(trade)
+                        capital += trade['profit_loss_usd']
+                        del positions[ticker]
+
+                    # Check strategy exit conditions
+                    elif self._check_exit_signal(indicators_data, i, strategy):
+                        trade = self._close_position(
+                            ticker, position, current_price, current_date,
+                            commission, "signal"
+                        )
+                        trades.append(trade)
+                        capital += trade['profit_loss_usd']
+                        del positions[ticker]
+
+                # Check entry conditions
+                if ticker not in positions and len(positions) < max_positions:
+                    if self._check_entry_signal(indicators_data, i, strategy):
+                        # Calculate position size
+                        position_value = capital * (position_size_pct / 100)
+                        qty = position_value / current_price
+                        cost = qty * current_price * (1 + commission)
+
+                        if cost <= capital:
+                            positions[ticker] = {
+                                'qty': qty,
+                                'entry_price': current_price,
+                                'entry_date': current_date,
+                                'cost': cost
+                            }
+                            capital -= cost
+
+                # Track equity
+                portfolio_value = capital + sum(
+                    pos['qty'] * ticker_data['Close'].iloc[i]
+                    for tick, pos in positions.items() if tick == ticker
+                )
+                results['equity_curve'].append({
+                    'date': current_date.strftime('%Y-%m-%d'),
+                    'equity': portfolio_value
+                })
+
+        # Close any remaining positions
+        for ticker, position in list(positions.items()):
+            final_price = market_data['Close'][ticker].iloc[-1]
+            final_date = market_data.index[-1]
+            trade = self._close_position(
+                ticker, position, final_price, final_date,
+                commission, "end_of_test"
+            )
+            trades.append(trade)
+            capital += trade['profit_loss_usd']
+
+        # Calculate metrics
+        results['trades'] = trades
+        results['metrics'] = self._calculate_metrics(trades, capital, results['equity_curve'])
+
+        return results
+
+    def _calculate_indicators(
+        self,
+        data: pd.DataFrame,
+        indicators_config: List[Dict]
+    ) -> pd.DataFrame:
+        """Calculate technical indicators based on configuration"""
+        df = data.copy()
+
+        for indicator in indicators_config:
+            name = indicator.get('name', '').upper()
+            period = indicator.get('period', 14)
+
+            if name == 'SMA':
+                df[f'SMA_{period}'] = self.indicators.sma(df['Close'], period)
+            elif name == 'EMA':
+                df[f'EMA_{period}'] = self.indicators.ema(df['Close'], period)
+            elif name == 'RSI':
+                df['RSI'] = self.indicators.rsi(df['Close'], period)
+            elif name == 'MACD':
+                macd, signal, hist = self.indicators.macd(df['Close'])
+                df['MACD'] = macd
+                df['MACD_Signal'] = signal
+                df['MACD_Hist'] = hist
+            elif name == 'BB' or name == 'BOLLINGER':
+                upper, middle, lower = self.indicators.bollinger_bands(df['Close'], period)
+                df['BB_Upper'] = upper
+                df['BB_Middle'] = middle
+                df['BB_Lower'] = lower
+            elif name == 'ATR':
+                df['ATR'] = self.indicators.atr(df['High'], df['Low'], df['Close'], period)
+            elif name == 'STOCHASTIC':
+                k, d = self.indicators.stochastic(df['High'], df['Low'], df['Close'], period)
+                df['Stoch_K'] = k
+                df['Stoch_D'] = d
+            elif name == 'ADX':
+                df['ADX'] = self.indicators.adx(df['High'], df['Low'], df['Close'], period)
+
+        return df
+
+    def _check_entry_signal(
+        self,
+        data: pd.DataFrame,
+        index: int,
+        strategy: Dict
+    ) -> bool:
+        """Check if entry conditions are met"""
+        if index < 50:  # Need enough data for indicators
+            return False
+
+        strategy_type = strategy.get('strategy_type', '').lower()
+        row = data.iloc[index]
+        prev_row = data.iloc[index - 1]
+
+        # Simple momentum strategy
+        if strategy_type == 'momentum':
+            if 'SMA_20' in data.columns and 'SMA_50' in data.columns:
+                return row['SMA_20'] > row['SMA_50'] and prev_row['SMA_20'] <= prev_row['SMA_50']
+            elif 'RSI' in data.columns:
+                return row['RSI'] > 50 and prev_row['RSI'] <= 50
+
+        # Mean reversion strategy
+        elif strategy_type == 'mean_reversion':
+            if 'BB_Lower' in data.columns and 'BB_Middle' in data.columns:
+                return row['Close'] <= row['BB_Lower']
+            elif 'RSI' in data.columns:
+                return row['RSI'] < 30
+
+        # Breakout strategy
+        elif strategy_type == 'breakout':
+            if 'BB_Upper' in data.columns:
+                return row['Close'] > row['BB_Upper']
+            else:
+                # Simple breakout: price breaks 20-day high
+                if index >= 20:
+                    return row['Close'] > data['High'].iloc[index-20:index].max()
+
+        # Trend following
+        elif strategy_type == 'trend_following':
+            if 'MACD' in data.columns and 'MACD_Signal' in data.columns:
+                return row['MACD'] > row['MACD_Signal'] and prev_row['MACD'] <= prev_row['MACD_Signal']
+            elif 'SMA_20' in data.columns and 'SMA_50' in data.columns:
+                return row['SMA_20'] > row['SMA_50']
+
+        return False
+
+    def _check_exit_signal(
+        self,
+        data: pd.DataFrame,
+        index: int,
+        strategy: Dict
+    ) -> bool:
+        """Check if exit conditions are met"""
+        if index < 50:
+            return False
+
+        strategy_type = strategy.get('strategy_type', '').lower()
+        row = data.iloc[index]
+        prev_row = data.iloc[index - 1]
+
+        # Opposite of entry signals
+        if strategy_type == 'momentum':
+            if 'SMA_20' in data.columns and 'SMA_50' in data.columns:
+                return row['SMA_20'] < row['SMA_50']
+
+        elif strategy_type == 'mean_reversion':
+            if 'BB_Middle' in data.columns:
+                return row['Close'] >= row['BB_Middle']
+
+        elif strategy_type == 'breakout':
+            if 'BB_Middle' in data.columns:
+                return row['Close'] < row['BB_Middle']
+
+        elif strategy_type == 'trend_following':
+            if 'MACD' in data.columns and 'MACD_Signal' in data.columns:
+                return row['MACD'] < row['MACD_Signal']
+
+        return False
+
+    def _close_position(
+        self,
+        ticker: str,
+        position: Dict,
+        exit_price: float,
+        exit_date: datetime,
+        commission: float,
+        exit_reason: str
+    ) -> Dict:
+        """Close a position and record trade"""
+        entry_price = position['entry_price']
+        qty = position['qty']
+
+        exit_value = qty * exit_price * (1 - commission)
+        profit_loss = exit_value - position['cost']
+        profit_loss_pct = (profit_loss / position['cost']) * 100
+
+        return {
+            'ticker': ticker,
+            'action': 'BUY/SELL',
+            'quantity': qty,
+            'entry_price': entry_price,
+            'exit_price': exit_price,
+            'entry_date': position['entry_date'].strftime('%Y-%m-%d'),
+            'exit_date': exit_date.strftime('%Y-%m-%d'),
+            'profit_loss_usd': profit_loss,
+            'profit_loss_pct': profit_loss_pct,
+            'exit_reason': exit_reason
+        }
+
+    def _calculate_metrics(
+        self,
+        trades: List[Dict],
+        final_capital: float,
+        equity_curve: List[Dict]
+    ) -> Dict[str, float]:
+        """Calculate performance metrics"""
+        if not trades:
+            return {
+                'total_return_pct': 0,
+                'total_trades': 0,
+                'winning_trades': 0,
+                'losing_trades': 0,
+                'win_rate': 0,
+                'sharpe_ratio': 0,
+                'max_drawdown_pct': 0,
+                'profit_factor': 0,
+                'avg_win': 0,
+                'avg_loss': 0
+            }
+
+        # Basic metrics
+        total_return_pct = ((final_capital - self.initial_capital) / self.initial_capital) * 100
+        total_trades = len(trades)
+
+        winning_trades = [t for t in trades if t['profit_loss_usd'] > 0]
+        losing_trades = [t for t in trades if t['profit_loss_usd'] <= 0]
+
+        win_rate = (len(winning_trades) / total_trades * 100) if total_trades > 0 else 0
+
+        # Profit factor
+        total_wins = sum(t['profit_loss_usd'] for t in winning_trades)
+        total_losses = abs(sum(t['profit_loss_usd'] for t in losing_trades))
+        profit_factor = (total_wins / total_losses) if total_losses > 0 else 0
+
+        # Average win/loss
+        avg_win = (total_wins / len(winning_trades)) if winning_trades else 0
+        avg_loss = (total_losses / len(losing_trades)) if losing_trades else 0
+
+        # Sharpe ratio
+        if len(equity_curve) > 1:
+            returns = pd.Series([e['equity'] for e in equity_curve]).pct_change().dropna()
+            sharpe_ratio = (returns.mean() / returns.std()) * np.sqrt(252) if returns.std() > 0 else 0
+        else:
+            sharpe_ratio = 0
+
+        # Maximum drawdown
+        equity_values = [e['equity'] for e in equity_curve]
+        peak = equity_values[0]
+        max_dd = 0
+        for value in equity_values:
+            if value > peak:
+                peak = value
+            dd = ((peak - value) / peak) * 100
+            max_dd = max(max_dd, dd)
+
+        return {
+            'total_return_pct': round(total_return_pct, 2),
+            'total_trades': total_trades,
+            'winning_trades': len(winning_trades),
+            'losing_trades': len(losing_trades),
+            'win_rate': round(win_rate, 2),
+            'sharpe_ratio': round(sharpe_ratio, 2),
+            'sortino_ratio': round(sharpe_ratio * 1.2, 2),  # Approximation
+            'max_drawdown_pct': round(max_dd, 2),
+            'profit_factor': round(profit_factor, 2),
+            'avg_win': round(avg_win, 2),
+            'avg_loss': round(avg_loss, 2),
+            'quality_score': self._calculate_quality_score(
+                sharpe_ratio, win_rate, max_dd, total_return_pct
+            )
+        }
+
+    def _calculate_quality_score(
+        self,
+        sharpe: float,
+        win_rate: float,
+        max_dd: float,
+        total_return: float
+    ) -> float:
+        """Calculate composite quality score (0-100)"""
+        # Normalize each metric
+        sharpe_score = min(sharpe / 2 * 25, 25)  # Max 25 points
+        win_rate_score = (win_rate / 100) * 25  # Max 25 points
+        dd_score = max(0, (1 - max_dd / 50)) * 25  # Max 25 points, penalize high DD
+        return_score = min(total_return / 20 * 25, 25)  # Max 25 points
+
+        total_score = sharpe_score + win_rate_score + dd_score + return_score
+        return round(min(total_score, 100), 2)

@@ -24,3 +24,12 @@ ENV/
 /doc/source/reference/api
 !yfinance.css
 !/doc/source/development/assets/branches.png
+
+# System files
+.DS_Store
+
+# Logs and databases
+*.log
+*.db
+api_server.log
+trading_platform.db

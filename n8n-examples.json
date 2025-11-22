@@ -1,0 +1,222 @@
+{
+  "name": "YFinance API Examples",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "example-workflow",
+      "name": "Example YFinance n8n Workflows",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [250, 300]
+    }
+  ],
+  "connections": {},
+  "examples": [
+    {
+      "name": "Get Stock Price",
+      "description": "Fetch current price for a stock symbol",
+      "node_type": "HTTP Request",
+      "configuration": {
+        "method": "GET",
+        "url": "http://your-server:8000/ticker/AAPL/price",
+        "authentication": "None",
+        "responseFormat": "json"
+      }
+    },
+    {
+      "name": "Get Historical Data",
+      "description": "Fetch historical price data",
+      "node_type": "HTTP Request",
+      "configuration": {
+        "method": "GET",
+        "url": "http://your-server:8000/ticker/AAPL/history",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "period",
+              "value": "1mo"
+            },
+            {
+              "name": "interval",
+              "value": "1d"
+            }
+          ]
+        },
+        "responseFormat": "json"
+      }
+    },
+    {
+      "name": "Search Stocks",
+      "description": "Search for stocks by name or symbol",
+      "node_type": "HTTP Request",
+      "configuration": {
+        "method": "GET",
+        "url": "http://your-server:8000/search",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "={{ $json.searchTerm }}"
+            },
+            {
+              "name": "max_results",
+              "value": "10"
+            }
+          ]
+        },
+        "responseFormat": "json"
+      }
+    },
+    {
+      "name": "Price Alert Workflow",
+      "description": "Check price every hour and send alert if threshold crossed",
+      "workflow": [
+        {
+          "node": "Schedule Trigger",
+          "config": {
+            "type": "Schedule Trigger",
+            "rule": "Every 1 hour"
+          }
+        },
+        {
+          "node": "HTTP Request",
+          "config": {
+            "method": "GET",
+            "url": "http://your-server:8000/ticker/AAPL/price"
+          }
+        },
+        {
+          "node": "IF",
+          "config": {
+            "conditions": {
+              "number": [
+                {
+                  "value1": "={{ $json.currentPrice }}",
+                  "operation": "larger",
+                  "value2": "150"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": "Send Email/Slack",
+          "config": {
+            "message": "AAPL price is now {{ $json.currentPrice }}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Multiple Tickers with Loop",
+      "description": "Fetch data for multiple stocks",
+      "workflow": [
+        {
+          "node": "Manual Trigger or Schedule",
+          "config": {}
+        },
+        {
+          "node": "Set",
+          "config": {
+            "values": {
+              "string": [
+                {
+                  "name": "tickers",
+                  "value": "AAPL,MSFT,GOOGL,TSLA"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": "Split In Batches",
+          "config": {
+            "batchSize": 1
+          }
+        },
+        {
+          "node": "HTTP Request",
+          "config": {
+            "method": "GET",
+            "url": "http://your-server:8000/ticker/{{ $json.ticker }}/price"
+          }
+        },
+        {
+          "node": "Aggregate",
+          "config": {
+            "aggregation": "aggregateAllItemData"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Download Multiple Tickers at Once",
+      "description": "Use the download endpoint for multiple tickers",
+      "node_type": "HTTP Request",
+      "configuration": {
+        "method": "POST",
+        "url": "http://your-server:8000/download",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "tickers",
+              "value": "AAPL"
+            },
+            {
+              "name": "tickers",
+              "value": "MSFT"
+            },
+            {
+              "name": "tickers",
+              "value": "GOOGL"
+            },
+            {
+              "name": "period",
+              "value": "1mo"
+            },
+            {
+              "name": "interval",
+              "value": "1d"
+            }
+          ]
+        },
+        "responseFormat": "json"
+      }
+    },
+    {
+      "name": "Store to Google Sheets",
+      "description": "Fetch stock data and save to Google Sheets",
+      "workflow": [
+        {
+          "node": "Schedule Trigger",
+          "config": {
+            "rule": "Every day at 9:00 AM"
+          }
+        },
+        {
+          "node": "HTTP Request - Get Price",
+          "config": {
+            "method": "GET",
+            "url": "http://your-server:8000/ticker/AAPL/price"
+          }
+        },
+        {
+          "node": "Google Sheets",
+          "config": {
+            "operation": "append",
+            "sheetName": "Stock Prices",
+            "columns": "Date,Symbol,Price,Volume"
+          }
+        }
+      ]
+    }
+  ],
+  "curl_examples": {
+    "get_price": "curl -X GET 'http://your-server:8000/ticker/AAPL/price'",
+    "get_history": "curl -X GET 'http://your-server:8000/ticker/AAPL/history?period=1mo&interval=1d'",
+    "search": "curl -X GET 'http://your-server:8000/search?query=apple&max_results=5'",
+    "download_multiple": "curl -X POST 'http://your-server:8000/download?tickers=AAPL&tickers=MSFT&period=1mo'",
+    "with_api_key": "curl -X GET 'http://your-server:8000/ticker/AAPL/price' -H 'X-API-Key: your-secret-key'"
+  }
+}
+

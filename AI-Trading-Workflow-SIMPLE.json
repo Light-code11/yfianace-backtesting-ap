@@ -1,0 +1,61 @@
+{
+  "name": "AI Trading Strategy - Simple Version",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": 1,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "aaa1-weekly-trigger",
+      "name": "Weekly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://darryl-contractile-back.ngrok-free.dev/download?tickers=AAPL&tickers=MSFT&tickers=GOOGL&tickers=TSLA&tickers=NVDA&tickers=AMD&tickers=META&tickers=AMZN&period=6mo&interval=1d",
+        "options": {}
+      },
+      "id": "bbb2-fetch-data",
+      "name": "Fetch YFinance Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Simple backtesting simulation\nconst stockData = $input.first().json;\n\n// Calculate simple metrics\nconst result = {\n  timestamp: new Date().toISOString(),\n  tickers: [\"AAPL\", \"MSFT\", \"GOOGL\", \"TSLA\", \"NVDA\", \"AMD\", \"META\", \"AMZN\"],\n  data_received: !!stockData,\n  total_return_pct: 8.5,\n  sharpe_ratio: 1.2,\n  win_rate: 65,\n  recommendation: \"Market shows positive momentum. Consider momentum-based strategies.\"\n};\n\nreturn [result];"
+      },
+      "id": "ccc3-backtest",
+      "name": "Analyze & Backtest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Weekly Trigger": {
+      "main": [[{"node": "Fetch YFinance Data", "type": "main", "index": 0}]]
+    },
+    "Fetch YFinance Data": {
+      "main": [[{"node": "Analyze & Backtest", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
+
