@@ -173,6 +173,167 @@ def plot_trade_distribution(trades):
     return fig
 
 
+def plot_monthly_returns(equity_curve):
+    """Plot monthly returns heatmap"""
+    if not equity_curve:
+        return None
+
+    df = pd.DataFrame(equity_curve)
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.set_index('date')
+
+    # Calculate daily returns
+    df['returns'] = df['equity'].pct_change()
+
+    # Group by month and calculate monthly returns
+    monthly_returns = df['returns'].resample('M').apply(lambda x: (1 + x).prod() - 1) * 100
+
+    if len(monthly_returns) == 0:
+        return None
+
+    # Create pivot table for heatmap
+    monthly_returns_df = pd.DataFrame({
+        'Year': monthly_returns.index.year,
+        'Month': monthly_returns.index.month,
+        'Return': monthly_returns.values
+    })
+
+    pivot = monthly_returns_df.pivot(index='Month', columns='Year', values='Return')
+
+    # Month names
+    month_names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+    fig = go.Figure(data=go.Heatmap(
+        z=pivot.values,
+        x=pivot.columns,
+        y=[month_names[i-1] for i in pivot.index],
+        colorscale='RdYlGn',
+        zmid=0,
+        text=pivot.values,
+        texttemplate='%{text:.1f}%',
+        textfont={"size": 10},
+        colorbar=dict(title="Return (%)")
+    ))
+
+    fig.update_layout(
+        title="Monthly Returns Heatmap",
+        xaxis_title="Year",
+        yaxis_title="Month",
+        template='plotly_white'
+    )
+
+    return fig
+
+
+def plot_win_loss_distribution(trades):
+    """Plot win/loss pie chart"""
+    if not trades or len(trades) == 0:
+        return None
+
+    df = pd.DataFrame(trades)
+
+    wins = len(df[df['profit_loss_pct'] > 0])
+    losses = len(df[df['profit_loss_pct'] < 0])
+    breakeven = len(df[df['profit_loss_pct'] == 0])
+
+    fig = go.Figure(data=[go.Pie(
+        labels=['Winning Trades', 'Losing Trades', 'Breakeven'],
+        values=[wins, losses, breakeven],
+        marker=dict(colors=['#2ecc71', '#e74c3c', '#95a5a6']),
+        hole=0.4
+    )])
+
+    fig.update_layout(
+        title=f"Trade Outcome Distribution (Total: {len(df)} trades)",
+        template='plotly_white'
+    )
+
+    return fig
+
+
+def plot_rolling_sharpe(equity_curve, window=30):
+    """Plot rolling Sharpe ratio"""
+    if not equity_curve or len(equity_curve) < window:
+        return None
+
+    df = pd.DataFrame(equity_curve)
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.set_index('date')
+
+    # Calculate daily returns
+    df['returns'] = df['equity'].pct_change()
+
+    # Calculate rolling Sharpe (annualized)
+    rolling_mean = df['returns'].rolling(window=window).mean() * 252
+    rolling_std = df['returns'].rolling(window=window).std() * (252 ** 0.5)
+    rolling_sharpe = rolling_mean / rolling_std
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df.index,
+        y=rolling_sharpe,
+        mode='lines',
+        name=f'{window}-Day Rolling Sharpe',
+        line=dict(color='#9467bd', width=2)
+    ))
+
+    # Add reference line at Sharpe = 1
+    fig.add_hline(y=1, line_dash="dash", line_color="green",
+                  annotation_text="Sharpe = 1 (Good)")
+    fig.add_hline(y=0, line_dash="dash", line_color="red",
+                  annotation_text="Sharpe = 0")
+
+    fig.update_layout(
+        title=f"Rolling Sharpe Ratio ({window} days)",
+        xaxis_title="Date",
+        yaxis_title="Sharpe Ratio",
+        hovermode='x unified',
+        template='plotly_white'
+    )
+
+    return fig
+
+
+def plot_cumulative_returns(equity_curve):
+    """Plot cumulative returns percentage"""
+    if not equity_curve:
+        return None
+
+    df = pd.DataFrame(equity_curve)
+    df['date'] = pd.to_datetime(df['date'])
+
+    # Calculate cumulative return percentage
+    initial_equity = df['equity'].iloc[0]
+    df['cumulative_return_pct'] = ((df['equity'] - initial_equity) / initial_equity) * 100
+
+    fig = go.Figure()
+
+    # Cumulative returns line
+    fig.add_trace(go.Scatter(
+        x=df['date'],
+        y=df['cumulative_return_pct'],
+        mode='lines',
+        name='Cumulative Return',
+        line=dict(color='#1f77b4', width=2),
+        fill='tozeroy',
+        fillcolor='rgba(31, 119, 180, 0.2)'
+    ))
+
+    # Add zero line
+    fig.add_hline(y=0, line_dash="dash", line_color="gray")
+
+    fig.update_layout(
+        title="Cumulative Returns Over Time",
+        xaxis_title="Date",
+        yaxis_title="Cumulative Return (%)",
+        hovermode='x unified',
+        template='plotly_white'
+    )
+
+    return fig
+
+
 def plot_portfolio_allocation(allocations):
     """Plot portfolio allocation pie chart"""
     if not allocations:
@@ -464,23 +625,50 @@ elif page == "Backtest":
                                 st.metric("Total Trades", results['metrics']['total_trades'])
                                 st.metric("Quality Score", f"{results['metrics']['quality_score']:.1f}/100")
 
-                            # Equity curve
-                            st.subheader("📈 Equity Curve")
-                            equity_fig = plot_equity_curve(results['equity_curve'])
-                            if equity_fig:
-                                st.plotly_chart(equity_fig, use_container_width=True)
+                            # Charts Section
+                            st.markdown("---")
+                            st.subheader("📊 Performance Charts")
 
-                            # Drawdown analysis
-                            st.subheader("📉 Drawdown Analysis")
-                            dd_fig = plot_drawdown(results['equity_curve'])
-                            if dd_fig:
-                                st.plotly_chart(dd_fig, use_container_width=True)
+                            # Row 1: Equity Curve and Cumulative Returns
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                equity_fig = plot_equity_curve(results['equity_curve'])
+                                if equity_fig:
+                                    st.plotly_chart(equity_fig, use_container_width=True)
 
-                            # Trade distribution
-                            st.subheader("📊 Trade Distribution")
-                            trade_fig = plot_trade_distribution(results['trades'])
-                            if trade_fig:
-                                st.plotly_chart(trade_fig, use_container_width=True)
+                            with col2:
+                                cumulative_fig = plot_cumulative_returns(results['equity_curve'])
+                                if cumulative_fig:
+                                    st.plotly_chart(cumulative_fig, use_container_width=True)
+
+                            # Row 2: Drawdown and Rolling Sharpe
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                dd_fig = plot_drawdown(results['equity_curve'])
+                                if dd_fig:
+                                    st.plotly_chart(dd_fig, use_container_width=True)
+
+                            with col2:
+                                sharpe_fig = plot_rolling_sharpe(results['equity_curve'])
+                                if sharpe_fig:
+                                    st.plotly_chart(sharpe_fig, use_container_width=True)
+
+                            # Row 3: Trade Distribution and Win/Loss
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                trade_fig = plot_trade_distribution(results['trades'])
+                                if trade_fig:
+                                    st.plotly_chart(trade_fig, use_container_width=True)
+
+                            with col2:
+                                winloss_fig = plot_win_loss_distribution(results['trades'])
+                                if winloss_fig:
+                                    st.plotly_chart(winloss_fig, use_container_width=True)
+
+                            # Row 4: Monthly Returns Heatmap (full width)
+                            monthly_fig = plot_monthly_returns(results['equity_curve'])
+                            if monthly_fig:
+                                st.plotly_chart(monthly_fig, use_container_width=True)
 
                             # Trade history
                             st.subheader("📝 Trade History")
