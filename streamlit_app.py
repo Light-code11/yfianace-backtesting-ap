@@ -398,7 +398,11 @@ elif page == "Backtest":
     strategies_data = make_api_request("/strategies")
 
     if strategies_data and strategies_data.get('strategies'):
-        strategy_options = {f"{s['name']} (ID: {s['id']})": s['id'] for s in strategies_data['strategies']}
+        # Format: "NVDA - Strategy Name (ID: 1)"
+        strategy_options = {
+            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']} (ID: {s['id']})": s['id']
+            for s in strategies_data['strategies']
+        }
 
         with st.form("backtest_form"):
             st.subheader("Backtest Configuration")
@@ -498,7 +502,11 @@ elif page == "Paper Trading":
     strategies_data = make_api_request("/strategies")
 
     if strategies_data and strategies_data.get('strategies'):
-        strategy_options = {f"{s['name']} (ID: {s['id']})": s['id'] for s in strategies_data['strategies']}
+        # Format: "NVDA - Strategy Name (ID: 1)"
+        strategy_options = {
+            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']} (ID: {s['id']})": s['id']
+            for s in strategies_data['strategies']
+        }
 
         # Execute paper trade
         st.subheader("Execute Paper Trade")
@@ -585,7 +593,11 @@ elif page == "Portfolio Optimizer":
         st.subheader("Select Strategies to Include")
 
         # Multi-select for strategies
-        strategy_options = {s['name']: s['id'] for s in strategies_data['strategies']}
+        # Format: "NVDA - Strategy Name"
+        strategy_options = {
+            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']}": s['id']
+            for s in strategies_data['strategies']
+        }
         selected_strategies = st.multiselect(
             "Strategies",
             options=list(strategy_options.keys()),
