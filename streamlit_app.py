@@ -559,9 +559,17 @@ elif page == "Backtest":
     strategies_data = make_api_request("/strategies")
 
     if strategies_data and strategies_data.get('strategies'):
-        # Format: "NVDA - Strategy Name (ID: 1)"
+        # Format: "NVDA, AAPL - Strategy Name (ID: 1)"
+        def format_strategy_name(s):
+            tickers = s.get('tickers', [])
+            if tickers and isinstance(tickers, list) and len(tickers) > 0:
+                ticker_prefix = ', '.join(tickers) + ' - '
+            else:
+                ticker_prefix = ''
+            return f"{ticker_prefix}{s['name']} (ID: {s['id']})"
+
         strategy_options = {
-            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']} (ID: {s['id']})": s['id']
+            format_strategy_name(s): s['id']
             for s in strategies_data['strategies']
         }
 
@@ -690,9 +698,17 @@ elif page == "Paper Trading":
     strategies_data = make_api_request("/strategies")
 
     if strategies_data and strategies_data.get('strategies'):
-        # Format: "NVDA - Strategy Name (ID: 1)"
+        # Format: "NVDA, AAPL - Strategy Name (ID: 1)"
+        def format_strategy_name(s):
+            tickers = s.get('tickers', [])
+            if tickers and isinstance(tickers, list) and len(tickers) > 0:
+                ticker_prefix = ', '.join(tickers) + ' - '
+            else:
+                ticker_prefix = ''
+            return f"{ticker_prefix}{s['name']} (ID: {s['id']})"
+
         strategy_options = {
-            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']} (ID: {s['id']})": s['id']
+            format_strategy_name(s): s['id']
             for s in strategies_data['strategies']
         }
 
@@ -781,9 +797,17 @@ elif page == "Portfolio Optimizer":
         st.subheader("Select Strategies to Include")
 
         # Multi-select for strategies
-        # Format: "NVDA - Strategy Name"
+        # Format: "NVDA, AAPL - Strategy Name"
+        def format_strategy_name_simple(s):
+            tickers = s.get('tickers', [])
+            if tickers and isinstance(tickers, list) and len(tickers) > 0:
+                ticker_prefix = ', '.join(tickers) + ' - '
+            else:
+                ticker_prefix = ''
+            return f"{ticker_prefix}{s['name']}"
+
         strategy_options = {
-            f"{', '.join(s.get('tickers', [])) + ' - ' if s.get('tickers') else ''}{s['name']}": s['id']
+            format_strategy_name_simple(s): s['id']
             for s in strategies_data['strategies']
         }
         selected_strategies = st.multiselect(
