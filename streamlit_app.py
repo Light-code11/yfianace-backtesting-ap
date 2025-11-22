@@ -683,6 +683,13 @@ elif page == "Backtest":
                             if results['trades']:
                                 trades_df = pd.DataFrame(results['trades'])
                                 st.dataframe(trades_df, use_container_width=True)
+    else:
+        st.info("📋 No strategies available yet!")
+        st.write("""
+        **Get started:**
+        - Go to the **Generate Strategies** page to create strategies manually
+        - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
+        """)
 
 
 # =======================
@@ -747,6 +754,13 @@ elif page == "Paper Trading":
                         st.metric("Cash", f"${response['cash']:,.2f}")
                     with col3:
                         st.metric("Total Return", f"{response['total_return_pct']:.2f}%")
+    else:
+        st.info("📋 No strategies available for paper trading!")
+        st.write("""
+        **Get started:**
+        - Go to the **Generate Strategies** page to create strategies manually
+        - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
+        """)
 
     st.markdown("---")
 
@@ -882,6 +896,13 @@ elif page == "Portfolio Optimizer":
                         if response.get('strategies'):
                             allocation_df = pd.DataFrame(response['strategies'])
                             st.dataframe(allocation_df, use_container_width=True)
+    else:
+        st.info("📋 No strategies available for portfolio optimization!")
+        st.write("""
+        **Get started:**
+        - Go to the **Generate Strategies** page to create strategies manually
+        - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
+        """)
 
 
 # =======================
