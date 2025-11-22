@@ -476,13 +476,82 @@ if page == "Dashboard":
 
         if backtest_data and backtest_data.get('results'):
             backtest_df = pd.DataFrame(backtest_data['results'])
+
+            # Prepare columns to display
+            display_cols = [
+                'strategy_name', 'total_trades', 'total_return_pct', 'sharpe_ratio',
+                'win_rate', 'max_drawdown_pct', 'quality_score'
+            ]
+
+            # Add Kelly Criterion columns if available
+            if 'kelly_position_pct' in backtest_df.columns:
+                display_cols.extend(['kelly_position_pct', 'kelly_risk_level'])
+
             st.dataframe(
-                backtest_df[[
-                    'strategy_name', 'total_trades', 'total_return_pct', 'sharpe_ratio',
-                    'win_rate', 'max_drawdown_pct', 'quality_score'
-                ]],
-                use_container_width=True
+                backtest_df[display_cols],
+                use_container_width=True,
+                column_config={
+                    "kelly_position_pct": "Kelly Position %",
+                    "kelly_risk_level": "Kelly Risk"
+                }
             )
+
+            # Show Kelly Criterion explanation for the best strategy
+            if 'kelly_position_pct' in backtest_df.columns:
+                best_kelly = backtest_df.loc[backtest_df['quality_score'].idxmax()]
+
+                if pd.notna(best_kelly.get('kelly_position_pct')):
+                    st.markdown("---")
+                    st.subheader("📊 Kelly Criterion - Best Strategy")
+
+                    col1, col2, col3, col4 = st.columns(4)
+
+                    with col1:
+                        kelly_pct = best_kelly.get('kelly_position_pct', 0)
+                        st.metric("Optimal Position Size", f"{kelly_pct:.2f}%")
+
+                    with col2:
+                        risk_level = best_kelly.get('kelly_risk_level', 'UNKNOWN')
+                        st.metric("Risk Level", risk_level)
+
+                    with col3:
+                        kelly_fraction = best_kelly.get('kelly_criterion', 0)
+                        st.metric("Kelly Fraction", f"{kelly_fraction:.4f}")
+
+                    with col4:
+                        # Recommendation based on Kelly position
+                        if kelly_pct == 0:
+                            recommendation = "❌ Skip"
+                        elif kelly_pct < 2:
+                            recommendation = "⚠️ Very Conservative"
+                        elif kelly_pct < 5:
+                            recommendation = "✅ Conservative"
+                        elif kelly_pct < 10:
+                            recommendation = "✅ Good"
+                        else:
+                            recommendation = "🔥 Excellent"
+
+                        st.metric("Recommendation", recommendation)
+
+                    # Explanation
+                    with st.expander("ℹ️ What is Kelly Criterion?"):
+                        st.markdown("""
+                        **Kelly Criterion** calculates the mathematically optimal position size based on:
+                        - **Win Rate**: How often the strategy wins
+                        - **Win/Loss Ratio**: Average win vs average loss
+
+                        **Interpretation**:
+                        - **0%**: No edge - don't trade this strategy
+                        - **2-5%**: Small edge - conservative sizing
+                        - **5-10%**: Good edge - moderate sizing
+                        - **10-15%**: Strong edge - aggressive sizing
+
+                        **Safety Note**: We use "Quarter Kelly" (25% of full Kelly) to reduce risk of ruin.
+                        Full Kelly can be too aggressive and lead to large drawdowns.
+                        """)
+            else:
+                st.info("💡 Tip: Run a new backtest to see Kelly Criterion recommendations!")
+
 
 
 # =======================
@@ -685,6 +754,81 @@ elif page == "Backtest":
                             with col5:
                                 st.metric("Total Trades", results['metrics']['total_trades'])
                                 st.metric("Win Rate", f"{results['metrics']['win_rate']:.2f}%")
+
+                            # Kelly Criterion Section
+                            if 'kelly_position_pct' in results['metrics'] and results['metrics']['kelly_position_pct'] is not None:
+                                st.markdown("---")
+                                st.subheader("📊 Kelly Criterion - Optimal Position Sizing")
+
+                                col1, col2, col3, col4 = st.columns(4)
+
+                                with col1:
+                                    kelly_pct = results['metrics']['kelly_position_pct']
+                                    st.metric("Optimal Position Size", f"{kelly_pct:.2f}%")
+
+                                with col2:
+                                    risk_level = results['metrics'].get('kelly_risk_level', 'UNKNOWN')
+                                    # Color code the risk level
+                                    if risk_level in ['NO EDGE', 'EXTREME']:
+                                        st.metric("Risk Level", f"🔴 {risk_level}")
+                                    elif risk_level in ['VERY LOW', 'LOW']:
+                                        st.metric("Risk Level", f"🟢 {risk_level}")
+                                    elif risk_level in ['MODERATE', 'MODERATE-HIGH']:
+                                        st.metric("Risk Level", f"🟡 {risk_level}")
+                                    else:
+                                        st.metric("Risk Level", f"🟠 {risk_level}")
+
+                                with col3:
+                                    kelly_fraction = results['metrics'].get('kelly_criterion', 0)
+                                    st.metric("Kelly Fraction", f"{kelly_fraction:.4f}")
+
+                                with col4:
+                                    # Recommendation based on Kelly position
+                                    if kelly_pct == 0:
+                                        recommendation = "❌ Skip This Strategy"
+                                        rec_color = "red"
+                                    elif kelly_pct < 2:
+                                        recommendation = "⚠️ Very Conservative"
+                                        rec_color = "orange"
+                                    elif kelly_pct < 5:
+                                        recommendation = "✅ Conservative"
+                                        rec_color = "green"
+                                    elif kelly_pct < 10:
+                                        recommendation = "✅ Good Edge"
+                                        rec_color = "green"
+                                    else:
+                                        recommendation = "🔥 Excellent Edge"
+                                        rec_color = "green"
+
+                                    st.metric("Recommendation", recommendation)
+
+                                # Explanation
+                                with st.expander("ℹ️ What is Kelly Criterion?"):
+                                    st.markdown(f"""
+                                    **Kelly Criterion** calculates the mathematically optimal position size based on:
+                                    - **Win Rate**: {results['metrics']['win_rate']:.2f}% (How often the strategy wins)
+                                    - **Win/Loss Ratio**: {abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f} (Average win vs average loss)
+
+                                    **For This Strategy:**
+                                    - **Kelly Fraction**: {kelly_fraction:.4f} (Raw Kelly recommendation)
+                                    - **Position Size**: {kelly_pct:.2f}% (Quarter Kelly for safety)
+                                    - **Risk Level**: {risk_level}
+
+                                    **Interpretation**:
+                                    - **0%**: No edge - don't trade this strategy
+                                    - **0-2%**: Very small edge - might skip
+                                    - **2-5%**: Small edge - conservative sizing
+                                    - **5-10%**: Good edge - moderate sizing
+                                    - **10-15%**: Strong edge - aggressive sizing
+
+                                    **Safety Note**: We use "Quarter Kelly" (25% of full Kelly) to reduce risk of ruin.
+                                    Full Kelly can be too aggressive and lead to large drawdowns (50%+).
+
+                                    **Mathematical Formula**: f* = (p × b - q) / b
+                                    - p = win probability ({results['metrics']['win_rate']/100:.4f})
+                                    - q = loss probability ({1 - results['metrics']['win_rate']/100:.4f})
+                                    - b = win/loss ratio ({abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f})
+                                    """)
 
                             # Charts Section
                             st.markdown("---")
