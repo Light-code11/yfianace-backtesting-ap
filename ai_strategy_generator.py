@@ -28,8 +28,8 @@ class AIStrategyGenerator:
             http_client=http_client,
             max_retries=3  # Built-in retry mechanism
         )
-        # Use gpt-4o-mini or gpt-3.5-turbo as fallback (cheaper and more widely available)
-        self.model = "gpt-4o-mini"  # Changed from "gpt-4" for better compatibility
+        # Use gpt-4o for superior reasoning and strategy generation
+        self.model = "gpt-4o"  # Upgraded for better strategy quality
 
     def generate_strategies(
         self,
@@ -77,7 +77,7 @@ class AIStrategyGenerator:
         """
         Call OpenAI API with exponential backoff retry logic
         """
-        models_to_try = [self.model, "gpt-3.5-turbo"]  # Fallback models
+        models_to_try = [self.model, "gpt-4o-mini", "gpt-3.5-turbo"]  # Fallback models
 
         for model in models_to_try:
             for attempt in range(max_retries):
@@ -198,14 +198,27 @@ AI LEARNING INSIGHTS:
 {json.dumps(learning_insights, indent=2)}
 """
 
-        # Add requirements section
+        # Add requirements section with safety constraints
         prompt += f"""
+CRITICAL SAFETY CONSTRAINTS (MUST FOLLOW):
+1. Stop Loss: MAXIMUM 3% (never use 5% or higher - causes excessive losses)
+2. Position Size: MAXIMUM 5% per trade (never use 10% or higher)
+3. Win Rate Target: Aim for strategies with 55%+ win rate potential
+4. Risk/Reward: Minimum 2:1 ratio (take_profit should be 2x stop_loss)
+5. Max Trades Per Day: Limit to 2-3 to avoid overtrading
+
+PROVEN STRATEGY TEMPLATES (Use these as base, then customize):
+1. RSI Mean Reversion: Buy when RSI < 30, sell when RSI > 70, stop_loss=2%, take_profit=4%
+2. Golden Cross: Buy when SMA(50) > SMA(200), sell when opposite, stop_loss=3%, take_profit=6%
+3. Momentum Breakout: Buy on 20-day high, sell on 10-day low, stop_loss=2.5%, take_profit=5%
+4. MACD Trend: Buy on MACD crossover + price > SMA(20), stop_loss=2%, take_profit=4%
+
 REQUIREMENTS:
-Generate diverse strategies using different approaches:
-1. Momentum-based strategies
-2. Mean reversion strategies
-3. Breakout strategies
-4. Trend following strategies
+Generate diverse strategies using these proven approaches:
+1. RSI mean reversion (oversold/overbought)
+2. Moving average crossovers (trend following)
+3. Momentum breakouts (new highs/lows)
+4. MACD + trend confirmation
 
 IMPORTANT: Each strategy MUST use the tickers: {', '.join(tickers)}
 The "tickers" field in EVERY strategy response must be: {json.dumps(tickers)}
@@ -233,9 +246,9 @@ For EACH strategy, provide:
         "time_based": "Time-based exit (optional)"
       }},
       "risk_management": {{
-        "stop_loss_pct": 5.0,
-        "take_profit_pct": 10.0,
-        "position_size_pct": 10.0,
+        "stop_loss_pct": 2.5,
+        "take_profit_pct": 5.0,
+        "position_size_pct": 5.0,
         "max_positions": 3
       }},
       "holding_period_days": 5,

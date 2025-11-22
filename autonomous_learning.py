@@ -44,7 +44,7 @@ class AutonomousLearningAgent:
                  learning_interval_minutes: int = None,
                  learning_interval_hours: int = None,
                  strategies_per_cycle: int = 3,
-                 min_quality_score: float = 60.0):
+                 min_quality_score: float = 70.0):
         """
         Initialize the autonomous learning agent
 
@@ -377,7 +377,7 @@ if __name__ == "__main__":
         tickers=['NVDA', 'AAPL', 'MSFT'],  # Tickers to focus on
         learning_interval_hours=6,          # Run every 6 hours
         strategies_per_cycle=3,             # Generate 3 strategies per cycle
-        min_quality_score=60.0              # Archive strategies below 60 quality
+        min_quality_score=70.0              # Archive strategies below 70 quality
     )
 
     agent.run_forever()

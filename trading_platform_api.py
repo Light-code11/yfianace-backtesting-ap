@@ -842,7 +842,7 @@ async def start_autonomous_learning(config: AutonomousAgentConfig):
         learning_interval_minutes=config.interval_minutes,
         learning_interval_hours=config.interval_hours,
         strategies_per_cycle=config.strategies_per_cycle,
-        min_quality_score=60.0
+        min_quality_score=70.0
     )
 
     # Start in background thread
@@ -946,7 +946,7 @@ async def trigger_learning_cycle():
             tickers=['SPY', 'QQQ', 'AAPL'],
             learning_interval_hours=6,
             strategies_per_cycle=3,
-            min_quality_score=60.0
+            min_quality_score=70.0
         )
     else:
         agent = autonomous_agent
