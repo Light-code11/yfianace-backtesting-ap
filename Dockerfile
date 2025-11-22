@@ -20,6 +20,10 @@ RUN pip install --no-cache-dir -r requirements-trading-platform.txt
 COPY *.py ./
 COPY yfinance/ ./yfinance/
 
+# Copy and set executable permission for entrypoint script
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
+
 # Expose port (Railway sets PORT environment variable)
 EXPOSE 8000
 
@@ -27,6 +31,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Run the application (use PORT from environment or default to 8000)
-CMD ["sh", "-c", "uvicorn trading_platform_api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Use entrypoint script to handle PORT variable
+ENTRYPOINT ["./docker-entrypoint.sh"]
 
