@@ -488,7 +488,10 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
             avg_loss=metrics_clean['avg_loss'],
             trades=trades_clean,
             equity_curve=equity_curve_clean,
-            quality_score=metrics_clean['quality_score']
+            quality_score=metrics_clean['quality_score'],
+            kelly_criterion=metrics_clean.get('kelly_criterion'),
+            kelly_position_pct=metrics_clean.get('kelly_position_pct'),
+            kelly_risk_level=metrics_clean.get('kelly_risk_level')
         )
         db.add(backtest_result)
         db.commit()

@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Tuple
 from datetime import datetime, timedelta
+from kelly_criterion import KellyCriterion
 
 
 class TechnicalIndicators:
@@ -437,6 +438,13 @@ class BacktestingEngine:
             dd = ((peak - value) / peak) * 100
             max_dd = max(max_dd, dd)
 
+        # Calculate Kelly Criterion optimal position sizing
+        kelly_result = KellyCriterion.calculate_kelly_from_backtest({
+            'win_rate': win_rate,
+            'avg_win': avg_win,
+            'avg_loss': avg_loss
+        }, fractional_kelly=0.25)  # Use Quarter Kelly for safety
+
         return {
             'total_return_pct': round(total_return_pct, 2),
             'total_trades': total_trades,
@@ -451,7 +459,11 @@ class BacktestingEngine:
             'avg_loss': round(avg_loss, 2),
             'quality_score': self._calculate_quality_score(
                 sharpe_ratio, win_rate, max_dd, total_return_pct
-            )
+            ),
+            # Kelly Criterion optimal position sizing
+            'kelly_criterion': kelly_result['kelly_fraction'],
+            'kelly_position_pct': kelly_result['recommended_position_pct'],
+            'kelly_risk_level': kelly_result['risk_level']
         }
 
     def _calculate_quality_score(

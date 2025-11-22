@@ -94,6 +94,11 @@ class BacktestResult(Base):
     # Quality score (calculated)
     quality_score = Column(Float)  # 0-100 composite score
 
+    # Kelly Criterion optimal position sizing
+    kelly_criterion = Column(Float, nullable=True)  # Kelly fraction (0-1)
+    kelly_position_pct = Column(Float, nullable=True)  # Recommended position %
+    kelly_risk_level = Column(String, nullable=True)  # Risk level assessment
+
 
 class PaperTrade(Base):
     """Paper trading positions and history"""
