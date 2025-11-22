@@ -2430,14 +2430,35 @@ elif page == "🎯 Complete Trading System":
                     for strategy in strategies:
                         status_text.text(f"Backtesting {strategy} on {ticker}...")
 
+                        # Build strategy_config from strategy type
+                        # Get optimized parameters if available
+                        opt_key = f"{ticker}_{strategy}"
+                        opt_params = optimization_results.get(opt_key, {}).get('optimal_params', {})
+
+                        # Create strategy config for backtest API
+                        strategy_config = {
+                            "name": f"{strategy.replace('_', ' ').title()} - {ticker}",
+                            "tickers": [ticker],
+                            "strategy_type": strategy,
+                            "indicators": [],  # Will be determined by strategy_type
+                            "risk_management": {
+                                "stop_loss_pct": 5.0,
+                                "take_profit_pct": 10.0,
+                                "position_size_pct": 10.0
+                            }
+                        }
+
+                        # Add optimized parameters if available
+                        if opt_params:
+                            strategy_config['optimized_params'] = opt_params
+
                         # Run backtest
                         response = make_api_request(
                             "/backtest",
                             method="POST",
                             data={
-                                "ticker": ticker,
-                                "strategy_type": strategy,
-                                "lookback_period": lookback_period
+                                "strategy_config": strategy_config,
+                                "initial_capital": 100000
                             }
                         )
 
