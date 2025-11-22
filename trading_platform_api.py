@@ -743,8 +743,8 @@ async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
 
 class AutonomousAgentConfig(BaseModel):
     tickers: List[str] = ['SPY', 'QQQ', 'AAPL']
-    interval_hours: int = None
-    interval_minutes: int = None
+    interval_hours: Optional[int] = None
+    interval_minutes: Optional[int] = None
     strategies_per_cycle: int = 3
 
 
