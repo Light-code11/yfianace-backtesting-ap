@@ -37,6 +37,7 @@ from advanced_portfolio_optimizer import AdvancedPortfolioOptimizer
 from autonomous_learning import AutonomousLearningAgent
 from strategy_visualizer import StrategyVisualizer
 from ml_price_predictor import MLPricePredictor
+from hmm_regime_detector import HMMRegimeDetector
 import threading
 
 # Helper function to convert numpy types to Python types for PostgreSQL
@@ -1043,6 +1044,111 @@ async def delete_ml_model(ticker: str):
                 "success": False,
                 "error": f"No model found for {ticker}"
             }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =======================
+# HMM REGIME DETECTION ENDPOINTS
+# =======================
+
+class RegimeTrainingRequest(BaseModel):
+    ticker: str
+    period: str = "2y"  # Historical data period
+    n_regimes: int = 3  # Number of regimes (default 3: bull/bear/consolidation)
+    n_iter: int = 100  # Training iterations
+
+
+@app.post("/regime/train")
+async def train_regime_detector(request: RegimeTrainingRequest):
+    """
+    Train HMM model to detect market regimes
+
+    Args:
+        ticker: Stock ticker symbol
+        period: Historical data period (default 2 years)
+        n_regimes: Number of hidden states (default 3)
+        n_iter: Training iterations
+
+    Returns:
+        Training results with regime characteristics
+    """
+    try:
+        detector = HMMRegimeDetector(
+            n_regimes=request.n_regimes,
+            random_state=42
+        )
+
+        # Train model
+        result = detector.train(
+            ticker=request.ticker,
+            period=request.period,
+            n_iter=request.n_iter
+        )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/regime/predict/{ticker}")
+async def predict_regime(ticker: str):
+    """
+    Predict current market regime
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        Current regime with probabilities and transitions
+    """
+    try:
+        # Need to train first or load model
+        # For now, train on-demand (in production, would cache models)
+        detector = HMMRegimeDetector(n_regimes=3, random_state=42)
+
+        # Train on 2 years of data
+        train_result = detector.train(ticker, period="2y")
+
+        if not train_result['success']:
+            return train_result
+
+        # Get prediction
+        pred_result = detector.predict_regime(ticker)
+
+        return pred_result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/regime/history/{ticker}")
+async def get_regime_history(ticker: str, period: str = "1y"):
+    """
+    Get regime history over time for visualization
+
+    Args:
+        ticker: Stock ticker symbol
+        period: Historical period (default 1 year)
+
+    Returns:
+        Timeline with prices and regimes
+    """
+    try:
+        # Train detector
+        detector = HMMRegimeDetector(n_regimes=3, random_state=42)
+
+        train_result = detector.train(ticker, period=period)
+
+        if not train_result['success']:
+            return train_result
+
+        # Get history
+        history_result = detector.get_regime_history(ticker, period=period)
+
+        return history_result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

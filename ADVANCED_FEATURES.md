@@ -133,7 +133,51 @@
 
 **Impact**: MEDIUM-HIGH - Adds ML-powered signals, 55-65% win rate typical
 
-### 5. Advanced Risk Metrics
+### 5. Hidden Markov Model Regime Detection ✅
+**Status**: DEPLOYED - HMM regime detection now live!
+
+**What it does**:
+- Automatically detects 3 market regimes from price data:
+  - 🟢 **BULL**: High returns, low volatility (trending up)
+  - 🔴 **BEAR**: Negative returns, high volatility (trending down)
+  - 🟡 **CONSOLIDATION**: Low returns, low volatility (sideways/choppy)
+- Uses Gaussian HMM trained on returns, volatility, and volume
+- Probabilistic regime classification with confidence scores
+- Predicts next-period regime transitions
+- Visual timeline showing regime changes over time
+
+**Features**:
+- **Detect Regimes Tab**: Get current market regime with confidence
+- **Regime History Tab**: Visualize regime timeline with price chart
+- **Strategy Insights Tab**: Strategy recommendations for each regime
+- **API Endpoints**:
+  - POST /regime/train - Train HMM on ticker
+  - GET /regime/predict/{ticker} - Get current regime
+  - GET /regime/history/{ticker} - Get regime timeline
+
+**How It Works**:
+1. Trains Gaussian HMM on historical returns + volatility + volume
+2. Identifies 3 hidden states (regimes)
+3. Labels states based on characteristics:
+   - Highest return = BULL
+   - Lowest return = BEAR
+   - Middle = CONSOLIDATION (or HIGH_VOLATILITY if vol is high)
+4. Provides regime probabilities and transition matrix
+
+**Trading Insights**:
+- **BULL**: Use momentum strategies, increase position sizes
+- **BEAR**: Preserve capital, reduce exposure, consider inverse
+- **CONSOLIDATION**: Mean reversion, range trading, conservative sizing
+
+**Visualizations**:
+- Bar chart of current regime probabilities
+- Price chart colored by regime periods
+- Regime timeline showing transitions
+- Statistics on regime distribution (% of time in each)
+
+**Impact**: MEDIUM - Helps match strategy type to market conditions, improves risk management
+
+### 6. Advanced Risk Metrics
 **Status**: Library installed, integration pending
 
 **What's coming**:
@@ -143,16 +187,6 @@
 - Better Sortino ratio calculation
 
 **Impact**: MEDIUM - Better understanding of downside risk
-
-### 6. Hidden Markov Model Regime Detection
-**Status**: Library installed, training pending
-
-**What's coming**:
-- Auto-detect bull/bear/consolidation regimes
-- More accurate than current SMA-based detection
-- Predict regime changes before they happen
-
-**Impact**: MEDIUM - Better strategy adaptation to market conditions
 
 ### 7. Vectorized Backtesting
 **Status**: Library installed, integration pending
@@ -256,9 +290,9 @@ Based on quantitative finance research:
 | Strategy Visualization | ✅ Deployed | HIGH | Done |
 | Portfolio Optimization | ✅ Deployed | HIGH | Done |
 | ML Price Prediction | ✅ Deployed | MEDIUM-HIGH | Done |
+| HMM Regime Detection | ✅ Deployed | MEDIUM | Done |
 | Advanced Risk Metrics | 📦 Ready | MEDIUM | Next |
-| HMM Regime Detection | 📦 Ready | MEDIUM | Week 2 |
-| Vectorized Backtesting | 📦 Ready | LOW | Week 3 |
+| Vectorized Backtesting | 📦 Ready | LOW | Future |
 
 ## 💡 How to Use Kelly Criterion (Available Now!)
 
@@ -360,6 +394,69 @@ After backtesting, check the new fields:
 - Don't overtrade - wait for high-confidence signals
 - Combine ML with technical analysis for confirmation
 
+## 📊 How to Use HMM Regime Detection (Available Now!)
+
+1. **Check Current Market Regime**:
+   - Go to Market Regimes page → Detect Regimes tab
+   - Enter ticker (e.g., NVDA, SPY)
+   - Click "Detect Current Regime"
+   - Review regime label (BULL/BEAR/CONSOLIDATION) and confidence
+
+2. **Interpret Regime Probabilities**:
+   - **High confidence (70%+)**: Regime is well-defined, act accordingly
+   - **Mixed probabilities**: Market is transitioning between regimes, be cautious
+   - Example: BULL 80%, BEAR 15%, CONSOLIDATION 5% = Strong BULL regime
+
+3. **Match Strategy to Regime**:
+   - **BULL Regime** → Use momentum strategies:
+     - Breakouts, trend-following, moving average crossovers
+     - Increase position sizes (within Kelly limits)
+     - Trail stops to lock in gains
+   - **BEAR Regime** → Preserve capital:
+     - Reduce exposure to 0-30%
+     - Go to cash or use inverse ETFs
+     - Avoid momentum longs
+   - **CONSOLIDATION Regime** → Mean reversion:
+     - Range-bound trading (buy support, sell resistance)
+     - Conservative position sizing (half-Kelly)
+     - Quick profits, tight stops
+
+4. **Monitor Regime Transitions**:
+   - Check "Next Period Likely Regimes" probabilities
+   - If next-period BEAR probability rises (e.g., from 10% to 30%), regime may be changing
+   - Reduce positions when regime confidence drops
+
+5. **Use Regime History**:
+   - Regime History tab shows how regimes changed over time
+   - Identify typical regime durations (e.g., BULL periods last 60-90 days)
+   - See which price levels coincided with regime changes
+
+6. **Portfolio-Level Filters**:
+   - **BULL**: Max 100% exposure, can be aggressive
+   - **BEAR**: Max 30% exposure, defensive only
+   - **CONSOLIDATION**: Max 50-60% exposure, conservative
+   - This prevents overexposure in unfavorable regimes
+
+**Example Trading Workflow**:
+```
+1. Check regime: BULL (85% confidence)
+2. Generate momentum strategies (AI or manual)
+3. Backtest strategies
+4. Check Kelly position size (e.g., 8% recommended)
+5. Check ML prediction for entry timing
+6. Enter trade when:
+   - Regime = BULL (85%+)
+   - ML predicts UP (70%+)
+   - Kelly says 5-10% position
+7. Monitor regime daily - if drops to 60% or switches to CONSOLIDATION, reduce position
+```
+
+**Advanced Usage**:
+- Run regime detection on SPY/QQQ for market-wide regime
+- Compare individual stock regime vs market regime
+- Backtest strategies separately by regime to see regime-specific performance
+- Use regime as a signal in ML features (train ML model with regime as input)
+
 ## 🎯 Next Steps for You
 
 1. **Current Features** (Available Now!):
@@ -368,18 +465,47 @@ After backtesting, check the new fields:
    - ✅ **Strategy Visualization**: See exactly what your strategy is doing with interactive charts
    - ✅ **Portfolio Optimization**: Combine multiple strategies for better risk-adjusted returns
    - ✅ **ML Price Prediction**: XGBoost models predict next-day movements with 55-65% accuracy
+   - ✅ **HMM Regime Detection**: Auto-detect BULL/BEAR/CONSOLIDATION market regimes
 
 2. **How to Get Started**:
-   - Generate 3-5 different strategies (use Autonomous Agent for automated generation)
+   - Check current market regime (Market Regimes page)
+   - Generate 3-5 different strategies matching the current regime
    - Backtest each strategy - check Kelly position % and Sharpe ratio
    - Train ML models on your favorite tickers
    - Use ML predictions as additional entry signals
    - Use Portfolio Optimizer to combine top strategies with optimal weights
+   - Adjust position sizes based on regime (aggressive in BULL, conservative in CONSOLIDATION, minimal in BEAR)
    - Paper trade the portfolio to validate before going live
 
-3. **Coming Next**:
+3. **Complete Trading System Workflow**:
+   ```
+   1. Check Market Regime (Market Regimes page)
+      → BULL = momentum strategies, BEAR = defensive, CONSOLIDATION = mean reversion
+
+   2. Generate Strategies matching regime
+      → Use Autonomous Agent or manual strategy creation
+
+   3. Backtest Strategies
+      → Look for positive returns, good Sharpe ratio, Kelly > 5%
+
+   4. Train ML Model for entry timing
+      → Get daily predictions with 70%+ confidence
+
+   5. Optimize Portfolio
+      → Combine top 3-5 strategies with Portfolio Optimizer
+
+   6. Execute with Proper Position Sizing
+      → Use Kelly Criterion recommendations
+      → Adjust for regime (reduce in BEAR/CONSOLIDATION)
+
+   7. Monitor Daily
+      → Regime changes → adjust strategy mix
+      → ML predictions → entry/exit timing
+      → Kelly updates → position size adjustments
+   ```
+
+4. **Coming Next**:
    - Advanced risk metrics (VaR, CVaR, Ulcer Index)
-   - HMM regime detection (auto-detect bull/bear/consolidation)
    - Vectorized backtesting (1000x faster parameter optimization)
 
-Let the platform find the edge, Kelly Criterion tells you how much to risk, ML predicts market direction, and Portfolio Optimization combines everything optimally!
+Let the platform find the edge (AI + Backtesting), Kelly Criterion tells you how much to risk, ML predicts entry/exit timing, Regime Detection tells you which strategy type to use, and Portfolio Optimization combines everything optimally!

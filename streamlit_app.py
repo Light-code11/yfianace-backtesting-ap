@@ -373,7 +373,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -1574,6 +1574,429 @@ elif page == "🤖 ML Predictions":
                 st.info("📋 No trained models yet. Train your first model in the 'Train Model' tab!")
         else:
             st.error("❌ Failed to load models")
+
+
+# =======================
+# MARKET REGIMES PAGE
+# =======================
+
+elif page == "📊 Market Regimes":
+    st.markdown('<div class="main-header">📊 Market Regime Detection (HMM)</div>', unsafe_allow_html=True)
+
+    st.write("""
+    **Hidden Markov Models (HMM)** automatically detect market regimes from price data.
+
+    **Detects 3 regimes:**
+    - 🟢 **BULL**: High returns, lower volatility (trending up)
+    - 🔴 **BEAR**: Negative returns, higher volatility (trending down)
+    - 🟡 **CONSOLIDATION**: Low returns, low volatility (sideways/choppy)
+
+    **Why it matters:**
+    - Different strategies work in different regimes
+    - Momentum strategies excel in BULL markets
+    - Mean reversion works better in CONSOLIDATION
+    - Risk management critical in BEAR markets
+    """)
+
+    tab1, tab2, tab3 = st.tabs(["🔍 Detect Regimes", "📈 Regime History", "💡 Strategy Insights"])
+
+    # =======================
+    # TAB 1: DETECT REGIMES
+    # =======================
+    with tab1:
+        st.subheader("Detect Current Market Regime")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            regime_ticker = st.text_input(
+                "Ticker Symbol",
+                value="NVDA",
+                help="Stock ticker to analyze"
+            ).upper()
+
+        with col2:
+            regime_period = st.selectbox(
+                "Training Period",
+                ["1y", "2y", "3y", "5y"],
+                index=1,
+                help="More data = more accurate regime detection"
+            )
+
+        st.markdown("---")
+
+        if st.button("🔍 Detect Current Regime", use_container_width=True):
+            with st.spinner(f"Analyzing market regimes for {regime_ticker}..."):
+                # Train and predict
+                response = make_api_request(f"/regime/predict/{regime_ticker}")
+
+                if response and response.get('success'):
+                    st.success("✅ Regime detected successfully!")
+
+                    # Current regime
+                    current_regime = response['current_regime']
+
+                    # Main display
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        st.metric("Current Price", f"${response['current_price']:.2f}")
+
+                    with col2:
+                        regime_label = current_regime['label']
+
+                        # Color-code regime
+                        if regime_label == "BULL":
+                            st.markdown(f"### 🟢 **{regime_label}**")
+                        elif regime_label == "BEAR":
+                            st.markdown(f"### 🔴 **{regime_label}**")
+                        else:
+                            st.markdown(f"### 🟡 **{regime_label}**")
+
+                    with col3:
+                        confidence = current_regime['confidence']
+                        st.metric("Confidence", f"{confidence * 100:.1f}%")
+
+                    # Regime probabilities
+                    st.markdown("### 📊 Current Regime Probabilities")
+
+                    regime_probs = response['regime_probabilities']
+
+                    import plotly.graph_objects as go
+
+                    fig = go.Figure(data=[
+                        go.Bar(
+                            x=list(regime_probs.keys()),
+                            y=[v * 100 for v in regime_probs.values()],
+                            marker=dict(
+                                color=['green' if k == 'BULL' else 'red' if k == 'BEAR' else 'orange'
+                                       for k in regime_probs.keys()]
+                            ),
+                            text=[f"{v*100:.1f}%" for v in regime_probs.values()],
+                            textposition='auto'
+                        )
+                    ])
+
+                    fig.update_layout(
+                        title="Regime Probability Distribution",
+                        xaxis_title="Market Regime",
+                        yaxis_title="Probability (%)",
+                        yaxis=dict(range=[0, 100]),
+                        height=400
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Next period predictions
+                    st.markdown("### 🔮 Next Period Likely Regimes")
+
+                    next_probs = response['next_regime_probabilities']
+
+                    col1, col2, col3 = st.columns(3)
+
+                    prob_items = list(next_probs.items())
+                    for i, (regime, prob) in enumerate(prob_items):
+                        with [col1, col2, col3][i % 3]:
+                            st.metric(f"{regime}", f"{prob*100:.1f}%")
+
+                    # Trading insights
+                    st.markdown("### 💡 Trading Insights")
+
+                    regime_label = current_regime['label']
+
+                    if regime_label == "BULL":
+                        st.success("""
+                        **🟢 BULL Market Detected**
+                        - ✅ Momentum strategies likely to perform well
+                        - ✅ Trend-following strategies (breakouts, moving average crossovers)
+                        - ✅ Consider increasing position sizes (within Kelly limits)
+                        - ⚠️ Watch for regime change signals (drop in confidence)
+                        """)
+                    elif regime_label == "BEAR":
+                        st.error("""
+                        **🔴 BEAR Market Detected**
+                        - 🛡️ Focus on capital preservation
+                        - 🛡️ Reduce position sizes or go to cash
+                        - 🛡️ Consider inverse/short strategies if experienced
+                        - 🛡️ Tighter stop losses recommended
+                        - ⚠️ Avoid momentum longs (likely to fail)
+                        """)
+                    else:
+                        st.warning("""
+                        **🟡 CONSOLIDATION Market Detected**
+                        - ⚖️ Mean reversion strategies work better
+                        - ⚖️ Range-bound trading (buy support, sell resistance)
+                        - ⚖️ Breakout strategies may generate false signals
+                        - ⚖️ Reduce position sizes (choppy markets)
+                        - ⚠️ Wait for regime change to BULL before aggressive longs
+                        """)
+
+                    # Statistical details
+                    with st.expander("📊 Statistical Details"):
+                        st.write(f"**Timestamp**: {response['timestamp']}")
+                        st.write(f"**Current Regime State**: {current_regime['state']}")
+                        st.write(f"**Confidence**: {current_regime['confidence']:.4f}")
+
+                        st.markdown("**Regime Probabilities:**")
+                        for regime, prob in regime_probs.items():
+                            st.write(f"  - {regime}: {prob:.4f}")
+
+                        st.markdown("**Next Period Transition Probabilities:**")
+                        for regime, prob in next_probs.items():
+                            st.write(f"  - {regime}: {prob:.4f}")
+
+                elif response:
+                    st.error(f"❌ Detection failed: {response.get('error', 'Unknown error')}")
+                else:
+                    st.error("❌ Failed to connect to API")
+
+    # =======================
+    # TAB 2: REGIME HISTORY
+    # =======================
+    with tab2:
+        st.subheader("Regime History Over Time")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            history_ticker = st.text_input(
+                "Ticker Symbol for History",
+                value="NVDA",
+                key="history_ticker",
+                help="Stock ticker to view regime history"
+            ).upper()
+
+        with col2:
+            history_period = st.selectbox(
+                "Historical Period",
+                ["6mo", "1y", "2y", "3y"],
+                index=1,
+                help="Period to visualize regime changes"
+            )
+
+        if st.button("📈 Show Regime History", use_container_width=True):
+            with st.spinner(f"Loading regime history for {history_ticker}..."):
+                response = make_api_request(f"/regime/history/{history_ticker}?period={history_period}")
+
+                if response and response.get('success'):
+                    st.success("✅ History loaded!")
+
+                    timeline = response['timeline']
+                    regime_labels_map = response['regime_labels']
+
+                    # Create DataFrame
+                    timeline_df = pd.DataFrame(timeline)
+                    timeline_df['date'] = pd.to_datetime(timeline_df['date'])
+
+                    # Create regime timeline chart
+                    import plotly.graph_objects as go
+                    from plotly.subplots import make_subplots
+
+                    fig = make_subplots(
+                        rows=2, cols=1,
+                        shared_xaxes=True,
+                        vertical_spacing=0.05,
+                        row_heights=[0.7, 0.3],
+                        subplot_titles=("Price with Market Regimes", "Regime Timeline")
+                    )
+
+                    # Price chart with regime coloring
+                    colors = {
+                        'BULL': 'green',
+                        'BEAR': 'red',
+                        'CONSOLIDATION': 'orange',
+                        'HIGH_VOLATILITY': 'purple'
+                    }
+
+                    # Group consecutive regimes
+                    timeline_df['regime_change'] = (timeline_df['regime_label'] != timeline_df['regime_label'].shift()).cumsum()
+
+                    for _, group in timeline_df.groupby('regime_change'):
+                        regime_label = group['regime_label'].iloc[0]
+                        color = colors.get(regime_label, 'gray')
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=group['date'],
+                                y=group['price'],
+                                mode='lines',
+                                name=regime_label,
+                                line=dict(color=color, width=2),
+                                showlegend=False
+                            ),
+                            row=1, col=1
+                        )
+
+                    # Regime timeline (categorical)
+                    regime_numeric = timeline_df['regime_state'].values
+
+                    fig.add_trace(
+                        go.Scatter(
+                            x=timeline_df['date'],
+                            y=regime_numeric,
+                            mode='lines',
+                            line=dict(color='blue', width=2),
+                            fill='tozeroy',
+                            showlegend=False
+                        ),
+                        row=2, col=1
+                    )
+
+                    fig.update_xaxes(title_text="Date", row=2, col=1)
+                    fig.update_yaxes(title_text="Price ($)", row=1, col=1)
+                    fig.update_yaxes(title_text="Regime State", row=2, col=1)
+
+                    fig.update_layout(
+                        height=700,
+                        title=f"{history_ticker} Price and Market Regimes",
+                        hovermode='x unified'
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Regime statistics
+                    st.markdown("### 📊 Regime Statistics")
+
+                    regime_counts = timeline_df['regime_label'].value_counts()
+                    regime_pcts = (regime_counts / len(timeline_df) * 100).round(1)
+
+                    col1, col2, col3 = st.columns(3)
+
+                    for i, (regime, count) in enumerate(regime_counts.items()):
+                        pct = regime_pcts[regime]
+                        with [col1, col2, col3][i % 3]:
+                            st.metric(regime, f"{pct}%", f"{count} days")
+
+                    # Recent regime changes
+                    st.markdown("### 🔄 Recent Regime Changes")
+
+                    changes = timeline_df[timeline_df['regime_change'] != timeline_df['regime_change'].shift()].tail(10)
+
+                    if len(changes) > 0:
+                        changes_display = changes[['date', 'regime_label', 'price']].copy()
+                        changes_display['date'] = changes_display['date'].dt.strftime('%Y-%m-%d')
+                        changes_display.columns = ['Date', 'New Regime', 'Price']
+
+                        st.dataframe(changes_display, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("No regime changes detected in recent history")
+
+                elif response:
+                    st.error(f"❌ Failed: {response.get('error', 'Unknown error')}")
+                else:
+                    st.error("❌ Failed to connect to API")
+
+    # =======================
+    # TAB 3: STRATEGY INSIGHTS
+    # =======================
+    with tab3:
+        st.subheader("Strategy Recommendations by Regime")
+
+        st.markdown("""
+        ### 🟢 BULL Market Strategies
+
+        **Best Strategies:**
+        - **Momentum**: Buy high, sell higher (trend is your friend)
+        - **Breakout**: Enter on new highs with strong volume
+        - **Moving Average Crossovers**: Golden cross signals
+        - **Growth Stocks**: Focus on high-beta, growth names
+
+        **Position Sizing:**
+        - Can use higher Kelly fractions (closer to full Kelly)
+        - Aggressive position sizes justified
+        - Trailing stops to lock in gains
+
+        **Risk Management:**
+        - Watch for regime change signals
+        - Don't chase extended moves
+        - Take partial profits at resistance
+
+        ---
+
+        ### 🔴 BEAR Market Strategies
+
+        **Best Strategies:**
+        - **Cash is King**: Preserve capital, wait for BULL regime
+        - **Short Selling**: If experienced (high risk!)
+        - **Inverse ETFs**: Easier than shorting
+        - **Defensive Sectors**: Utilities, consumer staples
+
+        **Position Sizing:**
+        - Minimal to zero exposure
+        - Use quarter-Kelly or less
+        - Small positions only
+
+        **Risk Management:**
+        - Tight stop losses (market can gap against you)
+        - Don't try to catch falling knives
+        - Wait for regime change confirmation
+
+        ---
+
+        ### 🟡 CONSOLIDATION Market Strategies
+
+        **Best Strategies:**
+        - **Mean Reversion**: Buy dips, sell rips
+        - **Range Trading**: Support/resistance levels
+        - **Iron Condors**: Options strategies for range-bound
+        - **Pairs Trading**: Market-neutral approaches
+
+        **Position Sizing:**
+        - Conservative (half-Kelly recommended)
+        - Many small positions vs few large ones
+        - Quick profits, tight stops
+
+        **Risk Management:**
+        - Choppy markets = false breakouts
+        - Scale in/out of positions
+        - Avoid momentum strategies (whipsaw risk)
+        - Wait for BULL regime for big bets
+
+        ---
+
+        ### 🎯 How to Use Regime Detection in Trading
+
+        1. **Check Current Regime Daily**
+           - Use the "Detect Regimes" tab
+           - Look for high confidence (70%+)
+
+        2. **Match Strategy to Regime**
+           - BULL → Momentum strategies
+           - BEAR → Cash / defensive
+           - CONSOLIDATION → Mean reversion
+
+        3. **Adjust Position Sizing**
+           - BULL: Can be aggressive (within Kelly limits)
+           - BEAR: Minimal exposure
+           - CONSOLIDATION: Conservative
+
+        4. **Watch for Regime Changes**
+           - When regime probabilities shift (e.g., BULL → 40%, CONSOLIDATION → 35%, BEAR → 25%)
+           - This signals potential regime transition
+           - Reduce positions until new regime confirmed
+
+        5. **Combine with Other Signals**
+           - Regime + ML Prediction + Kelly Criterion = complete system
+           - Don't rely on one signal alone
+           - Confluence of multiple signals = higher conviction
+
+        ---
+
+        ### ⚠️ Important Notes
+
+        - **Regimes are probabilistic**, not deterministic
+        - **No regime lasts forever** - markets evolve
+        - **Regime changes lag** - HMM detects regimes after they've started
+        - **Use as a filter**, not the sole decision maker
+        - **Retrain models** monthly as market conditions change
+
+        ### 📚 Advanced Tips
+
+        - Train regime models on different timeframes (daily vs weekly)
+        - Compare regime detection across correlated assets (SPY, QQQ, etc.)
+        - Use regime as portfolio-level filter (e.g., max 30% exposure in BEAR regime)
+        - Backtest strategies separately by regime to validate performance
+        """)
 
 
 # =======================
