@@ -435,7 +435,11 @@ if page == "Dashboard":
 
         # Recent strategies
         st.subheader("📋 Recent Strategies")
-        strategies_data = make_api_request("/strategies?limit=10")
+
+        # Add toggle to show all or just active
+        show_all = st.checkbox("Show archived strategies", value=False, key="show_all_strategies")
+        active_param = "false" if show_all else "true"
+        strategies_data = make_api_request(f"/strategies?limit=20&active_only={active_param}")
 
         if strategies_data and strategies_data.get('strategies'):
             strategies_df = pd.DataFrame(strategies_data['strategies'])
@@ -1093,6 +1097,35 @@ elif page == "🤖 Autonomous Agent":
                 st.metric("Last Cycle", last_time)
             else:
                 st.metric("Last Cycle", "Never")
+
+        # Show current configuration if running
+        if status_data['is_running'] and status_data.get('current_config'):
+            st.markdown("---")
+            st.subheader("📊 Current Configuration")
+            config = status_data['current_config']
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                tickers = config.get('tickers', [])
+                st.markdown(f"**Tickers:** `{', '.join(tickers)}`")
+
+            with col2:
+                strategies = config.get('strategies_per_cycle', 'N/A')
+                st.markdown(f"**Strategies/Cycle:** `{strategies}`")
+
+            with col3:
+                quality = config.get('min_quality_score', 'N/A')
+                st.markdown(f"**Min Quality:** `{quality}`")
+
+            with col4:
+                if config.get('interval_hours'):
+                    interval = f"{config['interval_hours']}h"
+                elif config.get('interval_minutes'):
+                    interval = f"{config['interval_minutes']}m"
+                else:
+                    interval = "N/A"
+                st.markdown(f"**Interval:** `{interval}`")
 
         st.markdown("---")
 

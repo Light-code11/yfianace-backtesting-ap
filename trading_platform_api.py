@@ -75,6 +75,7 @@ print("Database initialized successfully")
 # Global autonomous learning agent
 autonomous_agent = None
 autonomous_agent_thread = None
+autonomous_agent_config = None  # Store current agent configuration
 autonomous_agent_enabled = os.getenv("ENABLE_AUTONOMOUS_LEARNING", "false").lower() == "true"
 
 # Pydantic models
@@ -832,13 +833,22 @@ class AutonomousAgentConfig(BaseModel):
 @app.post("/autonomous/start")
 async def start_autonomous_learning(config: AutonomousAgentConfig):
     """Start the autonomous learning agent"""
-    global autonomous_agent, autonomous_agent_thread
+    global autonomous_agent, autonomous_agent_thread, autonomous_agent_config
 
     if autonomous_agent_thread and autonomous_agent_thread.is_alive():
         return {
             "success": False,
             "message": "Autonomous learning agent is already running"
         }
+
+    # Store configuration
+    autonomous_agent_config = {
+        "tickers": config.tickers,
+        "interval_hours": config.interval_hours,
+        "interval_minutes": config.interval_minutes,
+        "strategies_per_cycle": config.strategies_per_cycle,
+        "min_quality_score": 70.0
+    }
 
     # Create agent with either minutes or hours
     autonomous_agent = AutonomousLearningAgent(
@@ -858,13 +868,8 @@ async def start_autonomous_learning(config: AutonomousAgentConfig):
 
     return {
         "success": True,
-        "message": "Autonomous learning agent started successfully",
-        "config": {
-            "tickers": config.tickers,
-            "interval_hours": config.interval_hours,
-            "interval_minutes": config.interval_minutes,
-            "strategies_per_cycle": config.strategies_per_cycle
-        }
+        "message": f"Autonomous learning agent started successfully for tickers: {', '.join(config.tickers)}",
+        "config": autonomous_agent_config
     }
 
 
@@ -891,7 +896,7 @@ async def stop_autonomous_learning():
 @app.get("/autonomous/status")
 async def get_autonomous_status(db=Depends(get_db)):
     """Get status of autonomous learning agent"""
-    global autonomous_agent_thread
+    global autonomous_agent_thread, autonomous_agent_config
 
     is_running = autonomous_agent_thread and autonomous_agent_thread.is_alive()
 
@@ -922,6 +927,7 @@ async def get_autonomous_status(db=Depends(get_db)):
     return {
         "is_running": is_running,
         "enabled_by_env": autonomous_agent_enabled,
+        "current_config": autonomous_agent_config if is_running else None,
         "statistics": {
             "total_cycles": total_autonomous_cycles,
             "last_cycle": recent_learnings[0].created_at.isoformat() if recent_learnings else None,
