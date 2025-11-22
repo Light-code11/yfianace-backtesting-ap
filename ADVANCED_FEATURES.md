@@ -507,35 +507,72 @@ After backtesting, check the new fields:
    - Adjust position sizes based on regime (aggressive in BULL, conservative in CONSOLIDATION, minimal in BEAR)
    - Paper trade the portfolio to validate before going live
 
-3. **Complete Trading System Workflow**:
+3. **Complete Trading System Workflow** (🎯 **NEW: Automated in "Complete Trading System" Page!**):
+
+   **THE EASY WAY** - Use the 🎯 Complete Trading System page:
+   - This page automates the ENTIRE workflow below in one click!
+   - Enter your tickers (e.g., SPY, QQQ, AAPL, MSFT, GOOGL)
+   - Select strategies to test (momentum, mean_reversion, breakout, etc.)
+   - Click "Run Complete Analysis" - it will:
+     1. Get ML predictions for all tickers
+     2. Detect market regime for each
+     3. Backtest all strategy/ticker combinations
+     4. Filter by minimum Sharpe ratio
+     5. Calculate advanced risk metrics
+     6. Optimize portfolio allocation
+     7. Show final recommendations with Kelly sizing
+
+   **THE MANUAL WAY** - If you prefer step-by-step control:
    ```
-   1. Check Market Regime (Market Regimes page)
+   1. Check Market Regime (📊 Market Regimes page)
       → BULL = momentum strategies, BEAR = defensive, CONSOLIDATION = mean reversion
+      → Train models for your tickers (2y period recommended)
+      → Current regime tells you which strategy types to use
 
-   2. Generate Strategies matching regime
-      → Use Autonomous Agent or manual strategy creation
+   2. Train ML Models (🤖 ML Predictions page)
+      → Train XGBoost on 2y data for your tickers
+      → Get daily predictions with confidence scores
+      → Use 60%+ confidence signals for entry/exit
 
-   3. Backtest Strategies
-      → Look for positive returns, good Sharpe ratio, Kelly > 5%
+   3. Generate/Backtest Strategies (Backtest page)
+      → Test multiple strategies on multiple tickers
+      → Look for: Sharpe > 1.0, Sortino > 1.5, Calmar > 2.0
+      → Check Kelly position % (5-15% is ideal)
+      → Review Advanced Risk Metrics (VaR, CVaR, drawdown stats)
 
-   4. Train ML Model for entry timing
-      → Get daily predictions with 70%+ confidence
+   4. Optimize Portfolio (Portfolio Optimizer page)
+      → Select top 3-5 strategies from backtests
+      → Choose optimization method (max_sharpe recommended)
+      → Set max allocation per strategy (20-30%)
+      → Get optimal weights and expected returns
 
-   5. Optimize Portfolio
-      → Combine top 3-5 strategies with Portfolio Optimizer
+   5. Execute with Risk Management
+      → Use Kelly Criterion position sizes from backtests
+      → Apply Quarter Kelly (25% of full Kelly) for safety
+      → Adjust for regime (reduce 50% in BEAR, 25% in CONSOLIDATION)
+      → Monitor ML predictions daily for entry/exit timing
 
-   6. Execute with Proper Position Sizing
-      → Use Kelly Criterion recommendations
-      → Adjust for regime (reduce in BEAR/CONSOLIDATION)
-
-   7. Monitor Daily
-      → Regime changes → adjust strategy mix
-      → ML predictions → entry/exit timing
-      → Kelly updates → position size adjustments
+   6. Monitor & Rebalance
+      → Check regime daily - if switches, adjust strategy mix
+      → Run ML predictions for entry/exit signals
+      → Rerun portfolio optimization monthly
+      → Track actual vs expected performance
    ```
 
-4. **Coming Next**:
-   - Advanced risk metrics (VaR, CVaR, Ulcer Index)
-   - Vectorized backtesting (1000x faster parameter optimization)
+4. **🎯 Complete Trading System Features**:
+   The new Complete Trading System page gives you a **professional-grade portfolio** by integrating:
+   - ✅ **Market Regime Detection**: Know if it's BULL/BEAR/CONSOLIDATION
+   - ✅ **ML Predictions**: Get directional forecasts with confidence scores
+   - ✅ **Multi-Strategy Backtesting**: Test all combinations automatically
+   - ✅ **Advanced Risk Metrics**: VaR, CVaR, Sortino, Calmar, tail risk
+   - ✅ **Portfolio Optimization**: Optimal weights using Markowitz theory
+   - ✅ **Kelly Criterion**: Mathematically optimal position sizing
+   - ✅ **One-Click Workflow**: Entire analysis in ~30 seconds
 
-Let the platform find the edge (AI + Backtesting), Kelly Criterion tells you how much to risk, ML predicts entry/exit timing, Regime Detection tells you which strategy type to use, and Portfolio Optimization combines everything optimally!
+   **Result**: A fully optimized, risk-managed, regime-aware portfolio ready to trade!
+
+5. **Coming Next**:
+   - Vectorized backtesting (1000x faster parameter optimization using vectorbt)
+   - Monte Carlo simulation (stress test portfolios under random scenarios)
+
+Let the platform do the heavy lifting! The 🎯 Complete Trading System page combines AI strategy generation, ML predictions, regime detection, advanced risk analysis, and portfolio optimization into one seamless workflow!

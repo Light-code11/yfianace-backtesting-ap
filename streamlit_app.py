@@ -373,7 +373,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -2157,6 +2157,488 @@ elif page == "📊 Market Regimes":
         - Compare regime detection across correlated assets (SPY, QQQ, etc.)
         - Use regime as portfolio-level filter (e.g., max 30% exposure in BEAR regime)
         - Backtest strategies separately by regime to validate performance
+        """)
+
+
+# =======================
+# COMPLETE TRADING SYSTEM PAGE
+# =======================
+
+elif page == "🎯 Complete Trading System":
+    st.markdown('<div class="main-header">🎯 Complete Trading System</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    ### 🚀 Build Your Optimal Portfolio Using All Advanced Features
+
+    This page integrates **all** your advanced features into one powerful workflow:
+    - 🤖 **ML Predictions** - Identify high-probability opportunities
+    - 📊 **Market Regimes** - Understand current market conditions
+    - 📈 **Strategy Backtesting** - Test multiple strategies on multiple tickers
+    - 🎲 **Advanced Risk Metrics** - Evaluate risk-adjusted performance
+    - 💼 **Portfolio Optimization** - Combine best strategies optimally
+    - 🎯 **Kelly Criterion** - Determine optimal position sizes
+    """)
+
+    st.markdown("---")
+
+    # Step 1: Configuration
+    st.subheader("Step 1️⃣: Configure Your Analysis")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        tickers_input = st.text_input(
+            "Tickers to Analyze (comma-separated)",
+            value="SPY,QQQ,AAPL,MSFT,GOOGL",
+            help="Enter multiple tickers to analyze"
+        )
+        tickers = [t.strip().upper() for t in tickers_input.split(",") if t.strip()]
+
+        strategies = st.multiselect(
+            "Select Strategies to Test",
+            ["momentum", "mean_reversion", "breakout", "trend_following", "volatility"],
+            default=["momentum", "mean_reversion", "breakout"],
+            help="Choose which strategies to backtest on each ticker"
+        )
+
+    with col2:
+        lookback_period = st.selectbox(
+            "Backtest Period",
+            ["1mo", "3mo", "6mo", "1y", "2y"],
+            index=3,
+            help="Historical period for backtesting"
+        )
+
+        min_sharpe = st.number_input(
+            "Minimum Sharpe Ratio",
+            min_value=0.0,
+            max_value=5.0,
+            value=1.0,
+            step=0.1,
+            help="Only include strategies with Sharpe >= this value"
+        )
+
+        total_capital = st.number_input(
+            "Total Capital ($)",
+            min_value=1000,
+            max_value=10000000,
+            value=100000,
+            step=10000,
+            help="Total portfolio capital for allocation"
+        )
+
+    st.markdown("---")
+
+    # Step 2: Run Complete Analysis
+    if st.button("🚀 Run Complete Analysis", use_container_width=True, type="primary"):
+
+        if not tickers or not strategies:
+            st.error("⚠️ Please select at least one ticker and one strategy")
+        else:
+            # Create progress tracking
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+
+            all_results = []
+            total_steps = len(tickers) * (2 + len(strategies))  # ML + Regime + N strategies
+            current_step = 0
+
+            # Container for results
+            results_container = st.container()
+
+            with results_container:
+                st.subheader("📊 Analysis Results")
+
+                # Step 2: Market Analysis for each ticker
+                st.markdown("### Step 2️⃣: Market Analysis")
+
+                market_analysis = {}
+
+                for ticker in tickers:
+                    with st.expander(f"🔍 {ticker} - Market Analysis", expanded=True):
+                        col1, col2 = st.columns(2)
+
+                        # ML Prediction
+                        with col1:
+                            st.markdown("#### 🤖 ML Prediction")
+                            status_text.text(f"Getting ML prediction for {ticker}...")
+
+                            ml_response = make_api_request(f"/ml/predict/{ticker}")
+                            current_step += 1
+                            progress_bar.progress(current_step / total_steps)
+
+                            if ml_response and ml_response.get('success'):
+                                pred = ml_response['prediction']
+                                direction = pred['direction']
+                                confidence = pred['confidence']
+
+                                # Color-code prediction
+                                if direction == "UP":
+                                    st.success(f"📈 **{direction}** (Confidence: {confidence:.1f}%)")
+                                else:
+                                    st.warning(f"📉 **{direction}** (Confidence: {confidence:.1f}%)")
+
+                                if confidence > 60:
+                                    st.info("✅ High confidence signal")
+                                else:
+                                    st.caption("⚠️ Low confidence - proceed with caution")
+
+                                market_analysis[ticker] = market_analysis.get(ticker, {})
+                                market_analysis[ticker]['ml_prediction'] = direction
+                                market_analysis[ticker]['ml_confidence'] = confidence
+                            else:
+                                st.error(f"❌ No ML model trained for {ticker}")
+                                st.caption("Train a model in the 🤖 ML Predictions page first")
+                                market_analysis[ticker] = market_analysis.get(ticker, {})
+                                market_analysis[ticker]['ml_prediction'] = "UNKNOWN"
+                                market_analysis[ticker]['ml_confidence'] = 0
+
+                        # Market Regime
+                        with col2:
+                            st.markdown("#### 📊 Market Regime")
+                            status_text.text(f"Detecting market regime for {ticker}...")
+
+                            regime_response = make_api_request(f"/regime/predict/{ticker}")
+                            current_step += 1
+                            progress_bar.progress(current_step / total_steps)
+
+                            if regime_response and regime_response.get('success'):
+                                current_regime = regime_response['current_regime']
+                                regime_probs = regime_response['regime_probabilities']
+
+                                # Color-code regime
+                                if current_regime == "BULL":
+                                    st.success(f"🟢 **{current_regime} MARKET**")
+                                elif current_regime == "BEAR":
+                                    st.error(f"🔴 **{current_regime} MARKET**")
+                                else:
+                                    st.info(f"🟡 **{current_regime} MARKET**")
+
+                                # Show probabilities
+                                for regime, prob in regime_probs.items():
+                                    st.caption(f"{regime}: {prob:.1f}%")
+
+                                market_analysis[ticker]['regime'] = current_regime
+                                market_analysis[ticker]['regime_probs'] = regime_probs
+                            else:
+                                st.error(f"❌ No regime model for {ticker}")
+                                st.caption("Train a model in the 📊 Market Regimes page first")
+                                market_analysis[ticker]['regime'] = "UNKNOWN"
+
+                # Step 3: Strategy Backtesting
+                st.markdown("---")
+                st.markdown("### Step 3️⃣: Strategy Backtesting & Risk Analysis")
+
+                backtest_results = []
+
+                for ticker in tickers:
+                    for strategy in strategies:
+                        status_text.text(f"Backtesting {strategy} on {ticker}...")
+
+                        # Run backtest
+                        response = make_api_request(
+                            "/backtest",
+                            method="POST",
+                            data={
+                                "ticker": ticker,
+                                "strategy_type": strategy,
+                                "lookback_period": lookback_period
+                            }
+                        )
+
+                        current_step += 1
+                        progress_bar.progress(current_step / total_steps)
+
+                        if response and response.get('success'):
+                            metrics = response['metrics']
+                            sharpe = metrics['sharpe_ratio']
+
+                            # Only include if meets minimum Sharpe requirement
+                            if sharpe >= min_sharpe:
+                                result = {
+                                    'ticker': ticker,
+                                    'strategy': strategy,
+                                    'strategy_id': f"{ticker}_{strategy}",
+                                    'total_return_pct': metrics['total_return_pct'],
+                                    'sharpe_ratio': sharpe,
+                                    'sortino_ratio': metrics.get('sortino_ratio', 0),
+                                    'calmar_ratio': metrics.get('calmar_ratio', 0),
+                                    'max_drawdown_pct': metrics['max_drawdown_pct'],
+                                    'win_rate': metrics['win_rate'],
+                                    'var_95_pct': metrics.get('var_95_pct', 0),
+                                    'cvar_95_pct': metrics.get('cvar_95_pct', 0),
+                                    'ulcer_index': metrics.get('ulcer_index', 0),
+                                    'kelly_position_pct': metrics.get('kelly_position_pct', 0),
+                                    'kelly_risk_level': metrics.get('kelly_risk_level', 'UNKNOWN'),
+                                    'ml_prediction': market_analysis.get(ticker, {}).get('ml_prediction', 'UNKNOWN'),
+                                    'ml_confidence': market_analysis.get(ticker, {}).get('ml_confidence', 0),
+                                    'regime': market_analysis.get(ticker, {}).get('regime', 'UNKNOWN')
+                                }
+                                backtest_results.append(result)
+
+                status_text.text("✅ Analysis complete!")
+                progress_bar.progress(1.0)
+
+                # Display results summary
+                if backtest_results:
+                    st.markdown("---")
+                    st.markdown(f"### Step 4️⃣: Results - {len(backtest_results)} Qualifying Strategies")
+
+                    # Create DataFrame
+                    results_df = pd.DataFrame(backtest_results)
+
+                    # Sort by Sortino Ratio (best risk-adjusted metric)
+                    results_df = results_df.sort_values('sortino_ratio', ascending=False)
+
+                    # Display top strategies
+                    st.dataframe(
+                        results_df[[
+                            'ticker', 'strategy', 'total_return_pct', 'sharpe_ratio',
+                            'sortino_ratio', 'calmar_ratio', 'max_drawdown_pct',
+                            'win_rate', 'var_95_pct', 'ml_prediction', 'regime'
+                        ]].style.format({
+                            'total_return_pct': '{:.2f}%',
+                            'sharpe_ratio': '{:.2f}',
+                            'sortino_ratio': '{:.2f}',
+                            'calmar_ratio': '{:.2f}',
+                            'max_drawdown_pct': '{:.2f}%',
+                            'win_rate': '{:.2f}%',
+                            'var_95_pct': '{:.2f}%'
+                        }).background_gradient(subset=['sortino_ratio'], cmap='RdYlGn'),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    # Step 5: Portfolio Optimization
+                    st.markdown("---")
+                    st.markdown("### Step 5️⃣: Portfolio Optimization")
+
+                    st.write(f"**Optimizing allocation across {len(backtest_results)} strategies...**")
+
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        optimization_method = st.selectbox(
+                            "Optimization Method",
+                            ["max_sharpe", "min_volatility", "max_return", "risk_parity"],
+                            help="Method for combining strategies"
+                        )
+
+                    with col2:
+                        max_allocation = st.slider(
+                            "Max Allocation per Strategy (%)",
+                            min_value=5,
+                            max_value=100,
+                            value=30,
+                            step=5,
+                            help="Maximum % allocated to any single strategy"
+                        )
+
+                    if st.button("🎯 Optimize Portfolio", use_container_width=True):
+                        with st.spinner("Running portfolio optimization..."):
+
+                            # Prepare data for optimizer
+                            optimize_data = {
+                                'total_capital': total_capital,
+                                'method': optimization_method,
+                                'constraints': {
+                                    'max_allocation_pct': max_allocation
+                                },
+                                'strategies': []
+                            }
+
+                            for _, row in results_df.iterrows():
+                                optimize_data['strategies'].append({
+                                    'id': row['strategy_id'],
+                                    'name': f"{row['ticker']} - {row['strategy']}",
+                                    'expected_return': row['total_return_pct'],
+                                    'volatility': max(1, 100 / max(row['sharpe_ratio'], 0.1)),  # Approximate
+                                    'sharpe_ratio': row['sharpe_ratio']
+                                })
+
+                            # Call optimizer
+                            opt_response = make_api_request(
+                                "/portfolio/optimize",
+                                method="POST",
+                                data=optimize_data
+                            )
+
+                            if opt_response and opt_response.get('success'):
+                                st.success("✅ Portfolio optimization complete!")
+
+                                # Display optimal allocations
+                                st.markdown("#### 💼 Optimal Portfolio Allocation")
+
+                                allocations = opt_response['allocations']
+                                portfolio_metrics = opt_response['portfolio_metrics']
+
+                                # Create allocation chart
+                                alloc_df = pd.DataFrame([
+                                    {'Strategy': name, 'Allocation %': weight * 100, 'Capital $': capital}
+                                    for name, weight, capital in zip(
+                                        allocations['strategy_names'],
+                                        allocations['weights'],
+                                        allocations['capital_allocation']
+                                    )
+                                ])
+
+                                col1, col2 = st.columns([2, 1])
+
+                                with col1:
+                                    # Pie chart
+                                    fig = px.pie(
+                                        alloc_df,
+                                        values='Allocation %',
+                                        names='Strategy',
+                                        title='Portfolio Allocation'
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+
+                                with col2:
+                                    st.markdown("#### 📊 Portfolio Metrics")
+                                    st.metric("Expected Return", f"{portfolio_metrics['expected_annual_return']:.2f}%")
+                                    st.metric("Expected Volatility", f"{portfolio_metrics['annual_volatility']:.2f}%")
+                                    st.metric("Sharpe Ratio", f"{portfolio_metrics['sharpe_ratio']:.2f}")
+
+                                # Detailed allocation table
+                                st.markdown("#### 📋 Detailed Allocations")
+                                st.dataframe(
+                                    alloc_df.style.format({
+                                        'Allocation %': '{:.2f}%',
+                                        'Capital $': '${:,.2f}'
+                                    }).background_gradient(subset=['Allocation %'], cmap='Blues'),
+                                    use_container_width=True,
+                                    hide_index=True
+                                )
+
+                                # Step 6: Final Recommendations
+                                st.markdown("---")
+                                st.markdown("### Step 6️⃣: Trading Recommendations")
+
+                                st.success("🎯 **Your Optimized Trading System is Ready!**")
+
+                                # Merge allocations with backtest results and market analysis
+                                for idx, row in alloc_df.iterrows():
+                                    strategy_id = row['Strategy'].split(' - ')
+                                    if len(strategy_id) == 2:
+                                        ticker = strategy_id[0]
+                                        strategy = strategy_id[1]
+
+                                        # Find matching result
+                                        matching_result = results_df[
+                                            (results_df['ticker'] == ticker) &
+                                            (results_df['strategy'] == strategy)
+                                        ]
+
+                                        if not matching_result.empty:
+                                            result = matching_result.iloc[0]
+
+                                            with st.expander(f"📌 {row['Strategy']} - ${row['Capital $']:,.2f} ({row['Allocation %']:.1f}%)"):
+                                                col1, col2, col3 = st.columns(3)
+
+                                                with col1:
+                                                    st.markdown("**Market Context**")
+                                                    st.write(f"ML Prediction: **{result['ml_prediction']}** ({result['ml_confidence']:.1f}%)")
+                                                    st.write(f"Regime: **{result['regime']}**")
+
+                                                with col2:
+                                                    st.markdown("**Performance**")
+                                                    st.write(f"Return: **{result['total_return_pct']:.2f}%**")
+                                                    st.write(f"Sortino: **{result['sortino_ratio']:.2f}**")
+                                                    st.write(f"Max DD: **{result['max_drawdown_pct']:.2f}%**")
+
+                                                with col3:
+                                                    st.markdown("**Risk Management**")
+                                                    st.write(f"VaR 95%: **{result['var_95_pct']:.2f}%**")
+                                                    st.write(f"Kelly Size: **{result['kelly_position_pct']:.1f}%**")
+
+                                                    # Risk assessment
+                                                    if result['kelly_risk_level'] == 'SAFE':
+                                                        st.success("✅ Safe to trade")
+                                                    elif result['kelly_risk_level'] == 'MODERATE':
+                                                        st.info("⚠️ Moderate risk")
+                                                    else:
+                                                        st.warning("🔴 High risk")
+
+                                # Summary box
+                                st.markdown("---")
+                                st.info(f"""
+                                ### 📊 Portfolio Summary
+
+                                - **Total Capital**: ${total_capital:,.2f}
+                                - **Number of Strategies**: {len(alloc_df)}
+                                - **Expected Annual Return**: {portfolio_metrics['expected_annual_return']:.2f}%
+                                - **Expected Volatility**: {portfolio_metrics['annual_volatility']:.2f}%
+                                - **Portfolio Sharpe**: {portfolio_metrics['sharpe_ratio']:.2f}
+                                - **Optimization Method**: {optimization_method.replace('_', ' ').title()}
+
+                                **Next Steps:**
+                                1. Review each strategy's allocation and risk metrics
+                                2. Consider current market regime and ML predictions
+                                3. Start with paper trading to validate live performance
+                                4. Monitor and rebalance monthly or when regime changes
+                                """)
+                            else:
+                                st.error("❌ Portfolio optimization failed. Try with fewer strategies or adjust constraints.")
+                else:
+                    st.warning(f"""
+                    ⚠️ No strategies met the minimum Sharpe ratio of {min_sharpe}.
+
+                    **Suggestions:**
+                    - Lower the minimum Sharpe requirement
+                    - Try different strategies
+                    - Use a longer backtest period
+                    - Train ML models for your tickers first
+                    """)
+
+    # Quick Start Guide
+    st.markdown("---")
+    with st.expander("📖 Quick Start Guide", expanded=False):
+        st.markdown("""
+        ### How to Use the Complete Trading System
+
+        **Prerequisites:**
+        1. Train ML models for your tickers in the 🤖 ML Predictions page
+        2. Train regime models in the 📊 Market Regimes page
+
+        **Workflow:**
+
+        **Step 1: Configuration**
+        - Select multiple tickers you want to trade
+        - Choose multiple strategies to test on each ticker
+        - Set minimum quality threshold (Sharpe ratio)
+        - Specify your total capital
+
+        **Step 2: Market Analysis**
+        - System checks ML predictions for each ticker (UP/DOWN + confidence)
+        - System detects current market regime (BULL/BEAR/CONSOLIDATION)
+
+        **Step 3: Strategy Backtesting**
+        - Each strategy is backtested on each ticker
+        - Advanced risk metrics calculated automatically
+        - Only strategies meeting your Sharpe threshold are kept
+
+        **Step 4: Results Review**
+        - View all qualifying strategies ranked by Sortino ratio
+        - See performance, risk metrics, ML signals, and regime for each
+
+        **Step 5: Portfolio Optimization**
+        - System finds optimal weights to combine strategies
+        - Respects your max allocation constraints
+        - Maximizes Sharpe/minimizes volatility (your choice)
+
+        **Step 6: Trading Recommendations**
+        - Get final allocations for each strategy
+        - See combined market context (ML + regime)
+        - Review risk management (VaR, Kelly sizing)
+        - Ready to execute!
+
+        **Tips:**
+        - Start with 3-5 tickers and 3-4 strategies
+        - Use min Sharpe = 1.0 for quality strategies
+        - Train ML/regime models on 2y data for best results
+        - Rerun analysis monthly or when market regime changes
+        - Consider starting with paper trading to validate
         """)
 
 
