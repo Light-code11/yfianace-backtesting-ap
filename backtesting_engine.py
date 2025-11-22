@@ -394,10 +394,12 @@ class BacktestingEngine:
                 'losing_trades': 0,
                 'win_rate': 0,
                 'sharpe_ratio': 0,
+                'sortino_ratio': 0,  # Added missing key
                 'max_drawdown_pct': 0,
                 'profit_factor': 0,
                 'avg_win': 0,
-                'avg_loss': 0
+                'avg_loss': 0,
+                'quality_score': 0  # Added missing key
             }
 
         # Basic metrics
