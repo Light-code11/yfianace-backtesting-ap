@@ -2282,6 +2282,31 @@ elif page == "🎯 Complete Trading System":
                             status_text.text(f"Getting ML prediction for {ticker}...")
 
                             ml_response = make_api_request(f"/ml/predict/{ticker}")
+
+                            # If no model exists, train it automatically
+                            if ml_response and not ml_response.get('success') and "No trained model" in ml_response.get('error', ''):
+                                with st.spinner(f"🔄 Training ML model for {ticker}... (30-60 seconds)"):
+                                    status_text.text(f"🔄 Training ML model for {ticker}... (this may take 30-60 seconds)")
+
+                                    # Train the model
+                                    train_response = make_api_request(
+                                        "/ml/train",
+                                        method="POST",
+                                        data={
+                                            "ticker": ticker,
+                                            "period": "2y",
+                                            "test_size": 0.2,
+                                            "horizon": 1
+                                        }
+                                    )
+
+                                    if train_response and train_response.get('success'):
+                                        st.info(f"✅ Model trained successfully (Accuracy: {train_response['test_metrics']['accuracy']*100:.1f}%)")
+                                        # Now get prediction with newly trained model
+                                        ml_response = make_api_request(f"/ml/predict/{ticker}")
+                                    else:
+                                        st.warning(f"⚠️ Failed to train model: {train_response.get('error', 'Unknown error')}")
+
                             current_step += 1
                             progress_bar.progress(current_step / total_steps)
 
@@ -2305,8 +2330,7 @@ elif page == "🎯 Complete Trading System":
                                 market_analysis[ticker]['ml_prediction'] = direction
                                 market_analysis[ticker]['ml_confidence'] = confidence
                             else:
-                                st.error(f"❌ No ML model trained for {ticker}")
-                                st.caption("Train a model in the 🤖 ML Predictions page first")
+                                st.error(f"❌ ML prediction failed: {ml_response.get('error', 'Unknown error')}")
                                 market_analysis[ticker] = market_analysis.get(ticker, {})
                                 market_analysis[ticker]['ml_prediction'] = "UNKNOWN"
                                 market_analysis[ticker]['ml_confidence'] = 0
@@ -2314,15 +2338,17 @@ elif page == "🎯 Complete Trading System":
                         # Market Regime
                         with col2:
                             st.markdown("#### 📊 Market Regime")
-                            status_text.text(f"Detecting market regime for {ticker}...")
+                            status_text.text(f"Detecting market regime for {ticker}... (auto-training if needed)")
 
+                            # Note: /regime/predict automatically trains on-demand
                             regime_response = make_api_request(f"/regime/predict/{ticker}")
+
                             current_step += 1
                             progress_bar.progress(current_step / total_steps)
 
                             if regime_response and regime_response.get('success'):
-                                current_regime = regime_response['current_regime']
-                                regime_probs = regime_response['regime_probabilities']
+                                current_regime = regime_response['current_regime']['label'] if isinstance(regime_response.get('current_regime'), dict) else regime_response.get('current_regime', 'UNKNOWN')
+                                regime_probs = regime_response.get('regime_probabilities', {})
 
                                 # Color-code regime
                                 if current_regime == "BULL":
@@ -2334,13 +2360,14 @@ elif page == "🎯 Complete Trading System":
 
                                 # Show probabilities
                                 for regime, prob in regime_probs.items():
-                                    st.caption(f"{regime}: {prob:.1f}%")
+                                    prob_pct = prob * 100 if prob < 1 else prob  # Handle both decimal and percentage
+                                    st.caption(f"{regime}: {prob_pct:.1f}%")
 
                                 market_analysis[ticker]['regime'] = current_regime
                                 market_analysis[ticker]['regime_probs'] = regime_probs
                             else:
-                                st.error(f"❌ No regime model for {ticker}")
-                                st.caption("Train a model in the 📊 Market Regimes page first")
+                                error_msg = regime_response.get('error', 'Unknown error') if regime_response else 'No response'
+                                st.error(f"❌ Regime detection failed: {error_msg}")
                                 market_analysis[ticker]['regime'] = "UNKNOWN"
 
                 # Step 3: Strategy Backtesting
