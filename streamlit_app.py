@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import time
+from strategy_visualizer import StrategyVisualizer
 
 # Page configuration
 st.set_page_config(
@@ -846,6 +847,55 @@ elif page == "Backtest":
                                     - q = loss probability ({1 - results['metrics']['win_rate']/100:.4f})
                                     - b = win/loss ratio ({abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f})
                                     """)
+
+                            # Strategy Explanation Section
+                            st.markdown("---")
+                            st.subheader("📋 Strategy Details")
+
+                            # Fetch strategy details
+                            strategy_details = make_api_request(f"/backtest/strategy-details/{backtest_id}")
+
+                            if strategy_details and not strategy_details.get('error'):
+                                with st.expander("🔍 What is this strategy doing?", expanded=True):
+                                    st.code(strategy_details['description'], language='text')
+
+                                # Strategy visualization with buy/sell signals
+                                if strategy_details.get('trades') and strategy_details.get('tickers_tested'):
+                                    st.subheader("📈 Strategy Signals on Chart")
+
+                                    # Let user select ticker if multiple
+                                    tickers = strategy_details['tickers_tested']
+                                    if len(tickers) > 1:
+                                        selected_ticker = st.selectbox("Select ticker to visualize", tickers)
+                                    else:
+                                        selected_ticker = tickers[0]
+
+                                    # Generate chart
+                                    try:
+                                        strategy_config = strategy_details['strategy_config']
+                                        trades = strategy_details['trades']
+
+                                        chart_fig = StrategyVisualizer.create_strategy_chart(
+                                            ticker=selected_ticker,
+                                            strategy=strategy_config,
+                                            trades=trades,
+                                            period='1y'
+                                        )
+
+                                        if chart_fig:
+                                            st.plotly_chart(chart_fig, use_container_width=True)
+
+                                            st.info("""
+                                            **How to read this chart:**
+                                            - 🟢 **Green triangles** = BUY signals (where strategy entered)
+                                            - 🔴 **Red triangles** = SELL signals (where strategy exited)
+                                            - Lines show technical indicators used by the strategy
+                                            - Compare signals to price movement to see where it worked/failed
+                                            """)
+                                        else:
+                                            st.warning(f"Could not generate chart for {selected_ticker}")
+                                    except Exception as e:
+                                        st.error(f"Error generating strategy chart: {str(e)}")
 
                             # Charts Section
                             st.markdown("---")

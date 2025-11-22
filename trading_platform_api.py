@@ -628,6 +628,51 @@ async def get_backtest_result(backtest_id: int, db=Depends(get_db)):
     }
 
 
+@app.get("/backtest/strategy-details/{backtest_id}")
+async def get_strategy_details(backtest_id: int, db=Depends(get_db)):
+    """Get detailed strategy explanation and logic"""
+    result = db.query(BacktestResult).filter(BacktestResult.id == backtest_id).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Backtest result not found")
+
+    # Get the strategy
+    strategy = db.query(Strategy).filter(Strategy.id == result.strategy_id).first()
+
+    if not strategy:
+        return {
+            "error": "Strategy not found",
+            "strategy_name": result.strategy_name
+        }
+
+    # Build strategy config for visualization
+    strategy_config = {
+        'id': strategy.id,
+        'name': strategy.name,
+        'strategy_type': strategy.strategy_type,
+        'tickers': strategy.tickers,
+        'indicators': strategy.indicators,
+        'risk_management': {
+            'stop_loss_pct': strategy.stop_loss_pct,
+            'take_profit_pct': strategy.take_profit_pct,
+            'position_size_pct': strategy.position_size_pct,
+            'max_positions': 3
+        }
+    }
+
+    # Get human-readable description
+    description = StrategyVisualizer.get_strategy_description(strategy_config)
+
+    return {
+        "backtest_id": backtest_id,
+        "strategy_id": strategy.id,
+        "strategy_config": strategy_config,
+        "description": description,
+        "tickers_tested": result.tickers_tested,
+        "trades": result.trades
+    }
+
+
 # =======================
 # PAPER TRADING ENDPOINTS
 # =======================
