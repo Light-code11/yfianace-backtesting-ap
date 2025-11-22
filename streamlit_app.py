@@ -573,8 +573,8 @@ elif page == "Generate Strategies":
 elif page == "Backtest":
     st.markdown('<div class="main-header">🧪 Strategy Backtesting</div>', unsafe_allow_html=True)
 
-    # Get available strategies
-    strategies_data = make_api_request("/strategies")
+    # Get available strategies (including inactive ones to show all)
+    strategies_data = make_api_request("/strategies?active_only=false")
 
     if strategies_data and strategies_data.get('strategies'):
         # Format: "NVDA, AAPL - Strategy Name (ID: 1)"
@@ -737,11 +737,25 @@ elif page == "Backtest":
                                 else:
                                     st.dataframe(trades_df, use_container_width=True)
     else:
-        st.info("📋 No strategies available yet!")
+        st.warning("📋 No strategies found in the database!")
+
+        # Debug info
+        if strategies_data is None:
+            st.error("⚠️ API connection issue - could not fetch strategies from server")
+            st.code(f"API URL: {API_BASE_URL}/strategies")
+        elif strategies_data.get('strategies') == []:
+            st.info("The database exists but contains 0 strategies.")
+
         st.write("""
-        **Get started:**
-        - Go to the **Generate Strategies** page to create strategies manually
-        - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
+        **Troubleshooting:**
+        1. Check the **Dashboard** page - do you see any strategies listed there?
+        2. Check the **🤖 Autonomous Agent** page - is the agent status showing strategies generated?
+        3. If the agent shows strategies but they're not appearing:
+           - The database might be on a different server (Railway uses ephemeral storage)
+           - Try running the agent again to regenerate strategies
+
+        **Or create strategies manually:**
+        - Go to the **Generate Strategies** page to create strategies with AI
         """)
 
 
