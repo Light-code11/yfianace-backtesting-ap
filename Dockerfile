@@ -28,5 +28,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Run the application (use PORT from environment or default to 8000)
-CMD uvicorn trading_platform_api:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD ["sh", "-c", "uvicorn trading_platform_api:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
