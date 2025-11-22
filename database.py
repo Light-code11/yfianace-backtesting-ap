@@ -10,6 +10,10 @@ import os
 # Database configuration
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./trading_platform.db")
 
+# Fix Railway PostgreSQL URL format (postgres:// -> postgresql://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -74,14 +78,14 @@ class BacktestResult(Base):
     sharpe_ratio = Column(Float)
     sortino_ratio = Column(Float)
     max_drawdown_pct = Column(Float)
-    volatility = Column(Float)
+    volatility = Column(Float, nullable=True)  # Optional field
 
     # Advanced metrics
     profit_factor = Column(Float)
     avg_win = Column(Float)
     avg_loss = Column(Float)
-    largest_win = Column(Float)
-    largest_loss = Column(Float)
+    largest_win = Column(Float, nullable=True)  # Optional field
+    largest_loss = Column(Float, nullable=True)  # Optional field
 
     # Trade details
     trades = Column(JSON)  # List of all trades executed
