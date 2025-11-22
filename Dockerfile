@@ -20,17 +20,9 @@ RUN pip install --no-cache-dir -r requirements-trading-platform.txt
 COPY *.py ./
 COPY yfinance/ ./yfinance/
 
-# Copy and set executable permission for entrypoint script
-COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
-
 # Expose port (Railway sets PORT environment variable)
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
-
-# Use entrypoint script to handle PORT variable
-ENTRYPOINT ["./docker-entrypoint.sh"]
+# Run the application using Python startup script
+CMD ["python", "run.py"]
 
