@@ -107,8 +107,12 @@ class PortfolioOptimizationRequest(BaseModel):
 
 # Helper function to fetch market data
 def fetch_market_data(tickers: List[str], period: str = "6mo") -> pd.DataFrame:
-    """Fetch market data for multiple tickers"""
-    ticker_string = " ".join(tickers)
+    """Fetch market data for multiple tickers, including benchmark ETFs for relative strength analysis"""
+    # Add benchmark tickers for relative strength analysis
+    benchmarks = {'SPY', 'QQQ', 'SOXX'}  # Market and sector benchmarks
+    all_tickers = list(set(tickers) | benchmarks)  # Combine and remove duplicates
+
+    ticker_string = " ".join(all_tickers)
     data = yf.download(ticker_string, period=period, progress=False)
     return data
 

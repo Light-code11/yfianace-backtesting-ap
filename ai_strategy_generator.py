@@ -9,6 +9,33 @@ from openai import OpenAI
 from datetime import datetime
 import pandas as pd
 import httpx
+import yfinance as yf
+
+# Benchmark mapping: Stock → (Sector ETF, Broad Market)
+BENCHMARK_MAP = {
+    # Semiconductors
+    'NVDA': ('SOXX', 'SPY'),  # SOXX = iShares Semiconductor ETF
+    'AMD': ('SOXX', 'SPY'),
+    'INTC': ('SOXX', 'SPY'),
+    'TSM': ('SOXX', 'SPY'),
+    'AVGO': ('SOXX', 'SPY'),
+
+    # Big Tech (FAANG+)
+    'AAPL': ('QQQ', 'SPY'),
+    'MSFT': ('QQQ', 'SPY'),
+    'GOOGL': ('QQQ', 'SPY'),
+    'GOOG': ('QQQ', 'SPY'),
+    'META': ('QQQ', 'SPY'),
+    'AMZN': ('QQQ', 'SPY'),
+    'NFLX': ('QQQ', 'SPY'),
+    'TSLA': ('QQQ', 'SPY'),
+
+    # ETFs (no sector, just broad market)
+    'QQQ': (None, 'SPY'),
+    'SPY': (None, None),
+    'DIA': (None, 'SPY'),
+    'IWM': (None, 'SPY'),
+}
 
 class AIStrategyGenerator:
     def __init__(self, api_key: str = None):
@@ -121,7 +148,7 @@ class AIStrategyGenerator:
         raise Exception(f"Failed to generate strategies after trying all models and retries. Last error: Connection timeout or API unavailable.")
 
     def _analyze_market_data(self, market_data: pd.DataFrame, tickers: List[str]) -> Dict[str, Any]:
-        """Analyze market data to provide context for strategy generation"""
+        """Analyze market data with relative strength and market regime detection"""
         analysis = {
             "period": {
                 "start": market_data.index.min().strftime("%Y-%m-%d"),
@@ -129,6 +156,7 @@ class AIStrategyGenerator:
                 "days": len(market_data)
             },
             "tickers": tickers,
+            "market_regime": self._detect_market_regime(market_data),
             "market_stats": {}
         }
 
@@ -151,7 +179,7 @@ class AIStrategyGenerator:
                 elif ma_50 and ma_20 < ma_50:
                     trend = "strong_bearish"
 
-                analysis["market_stats"][ticker] = {
+                ticker_stats = {
                     "total_return_pct": round(total_return, 2),
                     "volatility_pct": round(volatility, 2),
                     "current_price": round(current_price, 2),
@@ -160,7 +188,89 @@ class AIStrategyGenerator:
                     "trend": trend
                 }
 
+                # Add relative strength analysis
+                relative_strength = self._calculate_relative_strength(ticker, close_prices, market_data)
+                if relative_strength:
+                    ticker_stats["relative_strength"] = relative_strength
+
+                analysis["market_stats"][ticker] = ticker_stats
+
         return analysis
+
+    def _detect_market_regime(self, market_data: pd.DataFrame) -> str:
+        """Detect overall market regime (bull, bear, sideways)"""
+        try:
+            # Use SPY as market proxy
+            if 'Close' in market_data.columns and 'SPY' in market_data.columns.levels[1]:
+                spy_prices = market_data['Close']['SPY']
+
+                # Calculate moving averages
+                sma_20 = spy_prices.rolling(20).mean().iloc[-1]
+                sma_50 = spy_prices.rolling(50).mean().iloc[-1] if len(spy_prices) >= 50 else None
+                sma_200 = spy_prices.rolling(200).mean().iloc[-1] if len(spy_prices) >= 200 else None
+                current_price = spy_prices.iloc[-1]
+
+                # Calculate momentum
+                return_20d = ((spy_prices.iloc[-1] / spy_prices.iloc[-20]) - 1) * 100 if len(spy_prices) >= 20 else 0
+
+                # Regime detection logic
+                if sma_200 and current_price > sma_200 and return_20d > 2:
+                    return "strong_bull"
+                elif sma_50 and current_price > sma_50 and return_20d > 0:
+                    return "bull"
+                elif sma_200 and current_price < sma_200 and return_20d < -2:
+                    return "strong_bear"
+                elif sma_50 and current_price < sma_50 and return_20d < 0:
+                    return "bear"
+                else:
+                    return "sideways"
+
+            return "unknown"
+        except Exception as e:
+            print(f"Error detecting market regime: {e}")
+            return "unknown"
+
+    def _calculate_relative_strength(self, ticker: str, ticker_prices: pd.Series, market_data: pd.DataFrame) -> Dict:
+        """Calculate relative strength vs sector and market benchmarks"""
+        try:
+            if ticker not in BENCHMARK_MAP:
+                return None
+
+            sector_etf, market_etf = BENCHMARK_MAP[ticker]
+            relative_strength = {}
+
+            # Calculate ticker return
+            ticker_return = ((ticker_prices.iloc[-1] / ticker_prices.iloc[0]) - 1) * 100
+
+            # Compare to sector ETF
+            if sector_etf and 'Close' in market_data.columns and sector_etf in market_data.columns.levels[1]:
+                sector_prices = market_data['Close'][sector_etf]
+                sector_return = ((sector_prices.iloc[-1] / sector_prices.iloc[0]) - 1) * 100
+                relative_strength['vs_sector'] = {
+                    'benchmark': sector_etf,
+                    'ticker_return': round(ticker_return, 2),
+                    'benchmark_return': round(sector_return, 2),
+                    'outperformance': round(ticker_return - sector_return, 2),
+                    'strength': 'outperforming' if ticker_return > sector_return else 'underperforming'
+                }
+
+            # Compare to broad market
+            if market_etf and 'Close' in market_data.columns and market_etf in market_data.columns.levels[1]:
+                market_prices = market_data['Close'][market_etf]
+                market_return = ((market_prices.iloc[-1] / market_prices.iloc[0]) - 1) * 100
+                relative_strength['vs_market'] = {
+                    'benchmark': market_etf,
+                    'ticker_return': round(ticker_return, 2),
+                    'benchmark_return': round(market_return, 2),
+                    'outperformance': round(ticker_return - market_return, 2),
+                    'strength': 'outperforming' if ticker_return > market_return else 'underperforming'
+                }
+
+            return relative_strength if relative_strength else None
+
+        except Exception as e:
+            print(f"Error calculating relative strength for {ticker}: {e}")
+            return None
 
     def _build_strategy_prompt(
         self,
@@ -172,12 +282,41 @@ class AIStrategyGenerator:
     ) -> str:
         """Build the prompt for strategy generation"""
 
+        # Extract market regime for emphasis
+        market_regime = market_summary.get('market_regime', 'unknown')
+
+        # Build relative strength summary
+        rs_summary = []
+        for ticker, stats in market_summary.get('market_stats', {}).items():
+            if 'relative_strength' in stats:
+                rs_data = stats['relative_strength']
+                if 'vs_sector' in rs_data:
+                    rs_summary.append(f"{ticker} vs {rs_data['vs_sector']['benchmark']}: {rs_data['vs_sector']['strength']} ({rs_data['vs_sector']['outperformance']:+.1f}%)")
+                if 'vs_market' in rs_data:
+                    rs_summary.append(f"{ticker} vs {rs_data['vs_market']['benchmark']}: {rs_data['vs_market']['strength']} ({rs_data['vs_market']['outperformance']:+.1f}%)")
+
         prompt = f"""Generate {num_strategies} distinct trading strategies based on the following market data and analysis.
+
+🌍 CURRENT MARKET REGIME: {market_regime.upper()}
+This is CRITICAL - strategies MUST be appropriate for {market_regime} conditions!
 
 MARKET DATA ANALYSIS:
 {json.dumps(market_summary, indent=2)}
 
 TICKERS TO ANALYZE: {', '.join(tickers)}
+
+📊 RELATIVE STRENGTH ANALYSIS:
+{chr(10).join(rs_summary) if rs_summary else 'No relative strength data available'}
+
+MARKET REGIME STRATEGY GUIDELINES:
+- strong_bull: Favor momentum and breakout strategies, higher position sizes
+- bull: Balanced approach, trend-following with moderate stops
+- sideways: Mean reversion strategies, tighter stops, range-bound trading
+- bear/strong_bear: Defensive strategies, tight stops, focus on high-quality setups only
+
+RELATIVE STRENGTH GUIDELINES:
+- If ticker is OUTPERFORMING sector/market: Favor long momentum strategies
+- If ticker is UNDERPERFORMING sector/market: Be more conservative, tighter stops, or avoid
 
 """
 

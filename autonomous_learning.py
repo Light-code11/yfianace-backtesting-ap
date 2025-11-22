@@ -81,11 +81,15 @@ class AutonomousLearningAgent:
         logger.info(f"Strategies per cycle: {strategies_per_cycle}")
 
     def fetch_market_data(self, tickers: List[str], period: str = "1y"):
-        """Fetch market data for backtesting"""
+        """Fetch market data for backtesting, including benchmark ETFs for relative strength analysis"""
         try:
-            ticker_string = " ".join(tickers)
+            # Add benchmark tickers for relative strength analysis
+            benchmarks = {'SPY', 'QQQ', 'SOXX'}  # Market and sector benchmarks (SOXX = iShares Semiconductor ETF)
+            all_tickers = list(set(tickers) | benchmarks)  # Combine and remove duplicates
+
+            ticker_string = " ".join(all_tickers)
             data = yf.download(ticker_string, period=period, progress=False)
-            logger.info(f"Fetched market data for {tickers}: {data.shape}")
+            logger.info(f"Fetched market data for {all_tickers}: {data.shape}")
             return data
         except Exception as e:
             logger.error(f"Error fetching market data: {e}")
