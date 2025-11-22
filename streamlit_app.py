@@ -997,21 +997,21 @@ elif page == "🤖 Autonomous Agent":
 
         with col1:
             # Start Agent
-            with st.form("start_agent_form"):
-                st.write("**Start Autonomous Agent**")
+            st.write("**Start Autonomous Agent**")
 
+            # Interval type selection (outside form for dynamic updates)
+            interval_type = st.radio(
+                "Interval Type",
+                ["Hours", "Minutes"],
+                horizontal=True,
+                help="Choose whether to set interval in hours or minutes"
+            )
+
+            with st.form("start_agent_form"):
                 tickers_input = st.text_input(
                     "Tickers (comma-separated)",
                     value="SPY,QQQ,AAPL",
                     help="Which stocks to focus on"
-                )
-
-                # Interval type selection
-                interval_type = st.radio(
-                    "Interval Type",
-                    ["Hours", "Minutes"],
-                    horizontal=True,
-                    help="Choose whether to set interval in hours or minutes"
                 )
 
                 # Show appropriate slider based on selection
