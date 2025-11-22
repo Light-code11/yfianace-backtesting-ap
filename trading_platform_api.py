@@ -1206,7 +1206,8 @@ async def vectorized_optimize(request: VectorizedOptimizeRequest):
             param_ranges=request.param_ranges
         )
 
-        return result
+        # Convert numpy types to Python types for JSON serialization
+        return convert_numpy_types(result)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1226,7 +1227,8 @@ async def batch_optimize(request: BatchOptimizeRequest):
             period=request.period
         )
 
-        return result
+        # Convert numpy types to Python types for JSON serialization
+        return convert_numpy_types(result)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
