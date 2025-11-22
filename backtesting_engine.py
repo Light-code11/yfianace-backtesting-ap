@@ -439,10 +439,13 @@ class BacktestingEngine:
             max_dd = max(max_dd, dd)
 
         # Calculate Kelly Criterion optimal position sizing
+        # Pass profitability metrics for sanity checking
         kelly_result = KellyCriterion.calculate_kelly_from_backtest({
             'win_rate': win_rate,
             'avg_win': avg_win,
-            'avg_loss': avg_loss
+            'avg_loss': avg_loss,
+            'total_return_pct': total_return_pct,  # Add profitability check
+            'sharpe_ratio': sharpe_ratio  # Add risk-adjusted return check
         }, fractional_kelly=0.25)  # Use Quarter Kelly for safety
 
         return {

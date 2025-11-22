@@ -65,7 +65,8 @@ class KellyCriterion:
         Calculate Kelly position size from backtest results
 
         Args:
-            backtest_results: Dict with keys: win_rate, avg_win, avg_loss
+            backtest_results: Dict with keys: win_rate, avg_win, avg_loss,
+                            total_return_pct (optional), sharpe_ratio (optional)
             fractional_kelly: Fraction of full Kelly to use
 
         Returns:
@@ -74,6 +75,25 @@ class KellyCriterion:
         win_rate = backtest_results.get('win_rate', 0)
         avg_win = abs(backtest_results.get('avg_win', 0))
         avg_loss = abs(backtest_results.get('avg_loss', 1))  # Avoid division by zero
+        total_return_pct = backtest_results.get('total_return_pct', None)
+        sharpe_ratio = backtest_results.get('sharpe_ratio', None)
+
+        # CRITICAL SANITY CHECKS - Don't recommend positions for losing strategies!
+        if total_return_pct is not None and total_return_pct <= 0:
+            return {
+                'kelly_fraction': 0.0,
+                'recommended_position_pct': 0.0,
+                'analysis': f'Strategy has negative total return ({total_return_pct:.2f}%). Despite {win_rate:.1f}% win rate, the strategy is unprofitable. DO NOT TRADE.',
+                'risk_level': 'NO EDGE'
+            }
+
+        if sharpe_ratio is not None and sharpe_ratio < 0:
+            return {
+                'kelly_fraction': 0.0,
+                'recommended_position_pct': 0.0,
+                'analysis': f'Strategy has negative Sharpe ratio ({sharpe_ratio:.2f}). Risk-adjusted returns are poor. DO NOT TRADE.',
+                'risk_level': 'NO EDGE'
+            }
 
         # Handle edge cases
         if win_rate == 0 or avg_win == 0:
