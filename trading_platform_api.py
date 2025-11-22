@@ -72,6 +72,44 @@ print("Initializing database...")
 init_db()
 print("Database initialized successfully")
 
+# Run Kelly Criterion migration
+print("Checking Kelly Criterion database columns...")
+try:
+    from sqlalchemy import create_engine, text, inspect
+    from database import DATABASE_URL
+
+    # Fix Railway PostgreSQL URL format
+    db_url = DATABASE_URL
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    engine = create_engine(db_url)
+    inspector = inspect(engine)
+    columns = [col['name'] for col in inspector.get_columns('backtest_results')]
+
+    kelly_columns = ['kelly_criterion', 'kelly_position_pct', 'kelly_risk_level']
+    missing_columns = [col for col in kelly_columns if col not in columns]
+
+    if missing_columns:
+        print(f"  Adding missing Kelly columns: {missing_columns}")
+        with engine.connect() as conn:
+            if 'kelly_criterion' in missing_columns:
+                conn.execute(text("ALTER TABLE backtest_results ADD COLUMN kelly_criterion FLOAT"))
+                print("  ✅ Added kelly_criterion")
+            if 'kelly_position_pct' in missing_columns:
+                conn.execute(text("ALTER TABLE backtest_results ADD COLUMN kelly_position_pct FLOAT"))
+                print("  ✅ Added kelly_position_pct")
+            if 'kelly_risk_level' in missing_columns:
+                conn.execute(text("ALTER TABLE backtest_results ADD COLUMN kelly_risk_level VARCHAR"))
+                print("  ✅ Added kelly_risk_level")
+            conn.commit()
+        print("✅ Kelly Criterion migration complete!")
+    else:
+        print("  ✅ Kelly Criterion columns already exist")
+except Exception as e:
+    print(f"  ⚠️  Kelly migration warning: {e}")
+    print("  Database will still work, but Kelly data may not save properly")
+
 # Global autonomous learning agent
 autonomous_agent = None
 autonomous_agent_thread = None
