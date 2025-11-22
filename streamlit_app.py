@@ -74,9 +74,23 @@ def make_api_request(endpoint, method="GET", data=None):
             response = requests.get(url)
         elif method == "POST":
             response = requests.post(url, json=data)
+        elif method == "DELETE":
+            response = requests.delete(url)
+        else:
+            st.error(f"Unsupported HTTP method: {method}")
+            return None
 
         response.raise_for_status()
         return response.json()
+    except requests.exceptions.HTTPError as e:
+        # Show detailed error for HTTP errors
+        error_detail = ""
+        try:
+            error_detail = response.json().get('detail', str(e))
+        except:
+            error_detail = str(e)
+        st.error(f"BACKTEST ERROR: {response.status_code}: {error_detail}")
+        return {"success": False, "error": error_detail}
     except Exception as e:
         st.error(f"API Error: {str(e)}")
         return None
@@ -2440,17 +2454,21 @@ elif page == "🎯 Complete Trading System":
                             "name": f"{strategy.replace('_', ' ').title()} - {ticker}",
                             "tickers": [ticker],
                             "strategy_type": strategy,
-                            "indicators": [],  # Will be determined by strategy_type
+                            "indicators": [],  # Will be determined by strategy_type in backtesting_engine
                             "risk_management": {
                                 "stop_loss_pct": 5.0,
                                 "take_profit_pct": 10.0,
-                                "position_size_pct": 10.0
+                                "position_size_pct": 10.0,
+                                "max_positions": 3
                             }
                         }
 
                         # Add optimized parameters if available
                         if opt_params:
                             strategy_config['optimized_params'] = opt_params
+
+                        # Debug: Show what we're sending (can remove later)
+                        # st.write(f"Debug - Sending to /backtest: {strategy_config}")
 
                         # Run backtest
                         response = make_api_request(
