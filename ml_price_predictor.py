@@ -192,12 +192,25 @@ class MLPricePredictor:
 
         try:
             # Download data
-            df = yf.download(ticker, period=period, progress=False)
+            df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
 
             if df.empty or len(df) < 100:
                 return {
                     "success": False,
                     "error": f"Insufficient data for {ticker}. Need at least 100 days."
+                }
+
+            # Flatten multi-index columns if present (yfinance sometimes returns MultiIndex)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
+            # Ensure we have the required columns
+            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if missing_cols:
+                return {
+                    "success": False,
+                    "error": f"Missing required columns: {missing_cols}"
                 }
 
             # Prepare features
@@ -357,7 +370,11 @@ class MLPricePredictor:
 
             # Get data
             if data is None:
-                data = yf.download(ticker, period="6mo", progress=False)
+                data = yf.download(ticker, period="6mo", progress=False, auto_adjust=True)
+
+                # Flatten multi-index columns if present
+                if isinstance(data.columns, pd.MultiIndex):
+                    data.columns = data.columns.get_level_values(0)
 
             if data.empty:
                 return {

@@ -101,7 +101,11 @@ class HMMRegimeDetector:
 
         try:
             # Download data
-            df = yf.download(ticker, period=period, progress=False)
+            df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+
+            # Flatten multi-index columns if present
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
 
             if df.empty or len(df) < 100:
                 return {
@@ -265,7 +269,11 @@ class HMMRegimeDetector:
         try:
             # Get data
             if data is None:
-                data = yf.download(ticker, period="6mo", progress=False)
+                data = yf.download(ticker, period="6mo", progress=False, auto_adjust=True)
+
+                # Flatten multi-index columns if present
+                if isinstance(data.columns, pd.MultiIndex):
+                    data.columns = data.columns.get_level_values(0)
 
             if data.empty:
                 return {
@@ -341,7 +349,11 @@ class HMMRegimeDetector:
 
         try:
             # Download data
-            df = yf.download(ticker, period=period, progress=False)
+            df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+
+            # Flatten multi-index columns if present
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
 
             if df.empty:
                 return {
