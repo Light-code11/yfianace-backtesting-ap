@@ -198,6 +198,7 @@ AI LEARNING INSIGHTS:
 {json.dumps(learning_insights, indent=2)}
 """
 
+        # Add requirements section
         prompt += f"""
 REQUIREMENTS:
 Generate diverse strategies using different approaches:
@@ -207,6 +208,7 @@ Generate diverse strategies using different approaches:
 4. Trend following strategies
 
 IMPORTANT: Each strategy MUST use the tickers: {', '.join(tickers)}
+The "tickers" field in EVERY strategy response must be: {json.dumps(tickers)}
 
 For EACH strategy, provide:
 {{
@@ -217,32 +219,32 @@ For EACH strategy, provide:
       "strategy_type": "momentum|mean_reversion|breakout|trend_following",
       "tickers": {json.dumps(tickers)},
       "indicators": [
-        {"name": "SMA", "period": 20},
-        {"name": "RSI", "period": 14}
+        {{"name": "SMA", "period": 20}},
+        {{"name": "RSI", "period": 14}}
       ],
-      "entry_conditions": {
+      "entry_conditions": {{
         "primary": "Specific entry condition",
         "secondary": "Confirmation signal",
         "filters": ["Additional filters"]
-      },
-      "exit_conditions": {
+      }},
+      "exit_conditions": {{
         "profit_target": "Take profit condition",
         "stop_loss": "Stop loss condition",
         "time_based": "Time-based exit (optional)"
-      },
-      "risk_management": {
+      }},
+      "risk_management": {{
         "stop_loss_pct": 5.0,
         "take_profit_pct": 10.0,
         "position_size_pct": 10.0,
         "max_positions": 3
-      },
+      }},
       "holding_period_days": 5,
       "rationale": "Why this strategy should work in current market conditions",
       "market_analysis": "Current market environment analysis",
       "risk_assessment": "Potential risks and mitigation"
-    }
+    }}
   ]
-}
+}}
 
 Make strategies:
 - SPECIFIC and ACTIONABLE with clear numeric thresholds
