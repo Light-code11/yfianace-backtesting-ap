@@ -848,6 +848,167 @@ elif page == "Backtest":
                                     - b = win/loss ratio ({abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f})
                                     """)
 
+                            # Advanced Risk Metrics Section
+                            st.markdown("---")
+                            st.subheader("📊 Advanced Risk Metrics")
+
+                            # Check if advanced metrics are available
+                            metrics = results['metrics']
+                            has_advanced = 'var_95_pct' in metrics
+
+                            if has_advanced:
+                                # Value at Risk
+                                st.markdown("### 📉 Value at Risk (VaR)")
+                                col1, col2, col3 = st.columns(3)
+
+                                with col1:
+                                    var_95 = metrics.get('var_95_pct', 0)
+                                    st.metric("95% VaR", f"{var_95:.2f}%")
+                                    st.caption("95% chance loss won't exceed this")
+
+                                with col2:
+                                    cvar_95 = metrics.get('cvar_95_pct', 0)
+                                    st.metric("95% CVaR", f"{cvar_95:.2f}%")
+                                    st.caption("Expected loss if VaR breached")
+
+                                with col3:
+                                    # Show interpretation
+                                    if var_95 > 5:
+                                        st.warning(f"⚠️ High risk: potential {var_95:.1f}% daily loss")
+                                    elif var_95 > 3:
+                                        st.info(f"Moderate risk: {var_95:.1f}% potential loss")
+                                    else:
+                                        st.success(f"✅ Low risk: {var_95:.1f}% max loss")
+
+                                # Risk-Adjusted Returns
+                                st.markdown("### 📈 Risk-Adjusted Performance")
+                                col1, col2, col3, col4 = st.columns(4)
+
+                                with col1:
+                                    sortino = metrics.get('sortino_ratio', 0)
+                                    st.metric("Sortino Ratio", f"{sortino:.2f}")
+                                    st.caption("Return / Downside risk")
+
+                                with col2:
+                                    calmar = metrics.get('calmar_ratio', 0)
+                                    st.metric("Calmar Ratio", f"{calmar:.2f}")
+                                    st.caption("Return / Max drawdown")
+
+                                with col3:
+                                    st.metric("Sharpe Ratio", f"{metrics['sharpe_ratio']:.2f}")
+                                    st.caption("Return / Total risk")
+
+                                with col4:
+                                    # Best ratio indicator
+                                    best_ratio = max(sortino, calmar, metrics['sharpe_ratio'])
+                                    if best_ratio > 2:
+                                        st.success("🔥 Excellent!")
+                                    elif best_ratio > 1:
+                                        st.info("✅ Good")
+                                    else:
+                                        st.warning("⚠️ Poor")
+
+                                # Drawdown Analysis
+                                st.markdown("### 💧 Drawdown Analysis")
+                                col1, col2, col3, col4 = st.columns(4)
+
+                                with col1:
+                                    ulcer = metrics.get('ulcer_index', 0)
+                                    st.metric("Ulcer Index", f"{ulcer:.2f}")
+                                    st.caption("DD depth + duration")
+
+                                with col2:
+                                    pain = metrics.get('pain_index', 0)
+                                    st.metric("Pain Index", f"{pain:.2f}%")
+                                    st.caption("Average drawdown")
+
+                                with col3:
+                                    max_dd_days = metrics.get('max_dd_duration_days', 0)
+                                    st.metric("Max DD Duration", f"{max_dd_days} days")
+                                    st.caption("Longest underwater period")
+
+                                with col4:
+                                    time_underwater = metrics.get('time_underwater_pct', 0)
+                                    st.metric("Time Underwater", f"{time_underwater:.1f}%")
+                                    st.caption("% of time in drawdown")
+
+                                # Tail Risk
+                                st.markdown("### 🎲 Tail Risk & Distribution")
+                                col1, col2, col3, col4 = st.columns(4)
+
+                                with col1:
+                                    skewness = metrics.get('skewness', 0)
+                                    st.metric("Skewness", f"{skewness:.3f}")
+                                    if skewness < -0.5:
+                                        st.caption("🔴 Negative skew (bad)")
+                                    elif skewness > 0.5:
+                                        st.caption("🟢 Positive skew (good)")
+                                    else:
+                                        st.caption("⚪ Neutral")
+
+                                with col2:
+                                    kurtosis = metrics.get('kurtosis', 0)
+                                    st.metric("Kurtosis", f"{kurtosis:.3f}")
+                                    if kurtosis > 3:
+                                        st.caption("⚠️ Fat tails (extreme events)")
+                                    else:
+                                        st.caption("✅ Normal distribution")
+
+                                with col3:
+                                    max_win_streak = metrics.get('max_win_streak', 0)
+                                    st.metric("Max Win Streak", f"{max_win_streak}")
+                                    st.caption("Consecutive wins")
+
+                                with col4:
+                                    max_loss_streak = metrics.get('max_loss_streak', 0)
+                                    st.metric("Max Loss Streak", f"{max_loss_streak}")
+                                    st.caption("Consecutive losses")
+
+                                # Interpretation Guide
+                                with st.expander("ℹ️ How to interpret these metrics"):
+                                    st.markdown("""
+                                    **Value at Risk (VaR)**:
+                                    - 95% VaR: There's only a 5% chance your daily loss will exceed this amount
+                                    - Lower is better (less risk)
+
+                                    **Conditional VaR (CVaR)**:
+                                    - If your loss exceeds VaR, CVaR is the expected loss
+                                    - Also called Expected Shortfall
+                                    - Always >= VaR
+
+                                    **Sortino Ratio**:
+                                    - Like Sharpe, but only penalizes downside volatility
+                                    - Higher is better (>2 is excellent, >1 is good)
+
+                                    **Calmar Ratio**:
+                                    - Return divided by maximum drawdown
+                                    - Higher is better (>3 is excellent)
+
+                                    **Ulcer Index**:
+                                    - Measures both depth and duration of drawdowns
+                                    - Lower is better (less painful drawdowns)
+
+                                    **Pain Index**:
+                                    - Average drawdown over the period
+                                    - Lower is better
+
+                                    **Skewness**:
+                                    - Negative: More left-tail risk (large losses)
+                                    - Positive: More right-tail potential (large wins)
+                                    - Near 0: Symmetric distribution
+
+                                    **Kurtosis**:
+                                    - > 0: Fatter tails than normal (more extreme events)
+                                    - < 0: Thinner tails than normal
+                                    - = 0: Normal distribution
+
+                                    **Time Underwater**:
+                                    - % of time spent below previous peak
+                                    - Lower is better (faster recovery)
+                                    """)
+                            else:
+                                st.info("💡 Advanced risk metrics will be available after running this backtest again with the latest code.")
+
                             # Strategy Explanation Section
                             st.markdown("---")
                             st.subheader("📋 Strategy Details")

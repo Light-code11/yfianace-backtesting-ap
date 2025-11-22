@@ -1,5 +1,5 @@
 """
-Advanced backtesting engine with technical indicators
+Advanced backtesting engine with technical indicators and advanced risk metrics
 """
 import pandas as pd
 import numpy as np
@@ -7,6 +7,7 @@ from typing import Dict, List, Any, Tuple
 from datetime import datetime, timedelta
 from kelly_criterion import KellyCriterion
 from advanced_indicators import AdvancedIndicators
+from advanced_risk_metrics import AdvancedRiskMetrics
 
 
 class TechnicalIndicators:
@@ -520,6 +521,42 @@ class BacktestingEngine:
             'sharpe_ratio': sharpe_ratio  # Add risk-adjusted return check
         }, fractional_kelly=0.25)  # Use Quarter Kelly for safety
 
+        # Calculate advanced risk metrics
+        advanced_risk = AdvancedRiskMetrics.comprehensive_risk_analysis(
+            equity_curve=equity_curve,
+            trades=trades,
+            risk_free_rate=0.02
+        )
+
+        # Extract key metrics from advanced risk analysis
+        if advanced_risk.get('success'):
+            var_95 = advanced_risk['value_at_risk']['var_95_pct']
+            cvar_95 = advanced_risk['conditional_var']['cvar_95_pct']
+            sortino_ratio = advanced_risk['risk_adjusted_returns']['sortino_ratio']
+            calmar_ratio = advanced_risk['risk_adjusted_returns']['calmar_ratio']
+            ulcer_index = advanced_risk['drawdown_metrics']['ulcer_index']
+            pain_index = advanced_risk['drawdown_metrics']['pain_index']
+            max_dd_duration = advanced_risk['drawdown_metrics']['max_drawdown_duration_days']
+            time_underwater_pct = advanced_risk['drawdown_metrics']['time_underwater_pct']
+            skewness = advanced_risk['tail_risk']['skewness']
+            kurtosis = advanced_risk['tail_risk']['kurtosis']
+            max_win_streak = advanced_risk['streaks']['max_win_streak']
+            max_loss_streak = advanced_risk['streaks']['max_loss_streak']
+        else:
+            # Fallback values if advanced metrics fail
+            var_95 = 0
+            cvar_95 = 0
+            sortino_ratio = sharpe_ratio * 1.2
+            calmar_ratio = 0
+            ulcer_index = 0
+            pain_index = 0
+            max_dd_duration = 0
+            time_underwater_pct = 0
+            skewness = 0
+            kurtosis = 0
+            max_win_streak = 0
+            max_loss_streak = 0
+
         return {
             'total_return_pct': round(total_return_pct, 2),
             'total_trades': total_trades,
@@ -527,7 +564,7 @@ class BacktestingEngine:
             'losing_trades': len(losing_trades),
             'win_rate': round(win_rate, 2),
             'sharpe_ratio': round(sharpe_ratio, 2),
-            'sortino_ratio': round(sharpe_ratio * 1.2, 2),  # Approximation
+            'sortino_ratio': round(sortino_ratio, 2),
             'max_drawdown_pct': round(max_dd, 2),
             'profit_factor': round(profit_factor, 2),
             'avg_win': round(avg_win, 2),
@@ -538,7 +575,19 @@ class BacktestingEngine:
             # Kelly Criterion optimal position sizing
             'kelly_criterion': kelly_result['kelly_fraction'],
             'kelly_position_pct': kelly_result['recommended_position_pct'],
-            'kelly_risk_level': kelly_result['risk_level']
+            'kelly_risk_level': kelly_result['risk_level'],
+            # Advanced Risk Metrics
+            'var_95_pct': round(var_95, 2),
+            'cvar_95_pct': round(cvar_95, 2),
+            'calmar_ratio': round(calmar_ratio, 2),
+            'ulcer_index': round(ulcer_index, 2),
+            'pain_index': round(pain_index, 2),
+            'max_dd_duration_days': max_dd_duration,
+            'time_underwater_pct': round(time_underwater_pct, 1),
+            'skewness': round(skewness, 3),
+            'kurtosis': round(kurtosis, 3),
+            'max_win_streak': max_win_streak,
+            'max_loss_streak': max_loss_streak
         }
 
     def _calculate_quality_score(

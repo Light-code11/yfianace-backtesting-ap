@@ -177,16 +177,46 @@
 
 **Impact**: MEDIUM - Helps match strategy type to market conditions, improves risk management
 
-### 6. Advanced Risk Metrics
-**Status**: Library installed, integration pending
+### 6. Advanced Risk Metrics ✅
+**Status**: DEPLOYED - Professional risk analysis now live!
 
-**What's coming**:
-- Value at Risk (VaR): "95% chance you won't lose more than X%"
-- Conditional VaR (CVaR): Expected loss in worst 5% scenarios
-- Ulcer Index: Depth and duration of drawdowns
-- Better Sortino ratio calculation
+**What it does**:
+- **Value at Risk (VaR)**: 95% confidence - daily loss won't exceed X%
+- **Conditional VaR (CVaR)**: Expected loss if VaR threshold is breached
+- **Sortino Ratio**: Return/downside deviation (better than Sharpe for asymmetric risk)
+- **Calmar Ratio**: Return/max drawdown
+- **Ulcer Index**: Depth and duration of drawdowns combined
+- **Pain Index**: Average drawdown over period
+- **Tail Risk**: Skewness and kurtosis (detect fat tails)
+- **Drawdown Duration**: Max days underwater + time underwater %
+- **Win/Loss Streaks**: Consecutive wins/losses
 
-**Impact**: MEDIUM - Better understanding of downside risk
+**Features**:
+- Automatically calculated for every backtest
+- Displayed in Backtest page under "Advanced Risk Metrics"
+- 4 sub-sections:
+  - Value at Risk (VaR & CVaR)
+  - Risk-Adjusted Performance (Sortino, Calmar, Sharpe)
+  - Drawdown Analysis (Ulcer, Pain, Duration, Time Underwater)
+  - Tail Risk & Distribution (Skewness, Kurtosis, Streaks)
+
+**How It Works**:
+1. Extracts returns from equity curve
+2. Calculates VaR using historical method (actual distribution)
+3. Computes CVaR as average of returns beyond VaR
+4. Uses empyrical library for professional-grade calculations
+5. Falls back to scipy for basic metrics if empyrical unavailable
+
+**Risk Metrics Explained**:
+- **VaR 95%**: "There's only a 5% chance you'll lose more than X% in a day"
+- **CVaR 95%**: "If that 5% bad event happens, you'll lose X% on average"
+- **Sortino > 2**: Excellent (only penalizes downside, not upside volatility)
+- **Calmar > 3**: Excellent (high return relative to worst drawdown)
+- **Ulcer < 5**: Low pain (shallow and brief drawdowns)
+- **Skewness < 0**: Negative (bad - more left-tail losses than right-tail gains)
+- **Kurtosis > 3**: Fat tails (more extreme events than normal distribution)
+
+**Impact**: MEDIUM - Professional risk analysis, better understanding of downside and tail risk
 
 ### 7. Vectorized Backtesting
 **Status**: Library installed, integration pending
