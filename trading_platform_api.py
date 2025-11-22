@@ -52,7 +52,9 @@ app.add_middleware(
 )
 
 # Initialize database
+print("Initializing database...")
 init_db()
+print("Database initialized successfully")
 
 # Global autonomous learning agent
 autonomous_agent = None
@@ -236,8 +238,11 @@ async def generate_strategies(
                 strategy_tickers = request.tickers
                 print(f"DEBUG: No tickers in AI response, using input tickers: {strategy_tickers}")
 
+            # Make strategy name unique by adding timestamp
+            unique_name = f"{strategy['name']} [{datetime.now().strftime('%Y%m%d_%H%M%S')}]"
+
             db_strategy = Strategy(
-                name=strategy['name'],
+                name=unique_name,
                 description=strategy.get('description', ''),
                 tickers=strategy_tickers,
                 entry_conditions=strategy.get('entry_conditions', {}),
@@ -425,6 +430,9 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
         }
 
     except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"BACKTEST ERROR: {error_detail}")  # Log to Railway console
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -144,9 +144,12 @@ class AutonomousLearningAgent:
             for i, strategy in enumerate(strategies, 1):
                 logger.info(f"  Backtesting strategy {i}/{len(strategies)}: {strategy['name']}")
 
+                # Make strategy name unique by adding timestamp
+                unique_name = f"{strategy['name']} [{datetime.now().strftime('%Y%m%d_%H%M%S')}]"
+
                 # Save strategy to database first
                 db_strategy = Strategy(
-                    name=strategy['name'],
+                    name=unique_name,
                     description=strategy.get('description', ''),
                     tickers=strategy.get('tickers', self.tickers),
                     entry_conditions=strategy.get('entry_conditions', {}),
