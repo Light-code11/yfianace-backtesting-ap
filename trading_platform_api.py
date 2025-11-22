@@ -849,11 +849,14 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         db.commit()
         db.refresh(portfolio)
 
-        return {
+        response = {
             "success": True,
             "portfolio_id": portfolio.id,
             **optimization_result
         }
+
+        # Convert numpy types to Python types for JSON serialization
+        return convert_numpy_types(response)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -982,7 +985,8 @@ async def train_ml_model(request: MLTrainingRequest):
             horizon=request.horizon
         )
 
-        return result
+        # Convert numpy types to Python types for JSON serialization
+        return convert_numpy_types(result)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1005,7 +1009,8 @@ async def get_ml_prediction(ticker: str):
         # Get prediction
         result = predictor.predict(ticker, return_proba=True)
 
-        return result
+        # Convert numpy types to Python types for JSON serialization
+        return convert_numpy_types(result)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
