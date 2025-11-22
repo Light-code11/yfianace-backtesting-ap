@@ -366,6 +366,54 @@ async def get_strategy(strategy_id: int, db=Depends(get_db)):
     }
 
 
+@app.post("/strategies/cleanup")
+async def cleanup_zero_trade_strategies(db=Depends(get_db)):
+    """Delete all strategies and backtest results with 0 trades"""
+    try:
+        # Find all backtest results with 0 trades
+        zero_trade_results = db.query(BacktestResult).filter(
+            BacktestResult.total_trades == 0
+        ).all()
+
+        strategy_ids_to_delete = set()
+        deleted_backtest_count = 0
+
+        # Delete backtest results and collect strategy IDs
+        for result in zero_trade_results:
+            strategy_ids_to_delete.add(result.strategy_id)
+            db.delete(result)
+            deleted_backtest_count += 1
+
+        # Delete strategies that only have zero-trade results
+        deleted_strategy_count = 0
+        for strategy_id in strategy_ids_to_delete:
+            # Check if this strategy has ANY backtest with trades > 0
+            has_good_results = db.query(BacktestResult).filter(
+                BacktestResult.strategy_id == strategy_id,
+                BacktestResult.total_trades > 0
+            ).first()
+
+            # Only delete if ALL backtests had 0 trades
+            if not has_good_results:
+                strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+                if strategy:
+                    db.delete(strategy)
+                    deleted_strategy_count += 1
+
+        db.commit()
+
+        return {
+            "success": True,
+            "deleted_strategies": deleted_strategy_count,
+            "deleted_backtests": deleted_backtest_count,
+            "message": f"Deleted {deleted_strategy_count} strategies and {deleted_backtest_count} backtest results with 0 trades"
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # =======================
 # BACKTESTING ENDPOINTS
 # =======================

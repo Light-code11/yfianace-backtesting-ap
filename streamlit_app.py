@@ -573,6 +573,24 @@ elif page == "Generate Strategies":
 elif page == "Backtest":
     st.markdown('<div class="main-header">🧪 Strategy Backtesting</div>', unsafe_allow_html=True)
 
+    # Cleanup button for zero-trade strategies
+    st.markdown("### 🧹 Database Cleanup")
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.write("Remove all strategies and backtest results with 0 trades to clean up your database.")
+    with col2:
+        if st.button("🗑️ Delete 0% Strategies", type="secondary", use_container_width=True):
+            with st.spinner("Cleaning up zero-trade strategies..."):
+                response = make_api_request("/strategies/cleanup", method="POST")
+                if response and response.get('success'):
+                    st.success(f"✅ {response['message']}")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Failed to cleanup strategies")
+
+    st.markdown("---")
+
     # Get available strategies (including inactive ones to show all)
     strategies_data = make_api_request("/strategies?active_only=false")
 
