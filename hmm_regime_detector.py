@@ -162,8 +162,8 @@ class HMMRegimeDetector:
             for char in regime_characteristics:
                 char['label'] = self.regime_labels.get(char['state'], 'UNKNOWN')
 
-            # Calculate transition matrix
-            transition_matrix = self.model.transmat_.tolist()
+            # Calculate transition matrix (convert to Python native types)
+            transition_matrix = [[float(x) for x in row] for row in self.model.transmat_.tolist()]
 
             # Get current regime
             current_regime_state = hidden_states[-1]
@@ -177,7 +177,7 @@ class HMMRegimeDetector:
                 "success": True,
                 "ticker": ticker,
                 "period": period,
-                "n_samples": len(X),
+                "n_samples": int(len(X)),
                 "current_regime": {
                     "state": int(current_regime_state),
                     "label": current_regime_label,

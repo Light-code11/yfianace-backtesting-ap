@@ -279,10 +279,10 @@ class MLPricePredictor:
             train_metrics = self._calculate_metrics(y_train, y_train_pred, y_train_proba)
             test_metrics = self._calculate_metrics(y_test, y_test_pred, y_test_proba)
 
-            # Feature importance
+            # Feature importance (convert numpy types to Python float)
             feature_importance = dict(zip(
                 self.feature_columns,
-                self.model.feature_importances_
+                [float(x) for x in self.model.feature_importances_]
             ))
             top_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)[:10]
 
@@ -296,19 +296,19 @@ class MLPricePredictor:
                 "period": period,
                 "horizon": horizon,
                 "samples": {
-                    "total": len(X),
-                    "train": len(X_train),
-                    "test": len(X_test)
+                    "total": int(len(X)),
+                    "train": int(len(X_train)),
+                    "test": int(len(X_test))
                 },
                 "class_balance": {
-                    "train_positive_pct": round(train_positive_pct, 2),
-                    "test_positive_pct": round(test_positive_pct, 2)
+                    "train_positive_pct": float(round(train_positive_pct, 2)),
+                    "test_positive_pct": float(round(test_positive_pct, 2))
                 },
                 "train_metrics": train_metrics,
                 "test_metrics": test_metrics,
-                "top_features": [{"feature": f, "importance": round(imp, 4)} for f, imp in top_features],
+                "top_features": [{"feature": f, "importance": float(round(imp, 4))} for f, imp in top_features],
                 "model_path": str(model_path),
-                "features_count": len(self.feature_columns)
+                "features_count": int(len(self.feature_columns))
             }
 
         except Exception as e:
@@ -318,17 +318,17 @@ class MLPricePredictor:
             }
 
     def _calculate_metrics(self, y_true, y_pred, y_proba) -> Dict[str, float]:
-        """Calculate classification metrics"""
+        """Calculate classification metrics (convert to Python native types for JSON)"""
         metrics = {
-            "accuracy": round(accuracy_score(y_true, y_pred), 4),
-            "precision": round(precision_score(y_true, y_pred, zero_division=0), 4),
-            "recall": round(recall_score(y_true, y_pred, zero_division=0), 4),
-            "f1_score": round(f1_score(y_true, y_pred, zero_division=0), 4)
+            "accuracy": float(round(accuracy_score(y_true, y_pred), 4)),
+            "precision": float(round(precision_score(y_true, y_pred, zero_division=0), 4)),
+            "recall": float(round(recall_score(y_true, y_pred, zero_division=0), 4)),
+            "f1_score": float(round(f1_score(y_true, y_pred, zero_division=0), 4))
         }
 
         # ROC AUC only if we have both classes
         if len(np.unique(y_true)) > 1:
-            metrics["roc_auc"] = round(roc_auc_score(y_true, y_proba), 4)
+            metrics["roc_auc"] = float(round(roc_auc_score(y_true, y_proba), 4))
         else:
             metrics["roc_auc"] = 0.0
 
