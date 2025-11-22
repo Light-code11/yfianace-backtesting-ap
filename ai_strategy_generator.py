@@ -3,15 +3,29 @@ AI-powered trading strategy generator using OpenAI GPT-4
 """
 import os
 import json
+import time
 from typing import List, Dict, Any
 from openai import OpenAI
 from datetime import datetime
 import pandas as pd
+import httpx
 
 class AIStrategyGenerator:
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
-        self.client = OpenAI(api_key=self.api_key)
+
+        # Create HTTP client with proper timeout settings
+        http_client = httpx.Client(
+            timeout=httpx.Timeout(60.0, connect=10.0),  # 60s total timeout, 10s connect timeout
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+        )
+
+        # Initialize OpenAI client with custom HTTP client
+        self.client = OpenAI(
+            api_key=self.api_key,
+            http_client=http_client,
+            max_retries=3  # Built-in retry mechanism
+        )
         # Use gpt-4o-mini or gpt-3.5-turbo as fallback (cheaper and more widely available)
         self.model = "gpt-4o-mini"  # Changed from "gpt-4" for better compatibility
 
@@ -48,47 +62,61 @@ class AIStrategyGenerator:
             learning_insights=learning_insights
         )
 
-        # Generate strategies
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert quantitative trader and strategy developer. Generate data-driven, backtestable trading strategies with clear entry/exit rules. IMPORTANT: Return ONLY valid JSON, no additional text."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=3000
-            )
-        except Exception as e:
-            # If gpt-4o-mini fails, try gpt-3.5-turbo as fallback
-            print(f"Failed with {self.model}, trying gpt-3.5-turbo: {e}")
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are an expert quantitative trader and strategy developer. Generate data-driven, backtestable trading strategies with clear entry/exit rules. IMPORTANT: Return ONLY valid JSON, no additional text."
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=3000
-            )
+        # Generate strategies with retry logic
+        response = self._call_openai_with_retry(prompt, max_retries=3)
 
         # Parse response
         strategies_json = json.loads(response.choices[0].message.content)
         strategies = strategies_json.get("strategies", [])
 
         return strategies
+
+    def _call_openai_with_retry(self, prompt: str, max_retries: int = 3):
+        """
+        Call OpenAI API with exponential backoff retry logic
+        """
+        models_to_try = [self.model, "gpt-3.5-turbo"]  # Fallback models
+
+        for model in models_to_try:
+            for attempt in range(max_retries):
+                try:
+                    print(f"Attempting OpenAI call with model={model}, attempt={attempt+1}/{max_retries}")
+
+                    response = self.client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You are an expert quantitative trader and strategy developer. Generate data-driven, backtestable trading strategies with clear entry/exit rules. IMPORTANT: Return ONLY valid JSON, no additional text."
+                            },
+                            {
+                                "role": "user",
+                                "content": prompt
+                            }
+                        ],
+                        temperature=0.7,
+                        max_tokens=3000
+                    )
+
+                    print(f"OpenAI call successful with model={model}")
+                    return response
+
+                except Exception as e:
+                    error_msg = str(e)
+                    print(f"Attempt {attempt+1} with {model} failed: {error_msg}")
+
+                    # If this is the last attempt with this model, try the next model
+                    if attempt == max_retries - 1:
+                        print(f"All retries exhausted for {model}, trying next model...")
+                        break
+
+                    # Exponential backoff: wait 2^attempt seconds
+                    wait_time = 2 ** attempt
+                    print(f"Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+
+        # If all models and retries failed, raise an exception
+        raise Exception(f"Failed to generate strategies after trying all models and retries. Last error: Connection timeout or API unavailable.")
 
     def _analyze_market_data(self, market_data: pd.DataFrame, tickers: List[str]) -> Dict[str, Any]:
         """Analyze market data to provide context for strategy generation"""
@@ -263,22 +291,7 @@ Return response as JSON:
 }}
 """
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a professional trading advisor. Provide clear, actionable, risk-aware recommendations. Return ONLY valid JSON."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.3,
-            max_tokens=2000
-        )
-
+        response = self._call_openai_with_retry(prompt, max_retries=3)
         recommendations = json.loads(response.choices[0].message.content)
         return recommendations
 
@@ -331,21 +344,6 @@ Return as JSON:
 }}
 """
 
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a machine learning system that learns from trading results to improve future strategy generation. Return ONLY valid JSON."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            temperature=0.2,
-            max_tokens=2000
-        )
-
+        response = self._call_openai_with_retry(prompt, max_retries=3)
         learning = json.loads(response.choices[0].message.content)
         return learning
