@@ -34,6 +34,7 @@ from backtesting_engine import BacktestingEngine
 from paper_trading import PaperTradingSimulator
 from portfolio_optimizer import PortfolioOptimizer
 from autonomous_learning import AutonomousLearningAgent
+from strategy_visualizer import StrategyVisualizer
 import threading
 
 # Helper function to convert numpy types to Python types for PostgreSQL
