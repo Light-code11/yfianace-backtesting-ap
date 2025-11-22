@@ -10,6 +10,7 @@ from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
 import json
+import os
 
 # Page configuration
 st.set_page_config(
@@ -19,8 +20,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# API Base URL
-API_BASE_URL = "http://localhost:8000"
+# API Base URL - configurable via environment variable
+# For Streamlit Cloud: Set this in Secrets management
+# For local: Use localhost
+API_BASE_URL = os.getenv("API_BASE_URL", st.secrets.get("API_BASE_URL", "http://localhost:8000"))
 
 # Custom CSS
 st.markdown("""
