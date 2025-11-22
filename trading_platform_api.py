@@ -43,16 +43,27 @@ import threading
 # Helper function to convert numpy types to Python types for PostgreSQL
 def convert_numpy_types(obj):
     """Recursively convert numpy types to native Python types"""
-    if isinstance(obj, np.integer):
+    import numpy as np
+
+    # Handle None/NaN
+    if obj is None or (isinstance(obj, float) and np.isnan(obj)):
+        return None
+
+    # Handle numpy types
+    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
         return int(obj)
-    elif isinstance(obj, np.floating):
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
         return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
     elif isinstance(obj, dict):
         return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, list):
+    elif isinstance(obj, (list, tuple)):
         return [convert_numpy_types(item) for item in obj]
+
+    # Return as-is for Python native types
     return obj
 
 # Initialize FastAPI app
@@ -540,14 +551,18 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
         db.commit()
         db.refresh(backtest_result)
 
-        return {
+        # Build response and ensure ALL numpy types are converted
+        response = {
             "success": True,
-            "backtest_id": backtest_result.id,
-            "strategy_name": results['strategy_name'],
+            "backtest_id": int(backtest_result.id),
+            "strategy_name": str(results['strategy_name']),
             "metrics": metrics_clean,  # Use cleaned metrics (numpy types converted)
             "total_trades": int(len(trades_clean)),
             "equity_curve_points": int(len(equity_curve_clean))
         }
+
+        # Final safety conversion to catch any remaining numpy types
+        return convert_numpy_types(response)
 
     except Exception as e:
         import traceback
