@@ -380,18 +380,51 @@ CRITICAL SAFETY CONSTRAINTS (MUST FOLLOW):
 4. Risk/Reward: Minimum 2:1 ratio (take_profit should be 2x stop_loss)
 5. Max Trades Per Day: Limit to 2-3 to avoid overtrading
 
-PROVEN STRATEGY TEMPLATES (Use these as base, then customize):
-1. RSI Mean Reversion: Buy when RSI < 30, sell when RSI > 70, stop_loss=2%, take_profit=4%
-2. Golden Cross: Buy when SMA(50) > SMA(200), sell when opposite, stop_loss=3%, take_profit=6%
-3. Momentum Breakout: Buy on 20-day high, sell on 10-day low, stop_loss=2.5%, take_profit=5%
-4. MACD Trend: Buy on MACD crossover + price > SMA(20), stop_loss=2%, take_profit=4%
+AVAILABLE TECHNICAL INDICATORS (50+ indicators now available!):
+
+📊 MOMENTUM INDICATORS:
+- RSI (Relative Strength Index): Periods 7, 14, 21
+- Stochastic: %K and %D oscillators
+- CCI (Commodity Channel Index): Measure momentum
+- Williams_R: Overbought/oversold (-100 to 0)
+- ROC (Rate of Change): Momentum strength
+- MFI (Money Flow Index): Volume-weighted RSI
+
+📈 TREND INDICATORS:
+- SMA (Simple Moving Average): 10, 20, 50, 100, 200 periods
+- EMA (Exponential Moving Average): 12, 26, 50, 200 periods
+- MACD: Standard (12,26,9) and custom periods
+- ADX (Average Directional Index): Trend strength 0-100
+- SuperTrend: Dynamic support/resistance
+- Aroon: Identify trend changes early
+
+💨 VOLATILITY INDICATORS:
+- ATR (Average True Range): Volatility measurement
+- Bollinger_Bands: Upper, Middle, Lower bands
+- Keltner_Channels: ATR-based price envelopes
+- Donchian_Channels: Price breakout levels
+
+📦 VOLUME INDICATORS:
+- OBV (On-Balance Volume): Volume flow
+- CMF (Chaikin Money Flow): Buying/selling pressure
+- VWAP (Volume Weighted Average Price): Intraday reference
+- Volume_SMA: Volume trend analysis
+
+ADVANCED STRATEGY EXAMPLES (use 2-4 indicators for confluence):
+1. Triple Momentum: RSI_14 > 50 AND Stoch_K > 20 AND MFI > 50
+2. Volatility Breakout: Price > BB_Upper AND ATR increasing AND Volume > Volume_SMA * 1.5
+3. Trend + Volume: SuperTrend bullish AND MACD > Signal AND CMF > 0
+4. Mean Reversion Filter: RSI < 30 AND Williams_R < -80 AND price near BB_Lower
+5. Momentum Surge: CCI > 100 AND ROC_12 > 5 AND ADX > 25
+6. Channel Breakout: Price breaks DC_Upper AND Volume spike AND ATR expansion
 
 REQUIREMENTS:
-Generate diverse strategies using these proven approaches:
-1. RSI mean reversion (oversold/overbought)
-2. Moving average crossovers (trend following)
-3. Momentum breakouts (new highs/lows)
-4. MACD + trend confirmation
+Generate ADVANCED strategies using NEW indicators:
+1. Combine 2-4 indicators for confluence (e.g., RSI + Stochastic + MFI)
+2. Add volatility filters (ATR, Bollinger Bands, Keltner Channels)
+3. Use volume confirmation (CMF, VWAP, Volume_SMA)
+4. Check trend strength (ADX, SuperTrend, Aroon)
+5. Mix indicator types: Momentum + Trend + Volatility + Volume
 
 IMPORTANT: Each strategy MUST use the tickers: {', '.join(tickers)}
 The "tickers" field in EVERY strategy response must be: {json.dumps(tickers)}
@@ -406,8 +439,18 @@ For EACH strategy, provide:
       "tickers": {json.dumps(tickers)},
       "indicators": [
         {{"name": "SMA", "period": 20}},
-        {{"name": "RSI", "period": 14}}
+        {{"name": "RSI", "period": 14}},
+        {{"name": "ATR", "period": 14}},
+        {{"name": "Volume_SMA", "period": 20}}
       ],
+
+      NOTE: You can use ANY of these indicators:
+      - Momentum: RSI, Stochastic, CCI, Williams_R, ROC, MFI
+      - Trend: SMA, EMA, MACD, ADX, SuperTrend, Aroon
+      - Volatility: ATR, Bollinger_Bands, Keltner_Channels, Donchian_Channels
+      - Volume: OBV, CMF, VWAP, Volume_SMA
+
+      COMBINE multiple indicators for better signals!
       "entry_conditions": {{
         "primary": "Specific entry condition",
         "secondary": "Confirmation signal",

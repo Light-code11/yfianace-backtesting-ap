@@ -6,6 +6,7 @@ import numpy as np
 from typing import Dict, List, Any, Tuple
 from datetime import datetime, timedelta
 from kelly_criterion import KellyCriterion
+from advanced_indicators import AdvancedIndicators
 
 
 class TechnicalIndicators:
@@ -237,37 +238,108 @@ class BacktestingEngine:
         data: pd.DataFrame,
         indicators_config: List[Dict]
     ) -> pd.DataFrame:
-        """Calculate technical indicators based on configuration"""
+        """Calculate technical indicators based on configuration using AdvancedIndicators"""
         df = data.copy()
 
         for indicator in indicators_config:
             name = indicator.get('name', '').upper()
             period = indicator.get('period', 14)
 
-            if name == 'SMA':
-                df[f'SMA_{period}'] = self.indicators.sma(df['Close'], period)
-            elif name == 'EMA':
-                df[f'EMA_{period}'] = self.indicators.ema(df['Close'], period)
-            elif name == 'RSI':
-                df['RSI'] = self.indicators.rsi(df['Close'], period)
-            elif name == 'MACD':
-                macd, signal, hist = self.indicators.macd(df['Close'])
-                df['MACD'] = macd
-                df['MACD_Signal'] = signal
-                df['MACD_Hist'] = hist
-            elif name == 'BB' or name == 'BOLLINGER':
-                upper, middle, lower = self.indicators.bollinger_bands(df['Close'], period)
-                df['BB_Upper'] = upper
-                df['BB_Middle'] = middle
-                df['BB_Lower'] = lower
-            elif name == 'ATR':
-                df['ATR'] = self.indicators.atr(df['High'], df['Low'], df['Close'], period)
-            elif name == 'STOCHASTIC':
-                k, d = self.indicators.stochastic(df['High'], df['Low'], df['Close'], period)
-                df['Stoch_K'] = k
-                df['Stoch_D'] = d
-            elif name == 'ADX':
-                df['ADX'] = self.indicators.adx(df['High'], df['Low'], df['Close'], period)
+            try:
+                # MOMENTUM INDICATORS
+                if name == 'RSI':
+                    df[f'RSI_{period}'] = AdvancedIndicators.rsi(df, period)
+                    df['RSI'] = df[f'RSI_{period}']  # Keep backward compatibility
+
+                elif name == 'STOCHASTIC' or name == 'STOCH':
+                    k, d = AdvancedIndicators.stochastic(df, period)
+                    df['Stoch_K'] = k
+                    df['Stoch_D'] = d
+
+                elif name == 'CCI':
+                    df[f'CCI_{period}'] = AdvancedIndicators.cci(df, period)
+
+                elif name == 'WILLIAMS_R' or name == 'WILLR':
+                    df[f'Williams_R_{period}'] = AdvancedIndicators.williams_r(df, period)
+                    df['Williams_R'] = df[f'Williams_R_{period}']
+
+                elif name == 'ROC':
+                    df[f'ROC_{period}'] = AdvancedIndicators.roc(df, period)
+
+                elif name == 'MFI':
+                    if 'Volume' in df.columns:
+                        df[f'MFI_{period}'] = AdvancedIndicators.mfi(df, period)
+
+                # TREND INDICATORS
+                elif name == 'SMA':
+                    df[f'SMA_{period}'] = AdvancedIndicators.sma(df, period)
+
+                elif name == 'EMA':
+                    df[f'EMA_{period}'] = AdvancedIndicators.ema(df, period)
+
+                elif name == 'MACD':
+                    macd_dict = AdvancedIndicators.macd(df)
+                    df['MACD'] = macd_dict['MACD']
+                    df['MACD_Signal'] = macd_dict['MACD_Signal']
+                    df['MACD_Hist'] = macd_dict['MACD_Hist']
+
+                elif name == 'ADX':
+                    df[f'ADX_{period}'] = AdvancedIndicators.adx(df, period)
+                    df['ADX'] = df[f'ADX_{period}']
+
+                elif name == 'SUPERTREND':
+                    st_dict = AdvancedIndicators.supertrend(df, period)
+                    df['SuperTrend'] = st_dict['SuperTrend']
+                    df['SuperTrend_Dir'] = st_dict['SuperTrend_Direction']
+
+                elif name == 'AROON':
+                    aroon_dict = AdvancedIndicators.aroon(df, period)
+                    df['Aroon_Up'] = aroon_dict['Aroon_Up']
+                    df['Aroon_Down'] = aroon_dict['Aroon_Down']
+
+                # VOLATILITY INDICATORS
+                elif name == 'ATR':
+                    df[f'ATR_{period}'] = AdvancedIndicators.atr(df, period)
+                    df['ATR'] = df[f'ATR_{period}']
+
+                elif name == 'BB' or name == 'BOLLINGER' or name == 'BOLLINGER_BANDS':
+                    bb_dict = AdvancedIndicators.bollinger_bands(df, period)
+                    df['BB_Upper'] = bb_dict['BB_Upper']
+                    df['BB_Middle'] = bb_dict['BB_Middle']
+                    df['BB_Lower'] = bb_dict['BB_Lower']
+
+                elif name == 'KC' or name == 'KELTNER' or name == 'KELTNER_CHANNELS':
+                    kc_dict = AdvancedIndicators.keltner_channels(df, period)
+                    df['KC_Upper'] = kc_dict['KC_Upper']
+                    df['KC_Middle'] = kc_dict['KC_Middle']
+                    df['KC_Lower'] = kc_dict['KC_Lower']
+
+                elif name == 'DC' or name == 'DONCHIAN' or name == 'DONCHIAN_CHANNELS':
+                    dc_dict = AdvancedIndicators.donchian_channels(df, period)
+                    df['DC_Upper'] = dc_dict['DC_Upper']
+                    df['DC_Middle'] = dc_dict['DC_Middle']
+                    df['DC_Lower'] = dc_dict['DC_Lower']
+
+                # VOLUME INDICATORS
+                elif name == 'OBV':
+                    if 'Volume' in df.columns:
+                        df['OBV'] = AdvancedIndicators.obv(df)
+
+                elif name == 'CMF':
+                    if 'Volume' in df.columns:
+                        df[f'CMF_{period}'] = AdvancedIndicators.cmf(df, period)
+
+                elif name == 'VWAP':
+                    if 'Volume' in df.columns:
+                        df['VWAP'] = AdvancedIndicators.vwap(df)
+
+                elif name == 'VOLUME_SMA':
+                    if 'Volume' in df.columns:
+                        df[f'Volume_SMA_{period}'] = AdvancedIndicators.volume_sma(df, period)
+
+            except Exception as e:
+                print(f"Warning: Could not calculate {name} indicator: {e}")
+                continue
 
         return df
 
