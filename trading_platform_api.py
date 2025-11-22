@@ -544,9 +544,9 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
             "success": True,
             "backtest_id": backtest_result.id,
             "strategy_name": results['strategy_name'],
-            "metrics": results['metrics'],
-            "total_trades": len(results['trades']),
-            "equity_curve_points": len(results['equity_curve'])
+            "metrics": metrics_clean,  # Use cleaned metrics (numpy types converted)
+            "total_trades": int(len(trades_clean)),
+            "equity_curve_points": int(len(equity_curve_clean))
         }
 
     except Exception as e:
