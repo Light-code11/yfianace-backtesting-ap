@@ -32,6 +32,8 @@ from ai_strategy_generator import AIStrategyGenerator
 from backtesting_engine import BacktestingEngine
 from paper_trading import PaperTradingSimulator
 from portfolio_optimizer import PortfolioOptimizer
+from autonomous_learning import AutonomousLearningAgent
+import threading
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -51,6 +53,11 @@ app.add_middleware(
 
 # Initialize database
 init_db()
+
+# Global autonomous learning agent
+autonomous_agent = None
+autonomous_agent_thread = None
+autonomous_agent_enabled = os.getenv("ENABLE_AUTONOMOUS_LEARNING", "false").lower() == "true"
 
 # Pydantic models
 class StrategyGenerationRequest(BaseModel):
@@ -727,6 +734,131 @@ async def get_learning_insights(limit: int = 10, db=Depends(get_db)):
             }
             for l in learnings
         ]
+    }
+
+
+# =======================
+# AUTONOMOUS LEARNING ENDPOINTS
+# =======================
+
+@app.post("/autonomous/start")
+async def start_autonomous_learning(
+    tickers: List[str] = None,
+    interval_hours: int = 6,
+    strategies_per_cycle: int = 3
+):
+    """Start the autonomous learning agent"""
+    global autonomous_agent, autonomous_agent_thread
+
+    if autonomous_agent_thread and autonomous_agent_thread.is_alive():
+        return {
+            "success": False,
+            "message": "Autonomous learning agent is already running"
+        }
+
+    # Create agent
+    autonomous_agent = AutonomousLearningAgent(
+        tickers=tickers or ['SPY', 'QQQ', 'AAPL'],
+        learning_interval_hours=interval_hours,
+        strategies_per_cycle=strategies_per_cycle,
+        min_quality_score=60.0
+    )
+
+    # Start in background thread
+    autonomous_agent_thread = threading.Thread(
+        target=autonomous_agent.run_forever,
+        daemon=True
+    )
+    autonomous_agent_thread.start()
+
+    return {
+        "success": True,
+        "message": "Autonomous learning agent started successfully",
+        "config": {
+            "tickers": tickers or ['SPY', 'QQQ', 'AAPL'],
+            "interval_hours": interval_hours,
+            "strategies_per_cycle": strategies_per_cycle
+        }
+    }
+
+
+@app.get("/autonomous/status")
+async def get_autonomous_status(db=Depends(get_db)):
+    """Get status of autonomous learning agent"""
+    global autonomous_agent_thread
+
+    is_running = autonomous_agent_thread and autonomous_agent_thread.is_alive()
+
+    # Get recent autonomous learning cycles
+    recent_learnings = db.query(AILearning).filter(
+        AILearning.learning_type == "autonomous_cycle"
+    ).order_by(AILearning.created_at.desc()).limit(5).all()
+
+    # Get statistics
+    total_autonomous_cycles = db.query(AILearning).filter(
+        AILearning.learning_type == "autonomous_cycle"
+    ).count()
+
+    # Get strategies created by autonomous agent
+    autonomous_strategies = []
+    if recent_learnings:
+        for learning in recent_learnings:
+            for strategy_id in learning.strategy_ids:
+                strategy = db.query(Strategy).get(strategy_id)
+                if strategy:
+                    autonomous_strategies.append({
+                        "id": strategy.id,
+                        "name": strategy.name,
+                        "created_at": strategy.created_at.isoformat(),
+                        "is_active": strategy.is_active
+                    })
+
+    return {
+        "is_running": is_running,
+        "enabled_by_env": autonomous_agent_enabled,
+        "statistics": {
+            "total_cycles": total_autonomous_cycles,
+            "last_cycle": recent_learnings[0].created_at.isoformat() if recent_learnings else None,
+            "strategies_generated": len(autonomous_strategies)
+        },
+        "recent_cycles": [
+            {
+                "cycle_id": l.id,
+                "completed_at": l.created_at.isoformat(),
+                "strategies_tested": len(l.strategy_ids),
+                "confidence_score": l.confidence_score
+            }
+            for l in recent_learnings
+        ]
+    }
+
+
+@app.post("/autonomous/trigger")
+async def trigger_learning_cycle():
+    """Manually trigger one learning cycle"""
+    global autonomous_agent
+
+    if not autonomous_agent:
+        # Create temporary agent
+        agent = AutonomousLearningAgent(
+            tickers=['SPY', 'QQQ', 'AAPL'],
+            learning_interval_hours=6,
+            strategies_per_cycle=3,
+            min_quality_score=60.0
+        )
+    else:
+        agent = autonomous_agent
+
+    # Run one cycle in background
+    def run_cycle():
+        agent.learning_cycle()
+
+    thread = threading.Thread(target=run_cycle, daemon=True)
+    thread.start()
+
+    return {
+        "success": True,
+        "message": "Learning cycle triggered. Check /autonomous/status for results."
     }
 
 

@@ -1,0 +1,329 @@
+"""
+Autonomous AI Learning System
+Runs in background, continuously generating, testing, and improving strategies
+"""
+import os
+import time
+import logging
+from datetime import datetime, timedelta
+from typing import List, Dict
+import asyncio
+from sqlalchemy.orm import Session
+
+from database import SessionLocal, Strategy, BacktestResult, AILearning, PerformanceLog
+from ai_strategy_generator import AIStrategyGenerator
+from backtesting_engine import BacktestingEngine
+import yfinance as yf
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+class AutonomousLearningAgent:
+    """Autonomous agent that learns and improves trading strategies over time"""
+
+    def __init__(self,
+                 tickers: List[str] = None,
+                 learning_interval_hours: int = 6,
+                 strategies_per_cycle: int = 3,
+                 min_quality_score: float = 60.0):
+        """
+        Initialize the autonomous learning agent
+
+        Args:
+            tickers: List of tickers to focus on (default: ['SPY', 'QQQ', 'AAPL'])
+            learning_interval_hours: How often to run learning cycle
+            strategies_per_cycle: Number of strategies to generate each cycle
+            min_quality_score: Minimum quality score to keep a strategy
+        """
+        self.tickers = tickers or ['SPY', 'QQQ', 'AAPL']
+        self.learning_interval_hours = learning_interval_hours
+        self.strategies_per_cycle = strategies_per_cycle
+        self.min_quality_score = min_quality_score
+        self.ai_generator = AIStrategyGenerator()
+        self.backtest_engine = BacktestingEngine()
+
+        logger.info(f"Autonomous Learning Agent initialized")
+        logger.info(f"Tickers: {self.tickers}")
+        logger.info(f"Learning interval: {learning_interval_hours} hours")
+        logger.info(f"Strategies per cycle: {strategies_per_cycle}")
+
+    def fetch_market_data(self, tickers: List[str], period: str = "1y"):
+        """Fetch market data for backtesting"""
+        try:
+            ticker_string = " ".join(tickers)
+            data = yf.download(ticker_string, period=period, progress=False)
+            logger.info(f"Fetched market data for {tickers}: {data.shape}")
+            return data
+        except Exception as e:
+            logger.error(f"Error fetching market data: {e}")
+            return None
+
+    def learning_cycle(self):
+        """Execute one complete learning cycle"""
+        logger.info("="*60)
+        logger.info("STARTING NEW LEARNING CYCLE")
+        logger.info("="*60)
+
+        db = SessionLocal()
+
+        try:
+            # Step 1: Gather past performance data
+            logger.info("Step 1: Gathering past performance data...")
+            past_results = db.query(BacktestResult).order_by(
+                BacktestResult.created_at.desc()
+            ).limit(20).all()
+
+            past_performance = [
+                {
+                    "strategy_name": r.strategy_name,
+                    "sharpe_ratio": r.sharpe_ratio,
+                    "total_return_pct": r.total_return_pct,
+                    "win_rate": r.win_rate,
+                    "max_drawdown_pct": r.max_drawdown_pct,
+                    "quality_score": r.quality_score
+                }
+                for r in past_results
+            ]
+
+            # Step 2: Get existing learning insights
+            logger.info("Step 2: Loading learning insights...")
+            learnings = db.query(AILearning).order_by(
+                AILearning.created_at.desc()
+            ).limit(5).all()
+
+            learning_insights = [
+                {
+                    "type": l.learning_type,
+                    "description": l.description,
+                    "insights": l.key_insights
+                }
+                for l in learnings
+            ]
+
+            # Step 3: Fetch market data
+            logger.info(f"Step 3: Fetching market data for {self.tickers}...")
+            market_data = self.fetch_market_data(self.tickers, period="1y")
+
+            if market_data is None or market_data.empty:
+                logger.error("Failed to fetch market data. Aborting cycle.")
+                return
+
+            # Step 4: Generate new strategies using AI
+            logger.info(f"Step 4: Generating {self.strategies_per_cycle} new strategies...")
+            strategies = self.ai_generator.generate_strategies(
+                market_data=market_data,
+                tickers=self.tickers,
+                num_strategies=self.strategies_per_cycle,
+                past_performance=past_performance,
+                learning_insights=learning_insights
+            )
+
+            logger.info(f"Generated {len(strategies)} strategies")
+
+            # Step 5: Backtest each strategy
+            logger.info("Step 5: Backtesting all strategies...")
+            backtest_results = []
+
+            for i, strategy in enumerate(strategies, 1):
+                logger.info(f"  Backtesting strategy {i}/{len(strategies)}: {strategy['name']}")
+
+                # Save strategy to database first
+                db_strategy = Strategy(
+                    name=strategy['name'],
+                    description=strategy.get('description', ''),
+                    tickers=strategy.get('tickers', self.tickers),
+                    entry_conditions=strategy.get('entry_conditions', {}),
+                    exit_conditions=strategy.get('exit_conditions', {}),
+                    stop_loss_pct=strategy.get('risk_management', {}).get('stop_loss_pct', 5.0),
+                    take_profit_pct=strategy.get('risk_management', {}).get('take_profit_pct', 10.0),
+                    position_size_pct=strategy.get('risk_management', {}).get('position_size_pct', 10.0),
+                    holding_period_days=strategy.get('holding_period_days', 5),
+                    rationale=strategy.get('rationale', ''),
+                    market_analysis=strategy.get('market_analysis', ''),
+                    risk_assessment=strategy.get('risk_assessment', ''),
+                    strategy_type=strategy.get('strategy_type', 'unknown'),
+                    indicators=strategy.get('indicators', []),
+                    is_active=True
+                )
+                db.add(db_strategy)
+                db.commit()
+                db.refresh(db_strategy)
+
+                # Backtest
+                try:
+                    strategy_config = {
+                        "id": db_strategy.id,
+                        "name": db_strategy.name,
+                        "tickers": db_strategy.tickers,
+                        "indicators": db_strategy.indicators,
+                        "strategy_type": db_strategy.strategy_type,
+                        "risk_management": {
+                            "stop_loss_pct": db_strategy.stop_loss_pct,
+                            "take_profit_pct": db_strategy.take_profit_pct,
+                            "position_size_pct": db_strategy.position_size_pct
+                        }
+                    }
+
+                    results = self.backtest_engine.backtest_strategy(strategy_config, market_data)
+
+                    # Save backtest results
+                    backtest_result = BacktestResult(
+                        strategy_id=db_strategy.id,
+                        strategy_name=results['strategy_name'],
+                        start_date=datetime.now() - timedelta(days=365),
+                        end_date=datetime.now(),
+                        initial_capital=100000,
+                        tickers_tested=results['tickers'],
+                        total_return_pct=results['metrics']['total_return_pct'],
+                        total_trades=results['metrics']['total_trades'],
+                        winning_trades=results['metrics']['winning_trades'],
+                        losing_trades=results['metrics']['losing_trades'],
+                        win_rate=results['metrics']['win_rate'],
+                        sharpe_ratio=results['metrics']['sharpe_ratio'],
+                        sortino_ratio=results['metrics']['sortino_ratio'],
+                        max_drawdown_pct=results['metrics']['max_drawdown_pct'],
+                        profit_factor=results['metrics']['profit_factor'],
+                        avg_win=results['metrics']['avg_win'],
+                        avg_loss=results['metrics']['avg_loss'],
+                        trades=results['trades'],
+                        equity_curve=results['equity_curve'],
+                        quality_score=results['metrics']['quality_score']
+                    )
+                    db.add(backtest_result)
+                    db.commit()
+
+                    backtest_results.append(backtest_result)
+
+                    logger.info(f"    ✅ Quality Score: {results['metrics']['quality_score']:.1f}/100, "
+                              f"Sharpe: {results['metrics']['sharpe_ratio']:.2f}, "
+                              f"Return: {results['metrics']['total_return_pct']:.1f}%")
+
+                except Exception as e:
+                    logger.error(f"    ❌ Backtest failed: {e}")
+                    continue
+
+            # Step 6: Analyze results and learn
+            logger.info("Step 6: Analyzing results and extracting insights...")
+
+            if backtest_results:
+                strategies_data = [
+                    {
+                        "name": s.name,
+                        "strategy_type": s.strategy_type,
+                        "indicators": s.indicators,
+                        "stop_loss_pct": s.stop_loss_pct,
+                        "take_profit_pct": s.take_profit_pct
+                    }
+                    for s in [db.query(Strategy).get(br.strategy_id) for br in backtest_results]
+                ]
+
+                results_data = [
+                    {
+                        "strategy_name": r.strategy_name,
+                        "sharpe_ratio": r.sharpe_ratio,
+                        "total_return_pct": r.total_return_pct,
+                        "win_rate": r.win_rate,
+                        "max_drawdown_pct": r.max_drawdown_pct,
+                        "quality_score": r.quality_score
+                    }
+                    for r in backtest_results
+                ]
+
+                # Use AI to learn from results
+                learning = self.ai_generator.learn_from_results(strategies_data, results_data)
+
+                # Save learning insights
+                ai_learning = AILearning(
+                    learning_type="autonomous_cycle",
+                    description=f"Autonomous learning cycle completed at {datetime.now().isoformat()}",
+                    strategy_ids=[r.strategy_id for r in backtest_results],
+                    performance_data=results_data,
+                    key_insights=learning,
+                    recommendations=learning.get('recommendations_for_next_generation', []),
+                    confidence_score=0.85
+                )
+                db.add(ai_learning)
+                db.commit()
+
+                logger.info("✅ Learning insights saved to database")
+
+            # Step 7: Archive poor performers
+            logger.info("Step 7: Archiving poor performing strategies...")
+            poor_performers = [
+                br for br in backtest_results
+                if br.quality_score < self.min_quality_score
+            ]
+
+            for br in poor_performers:
+                strategy = db.query(Strategy).get(br.strategy_id)
+                if strategy:
+                    strategy.is_active = False
+                    logger.info(f"  Archived: {strategy.name} (Quality: {br.quality_score:.1f})")
+
+            db.commit()
+
+            # Step 8: Summary
+            logger.info("="*60)
+            logger.info("LEARNING CYCLE COMPLETE")
+            logger.info(f"✅ Generated: {len(strategies)} strategies")
+            logger.info(f"✅ Backtested: {len(backtest_results)} strategies")
+            logger.info(f"✅ Archived: {len(poor_performers)} poor performers")
+            logger.info(f"✅ Active strategies: {len(backtest_results) - len(poor_performers)}")
+
+            if backtest_results:
+                best = max(backtest_results, key=lambda x: x.quality_score)
+                logger.info(f"🏆 Best strategy: {best.strategy_name} (Quality: {best.quality_score:.1f})")
+
+            logger.info("="*60)
+
+        except Exception as e:
+            logger.error(f"Error in learning cycle: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+
+        finally:
+            db.close()
+
+    def run_forever(self):
+        """Run the learning agent continuously"""
+        logger.info("🤖 Autonomous Learning Agent started!")
+        logger.info(f"Will run learning cycle every {self.learning_interval_hours} hours")
+
+        cycle_count = 0
+
+        while True:
+            try:
+                cycle_count += 1
+                logger.info(f"\n{'='*60}")
+                logger.info(f"CYCLE #{cycle_count}")
+                logger.info(f"{'='*60}")
+
+                self.learning_cycle()
+
+                # Wait for next cycle
+                logger.info(f"\n⏰ Next cycle in {self.learning_interval_hours} hours...")
+                logger.info(f"Next run at: {(datetime.now() + timedelta(hours=self.learning_interval_hours)).strftime('%Y-%m-%d %H:%M:%S')}")
+
+                time.sleep(self.learning_interval_hours * 3600)
+
+            except KeyboardInterrupt:
+                logger.info("\n🛑 Autonomous Learning Agent stopped by user")
+                break
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                logger.info("Will retry in 1 hour...")
+                time.sleep(3600)
+
+
+if __name__ == "__main__":
+    # Example usage
+    agent = AutonomousLearningAgent(
+        tickers=['NVDA', 'AAPL', 'MSFT'],  # Tickers to focus on
+        learning_interval_hours=6,          # Run every 6 hours
+        strategies_per_cycle=3,             # Generate 3 strategies per cycle
+        min_quality_score=60.0              # Archive strategies below 60 quality
+    )
+
+    agent.run_forever()

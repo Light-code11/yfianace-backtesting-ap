@@ -367,7 +367,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "AI Learning"]
+    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -917,6 +917,172 @@ elif page == "AI Learning":
                     st.write("**Recommendations:**")
                     for rec in insight['recommendations']:
                         st.write(f"- {rec}")
+
+
+# =======================
+# AUTONOMOUS AGENT PAGE
+# =======================
+
+elif page == "🤖 Autonomous Agent":
+    st.markdown('<div class="main-header">🤖 Autonomous Learning Agent</div>', unsafe_allow_html=True)
+
+    st.write("""
+    The Autonomous Learning Agent continuously generates, tests, and improves trading strategies **automatically** in the background.
+
+    **How it works:**
+    1. 🎯 Generates new strategies based on past learnings every X hours
+    2. 🧪 Backtests them automatically
+    3. 📊 Analyzes results and learns what works
+    4. 🗑️ Archives poor performers (below quality threshold)
+    5. 🔄 Repeats forever, getting smarter over time
+    """)
+
+    st.markdown("---")
+
+    # Get status
+    status_data = make_api_request("/autonomous/status")
+
+    if status_data:
+        # Status indicators
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            status = "🟢 Running" if status_data['is_running'] else "🔴 Stopped"
+            st.metric("Status", status)
+
+        with col2:
+            st.metric("Total Cycles", status_data['statistics']['total_cycles'])
+
+        with col3:
+            st.metric("Strategies Generated", status_data['statistics']['strategies_generated'])
+
+        with col4:
+            last_cycle = status_data['statistics']['last_cycle']
+            if last_cycle:
+                last_time = datetime.fromisoformat(last_cycle).strftime("%H:%M %m/%d")
+                st.metric("Last Cycle", last_time)
+            else:
+                st.metric("Last Cycle", "Never")
+
+        st.markdown("---")
+
+        # Control Panel
+        st.subheader("⚙️ Control Panel")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Start Agent
+            with st.form("start_agent_form"):
+                st.write("**Start Autonomous Agent**")
+
+                tickers_input = st.text_input(
+                    "Tickers (comma-separated)",
+                    value="SPY,QQQ,AAPL",
+                    help="Which stocks to focus on"
+                )
+
+                interval_hours = st.slider(
+                    "Learning Interval (hours)",
+                    min_value=1,
+                    max_value=24,
+                    value=6,
+                    help="How often to run learning cycles"
+                )
+
+                strategies_per_cycle = st.slider(
+                    "Strategies Per Cycle",
+                    min_value=1,
+                    max_value=10,
+                    value=3,
+                    help="How many strategies to generate each cycle"
+                )
+
+                start_button = st.form_submit_button("▶️ Start Agent", use_container_width=True)
+
+                if start_button:
+                    tickers = [t.strip().upper() for t in tickers_input.split(",")]
+
+                    with st.spinner("Starting autonomous agent..."):
+                        response = make_api_request(
+                            "/autonomous/start",
+                            method="POST",
+                            data={
+                                "tickers": tickers,
+                                "interval_hours": interval_hours,
+                                "strategies_per_cycle": strategies_per_cycle
+                            }
+                        )
+
+                        if response and response.get('success'):
+                            st.success(f"✅ {response['message']}")
+                            st.info(f"Agent will run every {interval_hours} hours, generating {strategies_per_cycle} strategies per cycle")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {response.get('message', 'Failed to start agent')}")
+
+        with col2:
+            # Manual trigger
+            st.write("**Manual Controls**")
+            st.write("Trigger one learning cycle manually")
+
+            if st.button("⚡ Trigger One Cycle Now", use_container_width=True):
+                with st.spinner("Running learning cycle..."):
+                    response = make_api_request("/autonomous/trigger", method="POST")
+
+                    if response and response.get('success'):
+                        st.success("✅ Learning cycle started! Check status in a few minutes.")
+                    else:
+                        st.error("❌ Failed to trigger cycle")
+
+        st.markdown("---")
+
+        # Recent Cycles
+        st.subheader("📜 Recent Learning Cycles")
+
+        if status_data.get('recent_cycles'):
+            cycles_df = pd.DataFrame(status_data['recent_cycles'])
+            cycles_df['completed_at'] = pd.to_datetime(cycles_df['completed_at']).dt.strftime('%Y-%m-%d %H:%M')
+
+            st.dataframe(
+                cycles_df[['cycle_id', 'completed_at', 'strategies_tested', 'confidence_score']],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No learning cycles yet. Start the agent or trigger a manual cycle to begin!")
+
+        st.markdown("---")
+
+        # Explanation
+        with st.expander("ℹ️ How does it work?"):
+            st.write("""
+            **The Autonomous Learning Loop:**
+
+            1. **Generate** - AI creates new trading strategies based on:
+               - Recent market data
+               - Past strategy performance
+               - Previous learning insights
+
+            2. **Backtest** - Each strategy is tested on 1 year of historical data
+               - Calculates Sharpe ratio, returns, drawdown, etc.
+               - Assigns quality score (0-100)
+
+            3. **Learn** - AI analyzes results to identify:
+               - What made successful strategies work
+               - Common failures to avoid
+               - Optimal parameter ranges
+
+            4. **Archive** - Strategies below quality threshold are deactivated
+               - Keeps database clean
+               - Focuses on high performers
+
+            5. **Repeat** - Process runs automatically every X hours
+               - Continuously improving
+               - Adapting to market changes
+
+            **Result:** Over time, the AI gets better at generating winning strategies without any manual intervention!
+            """)
 
 
 # Footer
