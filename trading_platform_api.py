@@ -1155,6 +1155,82 @@ async def get_regime_history(ticker: str, period: str = "1y"):
 
 
 # =======================
+# VECTORIZED BACKTESTING ENDPOINTS
+# =======================
+
+from vectorized_backtester import VectorizedBacktester
+
+vectorized_backtester = VectorizedBacktester()
+
+
+class VectorizedOptimizeRequest(BaseModel):
+    ticker: str
+    strategy_type: str
+    period: str = "1y"
+    param_ranges: Optional[Dict] = None
+
+
+class BatchOptimizeRequest(BaseModel):
+    tickers: List[str]
+    strategies: List[str]
+    period: str = "1y"
+
+
+@app.post("/vectorized/optimize")
+async def vectorized_optimize(request: VectorizedOptimizeRequest):
+    """
+    Optimize strategy parameters using vectorized backtesting (100x faster)
+
+    Tests hundreds/thousands of parameter combinations in seconds
+    """
+    try:
+        result = vectorized_backtester.optimize_strategy(
+            ticker=request.ticker,
+            strategy_type=request.strategy_type,
+            period=request.period,
+            param_ranges=request.param_ranges
+        )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/vectorized/batch-optimize")
+async def batch_optimize(request: BatchOptimizeRequest):
+    """
+    Optimize multiple strategies on multiple tickers using vectorized backtesting
+
+    Example: 5 tickers × 4 strategies = 20 optimizations in seconds
+    """
+    try:
+        result = vectorized_backtester.batch_optimize(
+            tickers=request.tickers,
+            strategies=request.strategies,
+            period=request.period
+        )
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/vectorized/status")
+async def vectorized_status():
+    """Check if vectorbt is available"""
+    from vectorized_backtester import VECTORBT_AVAILABLE
+
+    return {
+        "success": True,
+        "vectorbt_available": VECTORBT_AVAILABLE,
+        "method": "vectorbt" if VECTORBT_AVAILABLE else "numpy_fallback",
+        "speedup": "100-1000x" if VECTORBT_AVAILABLE else "1x (install vectorbt for speedup)"
+    }
+
+
+# =======================
 # AUTONOMOUS LEARNING ENDPOINTS
 # =======================
 
