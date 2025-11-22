@@ -2286,9 +2286,9 @@ elif page == "🎯 Complete Trading System":
                             progress_bar.progress(current_step / total_steps)
 
                             if ml_response and ml_response.get('success'):
-                                pred = ml_response['prediction']
-                                direction = pred['direction']
-                                confidence = pred['confidence']
+                                # Extract prediction and confidence from response
+                                direction = ml_response['prediction']  # "UP" or "DOWN"
+                                confidence = ml_response['confidence']['confidence_score'] * 100  # Convert to percentage
 
                                 # Color-code prediction
                                 if direction == "UP":
