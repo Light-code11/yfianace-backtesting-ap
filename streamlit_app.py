@@ -11,6 +11,7 @@ import requests
 from datetime import datetime, timedelta
 import json
 import os
+import time
 
 # Page configuration
 st.set_page_config(
@@ -438,9 +439,26 @@ if page == "Dashboard":
 
         if strategies_data and strategies_data.get('strategies'):
             strategies_df = pd.DataFrame(strategies_data['strategies'])
+
+            # Format tickers for display
+            if 'tickers' in strategies_df.columns:
+                strategies_df['tickers_display'] = strategies_df['tickers'].apply(
+                    lambda x: ', '.join(x) if x and isinstance(x, list) else 'N/A'
+                )
+                display_columns = ['tickers_display', 'name', 'strategy_type', 'created_at', 'is_active']
+            else:
+                display_columns = ['name', 'strategy_type', 'created_at', 'is_active']
+
             st.dataframe(
-                strategies_df[['name', 'strategy_type', 'created_at', 'is_active']],
-                use_container_width=True
+                strategies_df[display_columns],
+                use_container_width=True,
+                column_config={
+                    "tickers_display": "Tickers",
+                    "name": "Strategy Name",
+                    "strategy_type": "Type",
+                    "created_at": "Created",
+                    "is_active": "Active"
+                }
             )
 
         # Recent backtest results
