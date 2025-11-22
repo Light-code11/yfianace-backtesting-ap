@@ -80,7 +80,9 @@ class HMMRegimeDetector:
         self,
         ticker: str,
         period: str = "2y",
-        n_iter: int = 100
+        n_iter: int = 200,
+        tol: float = 1.0,
+        covariance_type: str = "diag"
     ) -> Dict[str, Any]:
         """
         Train HMM model to detect market regimes
@@ -88,7 +90,9 @@ class HMMRegimeDetector:
         Args:
             ticker: Stock ticker symbol
             period: Historical data period (default 2 years)
-            n_iter: Number of training iterations
+            n_iter: Number of training iterations (increased to 200 for better convergence)
+            tol: Convergence tolerance (default 1.0 to avoid spurious warnings)
+            covariance_type: Type of covariance ('diag' for stability, 'full' for flexibility)
 
         Returns:
             Dict with training results and regime characteristics
@@ -125,9 +129,11 @@ class HMMRegimeDetector:
             # Train Gaussian HMM
             self.model = hmm.GaussianHMM(
                 n_components=self.n_regimes,
-                covariance_type="full",
+                covariance_type=covariance_type,
                 n_iter=n_iter,
-                random_state=self.random_state
+                tol=tol,
+                random_state=self.random_state,
+                verbose=False  # Suppress convergence warnings
             )
 
             self.model.fit(X)
