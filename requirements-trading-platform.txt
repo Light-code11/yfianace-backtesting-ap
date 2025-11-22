@@ -29,8 +29,9 @@ statsmodels>=0.14.0  # Statistical analysis, cointegration
 hmmlearn>=0.3.0  # Hidden Markov Models for regime detection
 
 # Technical Indicators
-pandas-ta>=0.3.14b0  # 130+ technical indicators (easier install than ta-lib)
-# Note: TA-Lib requires C binaries, using pandas-ta as reliable alternative
+pandas-ta-openbb>=0.4.22  # 130+ technical indicators (OpenBB fork, Python 3.10 compatible)
+# Note: Using OpenBB fork as official pandas-ta requires Python 3.12+
+# TA-Lib requires C binaries, using pandas-ta as reliable alternative
 
 # Fast Backtesting
 vectorbt>=0.25.0  # 100x faster vectorized backtesting

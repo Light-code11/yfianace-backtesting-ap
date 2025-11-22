@@ -755,6 +755,23 @@ elif page == "Backtest":
                                 st.metric("Total Trades", results['metrics']['total_trades'])
                                 st.metric("Win Rate", f"{results['metrics']['win_rate']:.2f}%")
 
+                            # DEBUG: Show what Kelly fields are in the response
+                            with st.expander("🔍 Debug: API Response Kelly Fields"):
+                                st.write("Kelly fields in API response:")
+                                kelly_fields = {
+                                    'kelly_criterion': results['metrics'].get('kelly_criterion', 'NOT FOUND'),
+                                    'kelly_position_pct': results['metrics'].get('kelly_position_pct', 'NOT FOUND'),
+                                    'kelly_risk_level': results['metrics'].get('kelly_risk_level', 'NOT FOUND')
+                                }
+                                st.json(kelly_fields)
+
+                                if 'kelly_position_pct' not in results['metrics']:
+                                    st.error("❌ Kelly fields are MISSING from API response. Railway may not have deployed the latest code yet.")
+                                elif results['metrics']['kelly_position_pct'] is None:
+                                    st.warning("⚠️ Kelly fields exist but are NULL. This is an old backtest. Run a NEW backtest.")
+                                else:
+                                    st.success("✅ Kelly data found! Section should appear below.")
+
                             # Kelly Criterion Section
                             if 'kelly_position_pct' in results['metrics'] and results['metrics']['kelly_position_pct'] is not None:
                                 st.markdown("---")
