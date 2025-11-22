@@ -103,6 +103,53 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 
+@app.get("/debug/network")
+async def debug_network():
+    """Test network connectivity to OpenAI"""
+    import socket
+    import requests
+
+    results = {
+        "timestamp": datetime.now().isoformat(),
+        "tests": {}
+    }
+
+    # Test DNS
+    try:
+        ip = socket.gethostbyname("api.openai.com")
+        results["tests"]["dns"] = {"status": "ok", "ip": ip}
+    except Exception as e:
+        results["tests"]["dns"] = {"status": "failed", "error": str(e)}
+
+    # Test HTTPS
+    try:
+        response = requests.get("https://api.openai.com/v1/models", timeout=10)
+        results["tests"]["https"] = {"status": "ok", "http_code": response.status_code}
+    except Exception as e:
+        results["tests"]["https"] = {"status": "failed", "error": str(e)}
+
+    # Test OpenAI API
+    try:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if api_key:
+            headers = {"Authorization": f"Bearer {api_key}"}
+            response = requests.get(
+                "https://api.openai.com/v1/models",
+                headers=headers,
+                timeout=10
+            )
+            results["tests"]["openai_api"] = {
+                "status": "ok" if response.status_code == 200 else "failed",
+                "http_code": response.status_code
+            }
+        else:
+            results["tests"]["openai_api"] = {"status": "skipped", "reason": "no api key"}
+    except Exception as e:
+        results["tests"]["openai_api"] = {"status": "failed", "error": str(e)}
+
+    return results
+
+
 # =======================
 # STRATEGY ENDPOINTS
 # =======================
