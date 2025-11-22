@@ -612,26 +612,34 @@ elif page == "Backtest":
                         results = make_api_request(f"/backtest/results/{backtest_id}")
 
                         if results:
+                            # Calculate total profit in dollars
+                            total_profit = initial_capital * (results['metrics']['total_return_pct'] / 100)
+                            final_capital = initial_capital + total_profit
+
                             # Display metrics
                             st.subheader("📊 Performance Metrics")
 
-                            col1, col2, col3, col4 = st.columns(4)
+                            col1, col2, col3, col4, col5 = st.columns(5)
 
                             with col1:
                                 st.metric("Total Return", f"{results['metrics']['total_return_pct']:.2f}%")
-                                st.metric("Win Rate", f"{results['metrics']['win_rate']:.2f}%")
+                                st.metric("Total Profit", f"${total_profit:,.2f}")
 
                             with col2:
+                                st.metric("Initial Capital", f"${initial_capital:,.2f}")
+                                st.metric("Final Capital", f"${final_capital:,.2f}")
+
+                            with col3:
                                 st.metric("Sharpe Ratio", f"{results['metrics']['sharpe_ratio']:.2f}")
                                 st.metric("Sortino Ratio", f"{results['metrics']['sortino_ratio']:.2f}")
 
-                            with col3:
+                            with col4:
                                 st.metric("Max Drawdown", f"{results['metrics']['max_drawdown_pct']:.2f}%")
                                 st.metric("Profit Factor", f"{results['metrics']['profit_factor']:.2f}")
 
-                            with col4:
+                            with col5:
                                 st.metric("Total Trades", results['metrics']['total_trades'])
-                                st.metric("Quality Score", f"{results['metrics']['quality_score']:.1f}/100")
+                                st.metric("Win Rate", f"{results['metrics']['win_rate']:.2f}%")
 
                             # Charts Section
                             st.markdown("---")
@@ -682,7 +690,34 @@ elif page == "Backtest":
                             st.subheader("📝 Trade History")
                             if results['trades']:
                                 trades_df = pd.DataFrame(results['trades'])
-                                st.dataframe(trades_df, use_container_width=True)
+
+                                # Style the dataframe for better visibility
+                                def highlight_profit_loss(val):
+                                    """Highlight positive values in green, negative in red"""
+                                    try:
+                                        num = float(val)
+                                        if num > 0:
+                                            return 'background-color: #1e4620; color: #4ade80'  # Green
+                                        elif num < 0:
+                                            return 'background-color: #4a1a1a; color: #f87171'  # Red
+                                        return ''
+                                    except:
+                                        return ''
+
+                                # Apply styling to profit/loss columns
+                                if 'profit_loss_usd' in trades_df.columns:
+                                    styled_df = trades_df.style.applymap(
+                                        highlight_profit_loss,
+                                        subset=['profit_loss_usd']
+                                    )
+                                    if 'profit_loss_pct' in trades_df.columns:
+                                        styled_df = styled_df.applymap(
+                                            highlight_profit_loss,
+                                            subset=['profit_loss_pct']
+                                        )
+                                    st.dataframe(styled_df, use_container_width=True)
+                                else:
+                                    st.dataframe(trades_df, use_container_width=True)
     else:
         st.info("📋 No strategies available yet!")
         st.write("""
