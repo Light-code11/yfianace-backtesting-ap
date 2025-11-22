@@ -95,10 +95,44 @@ class AIStrategyGenerator:
         response = self._call_openai_with_retry(prompt, max_retries=3)
 
         # Parse response
-        strategies_json = json.loads(response.choices[0].message.content)
+        strategies_json = self._parse_json_response(response, "strategies")
         strategies = strategies_json.get("strategies", [])
 
+        if not strategies:
+            print(f"WARNING: No strategies in response. Full JSON: {strategies_json}")
+
         return strategies
+
+    def _parse_json_response(self, response, response_type: str = "strategies"):
+        """
+        Parse JSON from OpenAI response with error handling
+        """
+        try:
+            raw_content = response.choices[0].message.content
+            print(f"DEBUG [{response_type}]: Raw response length: {len(raw_content)} chars")
+            print(f"DEBUG [{response_type}]: First 200 chars: {raw_content[:200]}")
+
+            # Try to extract JSON if wrapped in markdown code blocks
+            if "```json" in raw_content:
+                print(f"DEBUG [{response_type}]: Found markdown JSON block, extracting...")
+                start = raw_content.find("```json") + 7
+                end = raw_content.find("```", start)
+                raw_content = raw_content[start:end].strip()
+            elif "```" in raw_content:
+                print(f"DEBUG [{response_type}]: Found markdown code block, extracting...")
+                start = raw_content.find("```") + 3
+                end = raw_content.find("```", start)
+                raw_content = raw_content[start:end].strip()
+
+            parsed_json = json.loads(raw_content)
+            print(f"DEBUG [{response_type}]: Successfully parsed JSON")
+            return parsed_json
+
+        except json.JSONDecodeError as e:
+            print(f"ERROR [{response_type}]: Failed to parse JSON")
+            print(f"ERROR [{response_type}]: {e}")
+            print(f"ERROR [{response_type}]: Response content: {response.choices[0].message.content[:500]}")
+            raise Exception(f"OpenAI returned invalid JSON for {response_type}: {e}")
 
     def _call_openai_with_retry(self, prompt: str, max_retries: int = 3):
         """
@@ -450,7 +484,7 @@ Return response as JSON:
 """
 
         response = self._call_openai_with_retry(prompt, max_retries=3)
-        recommendations = json.loads(response.choices[0].message.content)
+        recommendations = self._parse_json_response(response, "recommendations")
         return recommendations
 
     def learn_from_results(
@@ -503,5 +537,5 @@ Return as JSON:
 """
 
         response = self._call_openai_with_retry(prompt, max_retries=3)
-        learning = json.loads(response.choices[0].message.content)
+        learning = self._parse_json_response(response, "learning")
         return learning
