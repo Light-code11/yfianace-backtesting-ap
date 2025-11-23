@@ -1070,11 +1070,36 @@ elif page == "Backtest":
                                         strategy_config = strategy_details['strategy_config']
                                         trades = strategy_details['trades']
 
+                                        # Calculate period from backtest date range
+                                        from datetime import datetime
+                                        if strategy_details.get('start_date') and strategy_details.get('end_date'):
+                                            start = datetime.fromisoformat(strategy_details['start_date'])
+                                            end = datetime.fromisoformat(strategy_details['end_date'])
+                                            days_diff = (end - start).days
+
+                                            # Map days to period string
+                                            if days_diff <= 45:
+                                                chart_period = '1mo'
+                                            elif days_diff <= 120:
+                                                chart_period = '3mo'
+                                            elif days_diff <= 210:
+                                                chart_period = '6mo'
+                                            elif days_diff <= 450:
+                                                chart_period = '1y'
+                                            elif days_diff <= 900:
+                                                chart_period = '2y'
+                                            elif days_diff <= 2190:
+                                                chart_period = '5y'
+                                            else:
+                                                chart_period = '10y'
+                                        else:
+                                            chart_period = '1y'  # Fallback
+
                                         chart_fig = StrategyVisualizer.create_strategy_chart(
                                             ticker=selected_ticker,
                                             strategy=strategy_config,
                                             trades=trades,
-                                            period='1y'
+                                            period=chart_period
                                         )
 
                                         if chart_fig:

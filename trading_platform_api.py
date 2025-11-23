@@ -763,7 +763,9 @@ async def get_strategy_details(backtest_id: int, db=Depends(get_db)):
         "strategy_config": strategy_config,
         "description": description,
         "tickers_tested": result.tickers_tested,
-        "trades": result.trades
+        "trades": result.trades,
+        "start_date": result.start_date.isoformat() if result.start_date else None,
+        "end_date": result.end_date.isoformat() if result.end_date else None
     }
 
 
