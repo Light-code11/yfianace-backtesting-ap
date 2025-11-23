@@ -92,7 +92,6 @@ class LiveSignalGenerator:
 
         # Fetch recent data for THIS SPECIFIC ticker only
         # Use thread lock to prevent yfinance data mixing in parallel downloads
-        print(f"[DEBUG] Downloading data for ticker: {ticker}, period: {period}")
         with LiveSignalGenerator._yf_lock:
             data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
 
@@ -103,15 +102,9 @@ class LiveSignalGenerator:
                 "error": "No market data available"
             }
 
-        print(f"[DEBUG] Downloaded {len(data)} rows for {ticker}")
-        print(f"[DEBUG] Columns before MultiIndex handling: {data.columns}")
-        print(f"[DEBUG] Is MultiIndex: {isinstance(data.columns, pd.MultiIndex)}")
-
         # Handle MultiIndex columns from yfinance
         if isinstance(data.columns, pd.MultiIndex):
-            print(f"[DEBUG] MultiIndex detected for {ticker}, flattening...")
             data.columns = data.columns.get_level_values(0)
-            print(f"[DEBUG] Columns after flattening: {data.columns}")
 
         close = data['Close']
         high = data['High']
@@ -119,7 +112,6 @@ class LiveSignalGenerator:
         volume = data['Volume']
 
         current_price = float(close.iloc[-1])
-        print(f"[DEBUG] {ticker} current_price extracted: ${current_price:.2f}")
 
         # Calculate indicators
         indicators = LiveSignalGenerator._calculate_indicators(
