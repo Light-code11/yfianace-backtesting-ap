@@ -2978,17 +2978,22 @@ elif page == "🎯 Complete Trading System":
                         'total_capital': total_capital,
                         'method': optimization_method,
                         'constraints': {
-                            'max_allocation_pct': max_allocation
+                            'max_allocation': max_allocation / 100  # Convert to decimal (30% → 0.3)
                         },
                         'strategies': []
                     }
 
                     for _, row in results_df.iterrows():
+                        # Calculate approximate volatility from Sharpe ratio
+                        # Sharpe = Return / Volatility → Volatility = Return / Sharpe
+                        sharpe = max(row['sharpe_ratio'], 0.1)  # Avoid division by zero
+                        volatility = abs(row['total_return_pct']) / sharpe if sharpe > 0 else 20.0
+
                         optimize_data['strategies'].append({
                             'id': row['strategy_id'],
                             'name': f"{row['ticker']} - {row['strategy']}",
                             'expected_return': row['total_return_pct'],
-                            'volatility': max(1, 100 / max(row['sharpe_ratio'], 0.1)),  # Approximate
+                            'volatility': volatility,
                             'sharpe_ratio': row['sharpe_ratio']
                         })
 

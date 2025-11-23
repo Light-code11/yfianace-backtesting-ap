@@ -908,6 +908,15 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
                     "strategy_type": "custom"
                 })
 
+                # Calculate max drawdown from synthetic equity curve
+                peak = equity[0]
+                max_dd = 0
+                for value in equity:
+                    if value > peak:
+                        peak = value
+                    dd = ((peak - value) / peak) * 100
+                    max_dd = max(max_dd, dd)
+
                 backtest_results.append({
                     "strategy_name": strat_data.get('name', f"Strategy {idx}"),
                     "equity_curve": [
@@ -915,7 +924,9 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
                         for i in range(days)
                     ],
                     "total_return_pct": expected_return,
-                    "sharpe_ratio": sharpe
+                    "sharpe_ratio": sharpe,
+                    "max_drawdown_pct": max_dd,
+                    "win_rate": 50.0  # Default assumption for synthetic data
                 })
         else:
             return {"success": False, "error": "Must provide either strategy_ids or strategies"}
@@ -936,6 +947,8 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         )
 
         if not optimization_result.get('success'):
+            # Log the error for debugging
+            print(f"Portfolio optimization failed: {optimization_result.get('error')}")
             return optimization_result  # Return error from optimizer
 
         # Save optimization
