@@ -38,6 +38,7 @@ from autonomous_learning import AutonomousLearningAgent
 from strategy_visualizer import StrategyVisualizer
 from ml_price_predictor import MLPricePredictor
 from hmm_regime_detector import HMMRegimeDetector
+from live_signal_generator import LiveSignalGenerator
 import threading
 
 # Helper function to convert numpy types to Python types for PostgreSQL
@@ -767,6 +768,61 @@ async def get_strategy_details(backtest_id: int, db=Depends(get_db)):
         "start_date": result.start_date.isoformat() if result.start_date else None,
         "end_date": result.end_date.isoformat() if result.end_date else None
     }
+
+
+# =======================
+# LIVE SIGNALS ENDPOINT
+# =======================
+
+@app.get("/signals/live/{strategy_id}")
+async def get_live_signals(strategy_id: int, capital: float = 100000, db=Depends(get_db)):
+    """
+    Get live trading signals for a strategy
+
+    Returns current BUY/SELL/HOLD signals with entry/exit prices and risk management
+    """
+    try:
+        strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+
+        if not strategy:
+            raise HTTPException(status_code=404, detail="Strategy not found")
+
+        # Build strategy config
+        strategy_config = {
+            'id': strategy.id,
+            'name': strategy.name,
+            'tickers': strategy.tickers,
+            'strategy_type': strategy.strategy_type,
+            'indicators': strategy.indicators,
+            'risk_management': {
+                'stop_loss_pct': strategy.stop_loss_pct,
+                'take_profit_pct': strategy.take_profit_pct,
+                'position_size_pct': strategy.position_size_pct
+            }
+        }
+
+        # Generate live signals
+        signals_data = LiveSignalGenerator.generate_signals(strategy_config, period="3mo")
+
+        # Add position sizing based on capital
+        for signal in signals_data['signals']:
+            if signal.get('signal') in ['BUY', 'SELL']:
+                position_size_pct = signal.get('position_size_pct', 25.0)
+                signal['position_size_usd'] = round(capital * (position_size_pct / 100), 2)
+                signal['shares_to_trade'] = int(signal['position_size_usd'] / signal['current_price'])
+
+        return {
+            "success": True,
+            "strategy_id": strategy_id,
+            "capital": capital,
+            **signals_data
+        }
+
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"LIVE SIGNALS ERROR: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =======================

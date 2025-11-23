@@ -387,7 +387,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -1215,6 +1215,165 @@ elif page == "Backtest":
         **Or create strategies manually:**
         - Go to the **Generate Strategies** page to create strategies with AI
         """)
+
+
+# =======================
+# LIVE SIGNALS PAGE
+# =======================
+
+elif page == "📡 Live Signals":
+    st.markdown('<div class="main-header">📡 Live Trading Signals</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    Get **actionable buy/sell signals** for your validated strategies based on current market conditions.
+
+    This page analyzes your backtested strategies and tells you exactly:
+    - 📊 **Current Signal**: BUY, SELL, or HOLD right now
+    - 💰 **Entry Price**: Exact price to enter at
+    - 🛑 **Stop Loss**: Where to cut losses
+    - 🎯 **Take Profit**: Where to take profits
+    - 📈 **Position Size**: How much capital to allocate
+    """)
+
+    st.markdown("---")
+
+    # Get available strategies
+    strategies_data = make_api_request("/strategies?active_only=false")
+
+    if strategies_data and strategies_data.get('strategies'):
+        # Filter to strategies with backtest results
+        strategies_with_results = [
+            s for s in strategies_data['strategies']
+            if s.get('backtest_count', 0) > 0
+        ]
+
+        if not strategies_with_results:
+            st.warning("⚠️ No strategies with backtest results found. Go to the **Backtest** page to backtest your strategies first.")
+        else:
+            # Strategy selector
+            def format_strategy_name(s):
+                tickers = s.get('tickers', [])
+                if tickers and isinstance(tickers, list) and len(tickers) > 0:
+                    ticker_prefix = ', '.join(tickers) + ' - '
+                else:
+                    ticker_prefix = ''
+                return f"{ticker_prefix}{s['name']} (ID: {s['id']}, {s['strategy_type']})"
+
+            strategy_options = {
+                format_strategy_name(s): s['id']
+                for s in strategies_with_results
+            }
+
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                selected_strategy_name = st.selectbox(
+                    "Select Strategy",
+                    options=list(strategy_options.keys()),
+                    help="Choose a backtested strategy to get live signals"
+                )
+
+            with col2:
+                capital = st.number_input(
+                    "Trading Capital ($)",
+                    min_value=1000,
+                    max_value=10000000,
+                    value=100000,
+                    step=10000,
+                    help="Total capital available for trading"
+                )
+
+            if st.button("🔄 Refresh Signals", type="primary", use_container_width=True):
+                strategy_id = strategy_options[selected_strategy_name]
+
+                with st.spinner("Analyzing current market conditions..."):
+                    response = make_api_request(f"/signals/live/{strategy_id}?capital={capital}")
+
+                    if response and response.get('success'):
+                        st.success(f"✅ Signals generated at {response['generated_at']}")
+
+                        st.markdown("---")
+                        st.markdown(f"### {response['strategy_name']} - {response['strategy_type'].title()} Strategy")
+
+                        # Display signals for each ticker
+                        for signal_data in response['signals']:
+                            ticker = signal_data['ticker']
+                            signal = signal_data.get('signal', 'ERROR')
+
+                            if signal == 'ERROR':
+                                st.error(f"**{ticker}**: ❌ {signal_data.get('error', 'Unknown error')}")
+                                continue
+
+                            # Color-code the signal
+                            if signal == 'BUY':
+                                signal_color = '🟢'
+                                signal_box = 'success-box'
+                            elif signal == 'SELL':
+                                signal_color = '🔴'
+                                signal_box = 'warning-box'
+                            else:  # HOLD
+                                signal_color = '🟡'
+                                signal_box = 'metric-card'
+
+                            st.markdown(f"#### {signal_color} {ticker}: **{signal}**")
+
+                            col1, col2, col3, col4 = st.columns(4)
+
+                            with col1:
+                                st.metric("Current Price", f"${signal_data['current_price']:,.2f}")
+                                st.caption(f"Confidence: **{signal_data['confidence']}**")
+
+                            with col2:
+                                if signal != 'HOLD':
+                                    st.metric("Stop Loss", f"${signal_data['stop_loss']:,.2f}" if signal_data['stop_loss'] else "N/A")
+                                    risk_pct = abs((signal_data['current_price'] - signal_data['stop_loss']) / signal_data['current_price'] * 100) if signal_data['stop_loss'] else 0
+                                    st.caption(f"Risk: {risk_pct:.1f}%")
+
+                            with col3:
+                                if signal != 'HOLD':
+                                    st.metric("Take Profit", f"${signal_data['take_profit']:,.2f}" if signal_data['take_profit'] else "N/A")
+                                    reward_pct = abs((signal_data['take_profit'] - signal_data['current_price']) / signal_data['current_price'] * 100) if signal_data['take_profit'] else 0
+                                    st.caption(f"Reward: {reward_pct:.1f}%")
+
+                            with col4:
+                                if signal != 'HOLD':
+                                    st.metric("Position Size", f"${signal_data.get('position_size_usd', 0):,.0f}")
+                                    st.caption(f"{signal_data['position_size_pct']:.0f}% of capital")
+                                    st.caption(f"~{signal_data.get('shares_to_trade', 0)} shares")
+
+                            # Strategy reasoning
+                            with st.expander(f"📊 Why {signal}? (Click to expand)"):
+                                st.markdown(f"**Strategy Logic:**")
+                                st.write(signal_data['reasoning'])
+
+                                st.markdown(f"**Current Indicators:**")
+                                indicators_df = pd.DataFrame([signal_data['indicators']])
+                                st.dataframe(indicators_df.T.rename(columns={0: 'Value'}), use_container_width=True)
+
+                            # Action summary box
+                            if signal != 'HOLD':
+                                action_emoji = "🟢 BUY" if signal == 'BUY' else "🔴 SELL"
+                                st.info(f"""
+                                **Action Plan for {ticker}:**
+                                - {action_emoji} at **${signal_data['entry_price']:,.2f}**
+                                - Set stop loss at **${signal_data['stop_loss']:,.2f}**
+                                - Set take profit at **${signal_data['take_profit']:,.2f}**
+                                - Position size: **${signal_data.get('position_size_usd', 0):,.0f}** (~{signal_data.get('shares_to_trade', 0)} shares)
+                                - Risk/Reward: **{risk_pct:.1f}% / {reward_pct:.1f}%** ({reward_pct/risk_pct if risk_pct > 0 else 0:.1f}:1)
+                                """)
+
+                            st.markdown("---")
+
+                        # Disclaimer
+                        st.warning("""
+                        ⚠️ **Disclaimer**: These are algorithmic signals based on historical patterns.
+                        Always do your own research and never risk more than you can afford to lose.
+                        Past performance does not guarantee future results.
+                        """)
+                    else:
+                        st.error(f"❌ Failed to generate signals: {response.get('error', 'Unknown error')}")
+    else:
+        st.error("❌ No strategies found. Create strategies on the **Generate Strategies** or **Complete Trading System** page first.")
 
 
 # =======================
