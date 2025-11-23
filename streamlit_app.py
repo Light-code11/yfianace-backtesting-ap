@@ -2593,6 +2593,7 @@ elif page == "🎯 Complete Trading System":
                                     'strategy': strategy,
                                     'strategy_id': f"{ticker}_{strategy}",
                                     'total_return_pct': metrics['total_return_pct'],
+                                    'total_trades': metrics.get('total_trades', 0),
                                     'sharpe_ratio': sharpe,
                                     'sortino_ratio': metrics.get('sortino_ratio', 0),
                                     'calmar_ratio': metrics.get('calmar_ratio', 0),
@@ -2664,7 +2665,16 @@ elif page == "🎯 Complete Trading System":
 
             with col2:
                 st.markdown(f"**Sharpe Ratio:** {top_strategy['sharpe_ratio']:.2f}")
-                st.markdown(f"**Quality Score:** {top_strategy.get('quality_score', 0):.1f}/100")
+                st.markdown(f"**Total Trades:** {top_strategy.get('total_trades', 0)}")
+
+                # Add statistical reliability warning
+                trades = top_strategy.get('total_trades', 0)
+                if trades < 10:
+                    st.warning(f"⚠️ Only {trades} trade(s) - unreliable (need 30+ for confidence)")
+                elif trades < 30:
+                    st.warning(f"⚠️ Only {trades} trades - questionable (prefer 100+)")
+                elif trades < 100:
+                    st.info(f"ℹ️ {trades} trades - acceptable (100+ is better)")
 
             with col3:
                 # Quick save button for top strategy
@@ -2729,10 +2739,11 @@ elif page == "🎯 Complete Trading System":
             st.markdown("#### 📊 All Qualifying Strategies")
             st.dataframe(
                 results_df[[
-                    'ticker', 'strategy', 'total_return_pct', 'sharpe_ratio',
+                    'ticker', 'strategy', 'total_trades', 'total_return_pct', 'sharpe_ratio',
                     'sortino_ratio', 'calmar_ratio', 'max_drawdown_pct',
                     'win_rate', 'var_95_pct', 'ml_prediction', 'regime'
                 ]].style.format({
+                    'total_trades': '{:.0f}',
                     'total_return_pct': '{:.2f}%',
                     'sharpe_ratio': '{:.2f}',
                     'sortino_ratio': '{:.2f}',
