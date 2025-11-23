@@ -324,6 +324,9 @@ class AdvancedPortfolioOptimizer:
 
         # Check if optimization succeeded
         if not result.success:
+            # Convert status to int to ensure proper dictionary lookup
+            status_code = int(result.status)
+
             # Map scipy status codes to meaningful messages
             error_messages = {
                 1: "Maximum iterations exceeded",
@@ -336,11 +339,11 @@ class AdvancedPortfolioOptimizer:
                 8: "Positive directional derivative for linesearch (try adjusting max_allocation constraint)",
                 9: "Iteration limit reached"
             }
-            error_msg = error_messages.get(result.status, f"Optimization failed with status {result.status}")
+            error_msg = error_messages.get(status_code, f"Optimization failed with status {status_code}")
 
             # If status 4, provide helpful guidance
-            if result.status == 4:
-                error_msg += ". Try: 1) Increase max allocation per strategy to 50-60%, 2) Select strategies with different risk profiles, 3) Use fewer strategies (2-3)"
+            if status_code == 4:
+                error_msg += ". Try: 1) Increase max allocation per strategy to 60-70%, 2) Select strategies with different risk profiles, 3) Use fewer strategies (2-3)"
 
             raise ValueError(error_msg)
 
