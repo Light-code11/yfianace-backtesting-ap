@@ -2250,9 +2250,9 @@ elif page == "🎯 Complete Trading System":
     with col2:
         lookback_period = st.selectbox(
             "Backtest Period",
-            ["1mo", "3mo", "6mo", "1y", "2y"],
+            ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y"],
             index=3,
-            help="Historical period for backtesting"
+            help="Historical period for backtesting (use 5-10y for swing trading to get 30+ trades)"
         )
 
         min_sharpe = st.number_input(
