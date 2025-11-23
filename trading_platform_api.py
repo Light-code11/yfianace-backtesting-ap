@@ -394,6 +394,72 @@ async def list_strategies(
     }
 
 
+@app.post("/strategies")
+async def create_strategy(request: dict, db=Depends(get_db)):
+    """Create a new strategy manually"""
+    try:
+        # Extract data from request
+        name = request.get('name')
+        description = request.get('description', '')
+        tickers = request.get('tickers', [])
+        strategy_type = request.get('strategy_type', '')
+        indicators = request.get('indicators', [])
+        risk_management = request.get('risk_management', {})
+
+        # Validate required fields
+        if not name:
+            raise HTTPException(status_code=400, detail="Strategy name is required")
+        if not tickers:
+            raise HTTPException(status_code=400, detail="At least one ticker is required")
+        if not strategy_type:
+            raise HTTPException(status_code=400, detail="Strategy type is required")
+
+        # Check if strategy with this name already exists
+        existing = db.query(Strategy).filter(Strategy.name == name).first()
+        if existing:
+            # Make name unique by adding timestamp
+            name = f"{name} [{datetime.now().strftime('%Y%m%d_%H%M%S')}]"
+
+        # Create strategy entry/exit conditions based on strategy type and indicators
+        entry_conditions = {}
+        exit_conditions = {}
+
+        # Create database record
+        db_strategy = Strategy(
+            name=name,
+            description=description,
+            tickers=tickers,
+            strategy_type=strategy_type,
+            indicators=indicators,
+            entry_conditions=entry_conditions,
+            exit_conditions=exit_conditions,
+            stop_loss_pct=risk_management.get('stop_loss_pct', 5.0),
+            take_profit_pct=risk_management.get('take_profit_pct', 10.0),
+            position_size_pct=risk_management.get('position_size_pct', 10.0),
+            holding_period_days=risk_management.get('holding_period_days', 5),
+            rationale=f"Manual strategy creation: {strategy_type} strategy for {', '.join(tickers)}",
+            market_analysis="",
+            risk_assessment="",
+            is_active=True
+        )
+
+        db.add(db_strategy)
+        db.commit()
+        db.refresh(db_strategy)
+
+        return {
+            "success": True,
+            "strategy_id": db_strategy.id,
+            "message": f"Strategy '{db_strategy.name}' created successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create strategy: {str(e)}")
+
+
 @app.get("/strategies/{strategy_id}")
 async def get_strategy(strategy_id: int, db=Depends(get_db)):
     """Get strategy details"""
