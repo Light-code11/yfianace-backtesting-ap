@@ -2601,427 +2601,437 @@ elif page == "🎯 Complete Trading System":
                 status_text.text("✅ Analysis complete!")
                 progress_bar.progress(1.0)
 
-                # Display results summary
-                if backtest_results:
-                    st.markdown("---")
-                    st.markdown(f"### Step 4️⃣: Results - {len(backtest_results)} Qualifying Strategies")
+                # Store results in session state to persist across reruns
+                st.session_state.complete_trading_results = backtest_results
+                st.session_state.complete_trading_total_capital = total_capital
+                st.session_state.complete_trading_optimization_goal = optimization_goal
 
-                    # Create DataFrame
-                    results_df = pd.DataFrame(backtest_results)
+    # Display results from session state (persists across button clicks)
+    if 'complete_trading_results' in st.session_state and st.session_state.complete_trading_results:
+        backtest_results = st.session_state.complete_trading_results
+        total_capital = st.session_state.complete_trading_total_capital
+        optimization_goal = st.session_state.complete_trading_optimization_goal
 
-                    # Sort by optimization goal
-                    if optimization_goal == "Risk-Adjusted (Sharpe)":
-                        sort_column = 'sharpe_ratio'
-                        st.info(f"📊 Sorted by **Sharpe Ratio** (risk-adjusted returns)")
-                    elif optimization_goal == "Maximum Returns":
-                        sort_column = 'total_return_pct'
-                        st.info(f"🚀 Sorted by **Total Return %** (maximum absolute gains)")
-                    elif optimization_goal == "Best Sortino":
-                        sort_column = 'sortino_ratio'
-                        st.info(f"📈 Sorted by **Sortino Ratio** (downside risk-adjusted)")
-                    elif optimization_goal == "Best Calmar":
-                        sort_column = 'calmar_ratio'
-                        st.info(f"📉 Sorted by **Calmar Ratio** (drawdown-adjusted)")
-                    else:
-                        sort_column = 'sortino_ratio'  # Default
+        if backtest_results:
+            st.markdown("---")
+            st.markdown(f"### Step 4️⃣: Results - {len(backtest_results)} Qualifying Strategies")
 
-                    results_df = results_df.sort_values(sort_column, ascending=False)
+            # Create DataFrame
+            results_df = pd.DataFrame(backtest_results)
 
-                    # Display top strategies
-                    st.dataframe(
-                        results_df[[
-                            'ticker', 'strategy', 'total_return_pct', 'sharpe_ratio',
-                            'sortino_ratio', 'calmar_ratio', 'max_drawdown_pct',
-                            'win_rate', 'var_95_pct', 'ml_prediction', 'regime'
-                        ]].style.format({
-                            'total_return_pct': '{:.2f}%',
-                            'sharpe_ratio': '{:.2f}',
-                            'sortino_ratio': '{:.2f}',
-                            'calmar_ratio': '{:.2f}',
-                            'max_drawdown_pct': '{:.2f}%',
-                            'win_rate': '{:.2f}%',
-                            'var_95_pct': '{:.2f}%'
-                        }),
-                        use_container_width=True,
-                        hide_index=True
-                    )
+            # Sort by optimization goal
+            if optimization_goal == "Risk-Adjusted (Sharpe)":
+                sort_column = 'sharpe_ratio'
+                st.info(f"📊 Sorted by **Sharpe Ratio** (risk-adjusted returns)")
+            elif optimization_goal == "Maximum Returns":
+                sort_column = 'total_return_pct'
+                st.info(f"🚀 Sorted by **Total Return %** (maximum absolute gains)")
+            elif optimization_goal == "Best Sortino":
+                sort_column = 'sortino_ratio'
+                st.info(f"📈 Sorted by **Sortino Ratio** (downside risk-adjusted)")
+            elif optimization_goal == "Best Calmar":
+                sort_column = 'calmar_ratio'
+                st.info(f"📉 Sorted by **Calmar Ratio** (drawdown-adjusted)")
+            else:
+                sort_column = 'sortino_ratio'  # Default
 
-                    # View detailed trades for individual strategies
-                    st.markdown("---")
-                    st.markdown("#### 📋 View Detailed Strategy Results")
+            results_df = results_df.sort_values(sort_column, ascending=False)
 
-                    strategy_names = [f"{row['ticker']} - {row['strategy']}" for _, row in results_df.iterrows()]
-                    selected_detail_strategy = st.selectbox(
-                        "Select a strategy to view detailed trades:",
-                        options=strategy_names,
-                        key="detail_strategy_selector"
-                    )
+            # Display top strategies
+            st.dataframe(
+                results_df[[
+                    'ticker', 'strategy', 'total_return_pct', 'sharpe_ratio',
+                    'sortino_ratio', 'calmar_ratio', 'max_drawdown_pct',
+                    'win_rate', 'var_95_pct', 'ml_prediction', 'regime'
+                ]].style.format({
+                    'total_return_pct': '{:.2f}%',
+                    'sharpe_ratio': '{:.2f}',
+                    'sortino_ratio': '{:.2f}',
+                    'calmar_ratio': '{:.2f}',
+                    'max_drawdown_pct': '{:.2f}%',
+                    'win_rate': '{:.2f}%',
+                    'var_95_pct': '{:.2f}%'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
 
-                    if st.button("📊 View Detailed Backtest Results", key="view_details_btn", use_container_width=True):
-                        # Parse ticker and strategy from selection
-                        parts = selected_detail_strategy.split(' - ')
-                        if len(parts) == 2:
-                            detail_ticker = parts[0]
-                            detail_strategy = parts[1]
+            # View detailed trades for individual strategies
+            st.markdown("---")
+            st.markdown("#### 📋 View Detailed Strategy Results")
 
-                            with st.spinner(f"Loading detailed results for {selected_detail_strategy}..."):
-                                # Find the backtest result for this strategy
-                                matching_result = None
-                                for result in backtest_results:
-                                    if result['ticker'] == detail_ticker and result['strategy'] == detail_strategy:
-                                        matching_result = result
-                                        break
+            strategy_names = [f"{row['ticker']} - {row['strategy']}" for _, row in results_df.iterrows()]
+            selected_detail_strategy = st.selectbox(
+                "Select a strategy to view detailed trades:",
+                options=strategy_names,
+                key="detail_strategy_selector"
+            )
 
-                                if matching_result:
-                                    # Re-run backtest to get trade details
-                                    strategy_config = {
-                                        "name": f"{detail_ticker} {detail_strategy}",
-                                        "tickers": [detail_ticker],
-                                        "strategy_type": detail_strategy,
-                                        "indicators": [],
-                                        "risk_management": {
-                                            "stop_loss_pct": 15.0,
-                                            "take_profit_pct": 30.0,
-                                            "position_size_pct": 95.0,
-                                            "max_positions": 1
-                                        }
-                                    }
+            if st.button("📊 View Detailed Backtest Results", key="view_details_btn", use_container_width=True):
+                # Parse ticker and strategy from selection
+                parts = selected_detail_strategy.split(' - ')
+                if len(parts) == 2:
+                    detail_ticker = parts[0]
+                    detail_strategy = parts[1]
 
-                                    # Add indicators based on strategy type
-                                    if detail_strategy == "momentum":
-                                        strategy_config["indicators"] = [
-                                            {"name": "SMA", "period": 20},
-                                            {"name": "SMA", "period": 50},
-                                            {"name": "RSI", "period": 14}
-                                        ]
-                                    elif detail_strategy == "mean_reversion":
-                                        strategy_config["indicators"] = [
-                                            {"name": "BOLLINGER_BANDS", "period": 20},
-                                            {"name": "RSI", "period": 14}
-                                        ]
-                                    elif detail_strategy == "breakout":
-                                        strategy_config["indicators"] = [
-                                            {"name": "BOLLINGER_BANDS", "period": 20},
-                                            {"name": "ATR", "period": 14}
-                                        ]
-                                    elif detail_strategy == "trend_following":
-                                        strategy_config["indicators"] = [
-                                            {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
-                                            {"name": "SMA", "period": 20},
-                                            {"name": "SMA", "period": 50}
-                                        ]
+                    with st.spinner(f"Loading detailed results for {selected_detail_strategy}..."):
+                        # Find the backtest result for this strategy
+                        matching_result = None
+                        for result in backtest_results:
+                            if result['ticker'] == detail_ticker and result['strategy'] == detail_strategy:
+                                matching_result = result
+                                break
 
-                                    backtest_response = make_api_request(
-                                        "/backtest",
-                                        method="POST",
-                                        data={
-                                            "strategy_config": strategy_config,
-                                            "initial_capital": total_capital
-                                        }
-                                    )
-
-                                    if backtest_response and backtest_response.get('success'):
-                                        backtest_id = backtest_response['backtest_id']
-                                        detailed_results = make_api_request(f"/backtest/results/{backtest_id}")
-
-                                        if detailed_results:
-                                            st.success(f"✅ Detailed results for {selected_detail_strategy}")
-
-                                            # Show metrics
-                                            col1, col2, col3, col4 = st.columns(4)
-                                            with col1:
-                                                st.metric("Total Return", f"{detailed_results['metrics']['total_return_pct']:.2f}%")
-                                            with col2:
-                                                st.metric("Sharpe Ratio", f"{detailed_results['metrics']['sharpe_ratio']:.2f}")
-                                            with col3:
-                                                st.metric("Win Rate", f"{detailed_results['metrics']['win_rate']:.2f}%")
-                                            with col4:
-                                                st.metric("Total Trades", detailed_results['metrics']['total_trades'])
-
-                                            # Show trades table
-                                            if detailed_results.get('trades'):
-                                                st.markdown("#### 📈 All Trades")
-                                                trades_df = pd.DataFrame(detailed_results['trades'])
-                                                st.dataframe(
-                                                    trades_df[[
-                                                        'entry_date', 'exit_date', 'entry_price', 'exit_price',
-                                                        'profit_loss_pct', 'profit_loss_usd', 'exit_reason'
-                                                    ]].style.format({
-                                                        'entry_price': '${:.2f}',
-                                                        'exit_price': '${:.2f}',
-                                                        'profit_loss_pct': '{:.2f}%',
-                                                        'profit_loss_usd': '${:,.2f}'
-                                                    }),
-                                                    use_container_width=True,
-                                                    height=400
-                                                )
-
-                                                # Show equity curve
-                                                if detailed_results.get('equity_curve'):
-                                                    st.markdown("#### 📊 Equity Curve")
-                                                    equity_df = pd.DataFrame(detailed_results['equity_curve'])
-                                                    fig = px.line(
-                                                        equity_df,
-                                                        x='date',
-                                                        y='equity',
-                                                        title=f'Equity Curve - {selected_detail_strategy}'
-                                                    )
-                                                    fig.update_layout(
-                                                        xaxis_title="Date",
-                                                        yaxis_title="Portfolio Value ($)",
-                                                        hovermode='x unified'
-                                                    )
-                                                    st.plotly_chart(fig, use_container_width=True)
-                                            else:
-                                                st.warning("No trades were generated for this strategy")
-                                        else:
-                                            st.error("Failed to load detailed results")
-                                    else:
-                                        st.error(f"Backtest failed: {backtest_response.get('error', 'Unknown error')}")
-                                else:
-                                    st.error("Could not find matching strategy result")
-
-                    # Step 5: Portfolio Optimization
-                    st.markdown("---")
-                    st.markdown("### Step 5️⃣: Portfolio Optimization")
-
-                    st.write(f"**Optimizing allocation across {len(backtest_results)} strategies...**")
-
-                    col1, col2 = st.columns(2)
-
-                    with col1:
-                        optimization_method = st.selectbox(
-                            "Optimization Method",
-                            ["max_sharpe", "min_volatility", "max_return", "risk_parity"],
-                            help="Method for combining strategies"
-                        )
-
-                    with col2:
-                        max_allocation = st.slider(
-                            "Max Allocation per Strategy (%)",
-                            min_value=5,
-                            max_value=100,
-                            value=30,
-                            step=5,
-                            help="Maximum % allocated to any single strategy"
-                        )
-
-                    if st.button("🎯 Optimize Portfolio", use_container_width=True):
-                        with st.spinner("Running portfolio optimization..."):
-
-                            # Prepare data for optimizer
-                            optimize_data = {
-                                'total_capital': total_capital,
-                                'method': optimization_method,
-                                'constraints': {
-                                    'max_allocation_pct': max_allocation
-                                },
-                                'strategies': []
+                        if matching_result:
+                            # Re-run backtest to get trade details
+                            strategy_config = {
+                                "name": f"{detail_ticker} {detail_strategy}",
+                                "tickers": [detail_ticker],
+                                "strategy_type": detail_strategy,
+                                "indicators": [],
+                                "risk_management": {
+                                    "stop_loss_pct": 15.0,
+                                    "take_profit_pct": 30.0,
+                                    "position_size_pct": 95.0,
+                                    "max_positions": 1
+                                }
                             }
 
-                            for _, row in results_df.iterrows():
-                                optimize_data['strategies'].append({
-                                    'id': row['strategy_id'],
-                                    'name': f"{row['ticker']} - {row['strategy']}",
-                                    'expected_return': row['total_return_pct'],
-                                    'volatility': max(1, 100 / max(row['sharpe_ratio'], 0.1)),  # Approximate
-                                    'sharpe_ratio': row['sharpe_ratio']
-                                })
+                            # Add indicators based on strategy type
+                            if detail_strategy == "momentum":
+                                strategy_config["indicators"] = [
+                                    {"name": "SMA", "period": 20},
+                                    {"name": "SMA", "period": 50},
+                                    {"name": "RSI", "period": 14}
+                                ]
+                            elif detail_strategy == "mean_reversion":
+                                strategy_config["indicators"] = [
+                                    {"name": "BOLLINGER_BANDS", "period": 20},
+                                    {"name": "RSI", "period": 14}
+                                ]
+                            elif detail_strategy == "breakout":
+                                strategy_config["indicators"] = [
+                                    {"name": "BOLLINGER_BANDS", "period": 20},
+                                    {"name": "ATR", "period": 14}
+                                ]
+                            elif detail_strategy == "trend_following":
+                                strategy_config["indicators"] = [
+                                    {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
+                                    {"name": "SMA", "period": 20},
+                                    {"name": "SMA", "period": 50}
+                                ]
 
-                            # Call optimizer
-                            opt_response = make_api_request(
-                                "/portfolio/optimize",
+                            backtest_response = make_api_request(
+                                "/backtest",
                                 method="POST",
-                                data=optimize_data
+                                data={
+                                    "strategy_config": strategy_config,
+                                    "initial_capital": total_capital
+                                }
                             )
 
-                            if opt_response and opt_response.get('success'):
-                                st.success("✅ Portfolio optimization complete!")
+                            if backtest_response and backtest_response.get('success'):
+                                backtest_id = backtest_response['backtest_id']
+                                detailed_results = make_api_request(f"/backtest/results/{backtest_id}")
 
-                                # Display optimal allocations
-                                st.markdown("#### 💼 Optimal Portfolio Allocation")
+                                if detailed_results:
+                                    st.success(f"✅ Detailed results for {selected_detail_strategy}")
 
-                                allocations = opt_response['allocations']
-                                portfolio_metrics = opt_response['portfolio_metrics']
+                                    # Show metrics
+                                    col1, col2, col3, col4 = st.columns(4)
+                                    with col1:
+                                        st.metric("Total Return", f"{detailed_results['metrics']['total_return_pct']:.2f}%")
+                                    with col2:
+                                        st.metric("Sharpe Ratio", f"{detailed_results['metrics']['sharpe_ratio']:.2f}")
+                                    with col3:
+                                        st.metric("Win Rate", f"{detailed_results['metrics']['win_rate']:.2f}%")
+                                    with col4:
+                                        st.metric("Total Trades", detailed_results['metrics']['total_trades'])
 
-                                # Create allocation chart
-                                alloc_df = pd.DataFrame([
-                                    {'Strategy': name, 'Allocation %': weight * 100, 'Capital $': capital}
-                                    for name, weight, capital in zip(
-                                        allocations['strategy_names'],
-                                        allocations['weights'],
-                                        allocations['capital_allocation']
-                                    )
-                                ])
+                                    # Show trades table
+                                    if detailed_results.get('trades'):
+                                        st.markdown("#### 📈 All Trades")
+                                        trades_df = pd.DataFrame(detailed_results['trades'])
+                                        st.dataframe(
+                                            trades_df[[
+                                                'entry_date', 'exit_date', 'entry_price', 'exit_price',
+                                                'profit_loss_pct', 'profit_loss_usd', 'exit_reason'
+                                            ]].style.format({
+                                                'entry_price': '${:.2f}',
+                                                'exit_price': '${:.2f}',
+                                                'profit_loss_pct': '{:.2f}%',
+                                                'profit_loss_usd': '${:,.2f}'
+                                            }),
+                                            use_container_width=True,
+                                            height=400
+                                        )
 
-                                col1, col2 = st.columns([2, 1])
-
-                                with col1:
-                                    # Pie chart
-                                    fig = px.pie(
-                                        alloc_df,
-                                        values='Allocation %',
-                                        names='Strategy',
-                                        title='Portfolio Allocation'
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-
-                                with col2:
-                                    st.markdown("#### 📊 Portfolio Metrics")
-                                    st.metric("Expected Return", f"{portfolio_metrics['expected_annual_return']:.2f}%")
-                                    st.metric("Expected Volatility", f"{portfolio_metrics['annual_volatility']:.2f}%")
-                                    st.metric("Sharpe Ratio", f"{portfolio_metrics['sharpe_ratio']:.2f}")
-
-                                # Detailed allocation table
-                                st.markdown("#### 📋 Detailed Allocations")
-                                st.dataframe(
-                                    alloc_df.style.format({
-                                        'Allocation %': '{:.2f}%',
-                                        'Capital $': '${:,.2f}'
-                                    }),
-                                    use_container_width=True,
-                                    hide_index=True
-                                )
-
-                                # Step 6: Final Recommendations
-                                st.markdown("---")
-                                st.markdown("### Step 6️⃣: Trading Recommendations")
-
-                                st.success("🎯 **Your Optimized Trading System is Ready!**")
-
-                                # Merge allocations with backtest results and market analysis
-                                for idx, row in alloc_df.iterrows():
-                                    strategy_id = row['Strategy'].split(' - ')
-                                    if len(strategy_id) == 2:
-                                        ticker = strategy_id[0]
-                                        strategy = strategy_id[1]
-
-                                        # Find matching result
-                                        matching_result = results_df[
-                                            (results_df['ticker'] == ticker) &
-                                            (results_df['strategy'] == strategy)
-                                        ]
-
-                                        if not matching_result.empty:
-                                            result = matching_result.iloc[0]
-
-                                            with st.expander(f"📌 {row['Strategy']} - ${row['Capital $']:,.2f} ({row['Allocation %']:.1f}%)"):
-                                                col1, col2, col3 = st.columns(3)
-
-                                                with col1:
-                                                    st.markdown("**Market Context**")
-                                                    st.write(f"ML Prediction: **{result['ml_prediction']}** ({result['ml_confidence']:.1f}%)")
-                                                    st.write(f"Regime: **{result['regime']}**")
-
-                                                with col2:
-                                                    st.markdown("**Performance**")
-                                                    st.write(f"Return: **{result['total_return_pct']:.2f}%**")
-                                                    st.write(f"Sortino: **{result['sortino_ratio']:.2f}**")
-                                                    st.write(f"Max DD: **{result['max_drawdown_pct']:.2f}%**")
-
-                                                with col3:
-                                                    st.markdown("**Risk Management**")
-                                                    st.write(f"VaR 95%: **{result['var_95_pct']:.2f}%**")
-                                                    st.write(f"Kelly Size: **{result['kelly_position_pct']:.1f}%**")
-
-                                                    # Risk assessment
-                                                    if result['kelly_risk_level'] == 'SAFE':
-                                                        st.success("✅ Safe to trade")
-                                                    elif result['kelly_risk_level'] == 'MODERATE':
-                                                        st.info("⚠️ Moderate risk")
-                                                    else:
-                                                        st.warning("🔴 High risk")
-
-                                # Summary box
-                                st.markdown("---")
-                                st.info(f"""
-                                ### 📊 Portfolio Summary
-
-                                - **Total Capital**: ${total_capital:,.2f}
-                                - **Number of Strategies**: {len(alloc_df)}
-                                - **Expected Annual Return**: {portfolio_metrics['expected_annual_return']:.2f}%
-                                - **Expected Volatility**: {portfolio_metrics['annual_volatility']:.2f}%
-                                - **Portfolio Sharpe**: {portfolio_metrics['sharpe_ratio']:.2f}
-                                - **Optimization Method**: {optimization_method.replace('_', ' ').title()}
-
-                                **Next Steps:**
-                                1. Review each strategy's allocation and risk metrics
-                                2. Consider current market regime and ML predictions
-                                3. Start with paper trading to validate live performance
-                                4. Monitor and rebalance monthly or when regime changes
-                                """)
+                                        # Show equity curve
+                                        if detailed_results.get('equity_curve'):
+                                            st.markdown("#### 📊 Equity Curve")
+                                            equity_df = pd.DataFrame(detailed_results['equity_curve'])
+                                            fig = px.line(
+                                                equity_df,
+                                                x='date',
+                                                y='equity',
+                                                title=f'Equity Curve - {selected_detail_strategy}'
+                                            )
+                                            fig.update_layout(
+                                                xaxis_title="Date",
+                                                yaxis_title="Portfolio Value ($)",
+                                                hovermode='x unified'
+                                            )
+                                            st.plotly_chart(fig, use_container_width=True)
+                                    else:
+                                        st.warning("No trades were generated for this strategy")
+                                else:
+                                    st.error("Failed to load detailed results")
                             else:
-                                st.error("❌ Portfolio optimization failed. Try with fewer strategies or adjust constraints.")
-                else:
-                    # Build dynamic error message based on optimization goal
-                    if optimization_goal == "Maximum Returns":
-                        threshold_text = f"minimum quality threshold (Sharpe >= 0.3 for Maximum Returns mode)"
-                        suggestions = """
-                        **Suggestions for Maximum Returns mode:**
-                        - Try more volatile tickers (NVDA, TSLA, COIN)
-                        - Use momentum or breakout strategies
-                        - Ensure you have 6+ months of price data
-                        - Lower quality threshold to 0.2-0.3
-                        - Enable Vectorized Parameter Optimization
-                        """
-                    elif optimization_goal == "Risk-Adjusted (Sharpe)":
-                        threshold_text = f"minimum Sharpe ratio of {min_sharpe}"
-                        suggestions = """
-                        **Suggestions:**
-                        - Lower the minimum Sharpe requirement (try 0.4-0.5)
-                        - Try different strategies (mean_reversion works well)
-                        - Use a longer backtest period (1y or 2y)
-                        - Try ETFs instead of individual stocks (SPY, QQQ)
-                        - Enable Vectorized Parameter Optimization
-                        """
-                    elif optimization_goal == "Best Sortino":
-                        threshold_text = f"minimum Sortino ratio of {min_sharpe * 1.2:.2f}"
-                        suggestions = """
-                        **Suggestions:**
-                        - Lower the quality threshold
-                        - Sortino is harder to achieve than Sharpe
-                        - Try mean reversion strategies
-                        """
-                    else:  # Best Calmar
-                        threshold_text = f"minimum Calmar ratio of {min_sharpe * 0.8:.2f}"
-                        suggestions = """
-                        **Suggestions:**
-                        - Lower the quality threshold
-                        - Calmar favors strategies with low drawdowns
-                        - Try conservative strategies
-                        """
+                                st.error(f"Backtest failed: {backtest_response.get('error', 'Unknown error')}")
+                        else:
+                            st.error("Could not find matching strategy result")
 
-                    st.warning(f"""
-                    ⚠️ No strategies met the {threshold_text}.
+            # Step 5: Portfolio Optimization
+            st.markdown("---")
+            st.markdown("### Step 5️⃣: Portfolio Optimization")
 
-                    {suggestions}
+            st.write(f"**Optimizing allocation across {len(backtest_results)} strategies...**")
 
-                    **Debug Info:**
-                    - Optimization Goal: {optimization_goal}
-                    - Tickers tested: {', '.join(tickers)}
-                    - Strategies tested: {', '.join(strategies)}
-                    - Backtest Period: {lookback_period}
-                    """)
+            col1, col2 = st.columns(2)
 
-                    # Show all tested strategies so user can see what they got
-                    if all_tested_strategies:
-                        st.markdown("### 📊 All Tested Strategies (Even Those That Didn't Pass)")
-                        tested_df = pd.DataFrame(all_tested_strategies)
-                        tested_df = tested_df.sort_values('sharpe', ascending=False)
+            with col1:
+                optimization_method = st.selectbox(
+                    "Optimization Method",
+                    ["max_sharpe", "min_volatility", "max_return", "risk_parity"],
+                    help="Method for combining strategies"
+                )
+
+            with col2:
+                max_allocation = st.slider(
+                    "Max Allocation per Strategy (%)",
+                    min_value=5,
+                    max_value=100,
+                    value=30,
+                    step=5,
+                    help="Maximum % allocated to any single strategy"
+                )
+
+            if st.button("🎯 Optimize Portfolio", use_container_width=True):
+                with st.spinner("Running portfolio optimization..."):
+
+                    # Prepare data for optimizer
+                    optimize_data = {
+                        'total_capital': total_capital,
+                        'method': optimization_method,
+                        'constraints': {
+                            'max_allocation_pct': max_allocation
+                        },
+                        'strategies': []
+                    }
+
+                    for _, row in results_df.iterrows():
+                        optimize_data['strategies'].append({
+                            'id': row['strategy_id'],
+                            'name': f"{row['ticker']} - {row['strategy']}",
+                            'expected_return': row['total_return_pct'],
+                            'volatility': max(1, 100 / max(row['sharpe_ratio'], 0.1)),  # Approximate
+                            'sharpe_ratio': row['sharpe_ratio']
+                        })
+
+                    # Call optimizer
+                    opt_response = make_api_request(
+                        "/portfolio/optimize",
+                        method="POST",
+                        data=optimize_data
+                    )
+
+                    if opt_response and opt_response.get('success'):
+                        st.success("✅ Portfolio optimization complete!")
+
+                        # Display optimal allocations
+                        st.markdown("#### 💼 Optimal Portfolio Allocation")
+
+                        allocations = opt_response['allocations']
+                        portfolio_metrics = opt_response['portfolio_metrics']
+
+                        # Create allocation chart
+                        alloc_df = pd.DataFrame([
+                            {'Strategy': name, 'Allocation %': weight * 100, 'Capital $': capital}
+                            for name, weight, capital in zip(
+                                allocations['strategy_names'],
+                                allocations['weights'],
+                                allocations['capital_allocation']
+                            )
+                        ])
+
+                        col1, col2 = st.columns([2, 1])
+
+                        with col1:
+                            # Pie chart
+                            fig = px.pie(
+                                alloc_df,
+                                values='Allocation %',
+                                names='Strategy',
+                                title='Portfolio Allocation'
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+
+                        with col2:
+                            st.markdown("#### 📊 Portfolio Metrics")
+                            st.metric("Expected Return", f"{portfolio_metrics['expected_annual_return']:.2f}%")
+                            st.metric("Expected Volatility", f"{portfolio_metrics['annual_volatility']:.2f}%")
+                            st.metric("Sharpe Ratio", f"{portfolio_metrics['sharpe_ratio']:.2f}")
+
+                        # Detailed allocation table
+                        st.markdown("#### 📋 Detailed Allocations")
                         st.dataframe(
-                            tested_df.style.format({
-                                'sharpe': '{:.3f}',
-                                'return_pct': '{:.2f}%',
-                                'sortino': '{:.3f}',
-                                'calmar': '{:.3f}'
+                            alloc_df.style.format({
+                                'Allocation %': '{:.2f}%',
+                                'Capital $': '${:,.2f}'
                             }),
                             use_container_width=True,
                             hide_index=True
                         )
-                        st.caption(f"""
-                        💡 **Tip:** The highest Sharpe ratio above is **{tested_df['sharpe'].max():.3f}**.
-                        {"If using Maximum Returns mode, strategies with Sharpe >= 0.3 should pass." if optimization_goal == "Maximum Returns" else f"Lower your quality threshold to {tested_df['sharpe'].max() - 0.05:.2f} to see results."}
+
+                        # Step 6: Final Recommendations
+                        st.markdown("---")
+                        st.markdown("### Step 6️⃣: Trading Recommendations")
+
+                        st.success("🎯 **Your Optimized Trading System is Ready!**")
+
+                        # Merge allocations with backtest results and market analysis
+                        for idx, row in alloc_df.iterrows():
+                            strategy_id = row['Strategy'].split(' - ')
+                            if len(strategy_id) == 2:
+                                ticker = strategy_id[0]
+                                strategy = strategy_id[1]
+
+                                # Find matching result
+                                matching_result = results_df[
+                                    (results_df['ticker'] == ticker) &
+                                    (results_df['strategy'] == strategy)
+                                ]
+
+                                if not matching_result.empty:
+                                    result = matching_result.iloc[0]
+
+                                    with st.expander(f"📌 {row['Strategy']} - ${row['Capital $']:,.2f} ({row['Allocation %']:.1f}%)"):
+                                        col1, col2, col3 = st.columns(3)
+
+                                        with col1:
+                                            st.markdown("**Market Context**")
+                                            st.write(f"ML Prediction: **{result['ml_prediction']}** ({result['ml_confidence']:.1f}%)")
+                                            st.write(f"Regime: **{result['regime']}**")
+
+                                        with col2:
+                                            st.markdown("**Performance**")
+                                            st.write(f"Return: **{result['total_return_pct']:.2f}%**")
+                                            st.write(f"Sortino: **{result['sortino_ratio']:.2f}**")
+                                            st.write(f"Max DD: **{result['max_drawdown_pct']:.2f}%**")
+
+                                        with col3:
+                                            st.markdown("**Risk Management**")
+                                            st.write(f"VaR 95%: **{result['var_95_pct']:.2f}%**")
+                                            st.write(f"Kelly Size: **{result['kelly_position_pct']:.1f}%**")
+
+                                            # Risk assessment
+                                            if result['kelly_risk_level'] == 'SAFE':
+                                                st.success("✅ Safe to trade")
+                                            elif result['kelly_risk_level'] == 'MODERATE':
+                                                st.info("⚠️ Moderate risk")
+                                            else:
+                                                st.warning("🔴 High risk")
+
+                        # Summary box
+                        st.markdown("---")
+                        st.info(f"""
+                        ### 📊 Portfolio Summary
+
+                        - **Total Capital**: ${total_capital:,.2f}
+                        - **Number of Strategies**: {len(alloc_df)}
+                        - **Expected Annual Return**: {portfolio_metrics['expected_annual_return']:.2f}%
+                        - **Expected Volatility**: {portfolio_metrics['annual_volatility']:.2f}%
+                        - **Portfolio Sharpe**: {portfolio_metrics['sharpe_ratio']:.2f}
+                        - **Optimization Method**: {optimization_method.replace('_', ' ').title()}
+
+                        **Next Steps:**
+                        1. Review each strategy's allocation and risk metrics
+                        2. Consider current market regime and ML predictions
+                        3. Start with paper trading to validate live performance
+                        4. Monitor and rebalance monthly or when regime changes
                         """)
+                    else:
+                        st.error("❌ Portfolio optimization failed. Try with fewer strategies or adjust constraints.")
+        else:
+            # Build dynamic error message based on optimization goal
+            if optimization_goal == "Maximum Returns":
+                threshold_text = f"minimum quality threshold (Sharpe >= 0.3 for Maximum Returns mode)"
+                suggestions = """
+                **Suggestions for Maximum Returns mode:**
+                - Try more volatile tickers (NVDA, TSLA, COIN)
+                - Use momentum or breakout strategies
+                - Ensure you have 6+ months of price data
+                - Lower quality threshold to 0.2-0.3
+                - Enable Vectorized Parameter Optimization
+                """
+            elif optimization_goal == "Risk-Adjusted (Sharpe)":
+                threshold_text = f"minimum Sharpe ratio of {min_sharpe}"
+                suggestions = """
+                **Suggestions:**
+                - Lower the minimum Sharpe requirement (try 0.4-0.5)
+                - Try different strategies (mean_reversion works well)
+                - Use a longer backtest period (1y or 2y)
+                - Try ETFs instead of individual stocks (SPY, QQQ)
+                - Enable Vectorized Parameter Optimization
+                """
+            elif optimization_goal == "Best Sortino":
+                threshold_text = f"minimum Sortino ratio of {min_sharpe * 1.2:.2f}"
+                suggestions = """
+                **Suggestions:**
+                - Lower the quality threshold
+                - Sortino is harder to achieve than Sharpe
+                - Try mean reversion strategies
+                """
+            else:  # Best Calmar
+                threshold_text = f"minimum Calmar ratio of {min_sharpe * 0.8:.2f}"
+                suggestions = """
+                **Suggestions:**
+                - Lower the quality threshold
+                - Calmar favors strategies with low drawdowns
+                - Try conservative strategies
+                """
+
+            st.warning(f"""
+            ⚠️ No strategies met the {threshold_text}.
+
+            {suggestions}
+
+            **Debug Info:**
+            - Optimization Goal: {optimization_goal}
+            - Tickers tested: {', '.join(tickers)}
+            - Strategies tested: {', '.join(strategies)}
+            - Backtest Period: {lookback_period}
+            """)
+
+            # Show all tested strategies so user can see what they got
+            if all_tested_strategies:
+                st.markdown("### 📊 All Tested Strategies (Even Those That Didn't Pass)")
+                tested_df = pd.DataFrame(all_tested_strategies)
+                tested_df = tested_df.sort_values('sharpe', ascending=False)
+                st.dataframe(
+                    tested_df.style.format({
+                        'sharpe': '{:.3f}',
+                        'return_pct': '{:.2f}%',
+                        'sortino': '{:.3f}',
+                        'calmar': '{:.3f}'
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+                st.caption(f"""
+                💡 **Tip:** The highest Sharpe ratio above is **{tested_df['sharpe'].max():.3f}**.
+                {"If using Maximum Returns mode, strategies with Sharpe >= 0.3 should pass." if optimization_goal == "Maximum Returns" else f"Lower your quality threshold to {tested_df['sharpe'].max() - 0.05:.2f} to see results."}
+                """)
 
     # Quick Start Guide
     st.markdown("---")
