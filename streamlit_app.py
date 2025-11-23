@@ -1394,52 +1394,56 @@ elif page == "Portfolio Optimizer":
                 - Good when all strategies are quality
                 """)
 
-        if st.button("🎯 Optimize Portfolio", use_container_width=True):
-            if not selected_strategies:
-                st.warning("Please select at least one strategy")
-            else:
-                strategy_ids = [strategy_options[name] for name in selected_strategies]
+            if st.button("🎯 Optimize Portfolio", use_container_width=True):
+                if not selected_strategies:
+                    st.warning("Please select at least 2 strategies")
+                elif len(selected_strategies) < 2:
+                    st.warning("Please select at least 2 strategies for portfolio optimization")
+                else:
+                    strategy_ids = [strategy_options[name] for name in selected_strategies]
 
-                with st.spinner("Optimizing portfolio..."):
-                    response = make_api_request(
-                        "/portfolio/optimize",
-                        method="POST",
-                        data={
-                            "strategy_ids": strategy_ids,
-                            "total_capital": total_capital,
-                            "method": optimization_method,
-                            "constraints": {
-                                "max_allocation": max_allocation / 100  # Convert % to decimal
+                    with st.spinner("Optimizing portfolio..."):
+                        response = make_api_request(
+                            "/portfolio/optimize",
+                            method="POST",
+                            data={
+                                "strategy_ids": strategy_ids,
+                                "total_capital": total_capital,
+                                "method": optimization_method,
+                                "constraints": {
+                                    "max_allocation": max_allocation / 100  # Convert % to decimal
+                                }
                             }
-                        }
-                    )
+                        )
 
-                    if response and response.get('success'):
-                        st.success("✅ Portfolio optimized successfully!")
+                        if response and response.get('success'):
+                            st.success("✅ Portfolio optimized successfully!")
 
-                        # Display results
-                        col1, col2, col3 = st.columns(3)
+                            # Display results
+                            col1, col2, col3 = st.columns(3)
 
-                        with col1:
-                            st.metric("Expected Return", f"{response['expected_return']:.2f}%")
+                            with col1:
+                                st.metric("Expected Return", f"{response['expected_return']:.2f}%")
 
-                        with col2:
-                            st.metric("Expected Volatility", f"{response['expected_volatility']:.2f}%")
+                            with col2:
+                                st.metric("Expected Volatility", f"{response['expected_volatility']:.2f}%")
 
-                        with col3:
-                            st.metric("Expected Sharpe", f"{response['expected_sharpe']:.2f}")
+                            with col3:
+                                st.metric("Expected Sharpe", f"{response['expected_sharpe']:.2f}")
 
-                        # Allocation chart
-                        st.subheader("📊 Portfolio Allocation")
-                        allocation_fig = plot_portfolio_allocation(response['allocations'])
-                        if allocation_fig:
-                            st.plotly_chart(allocation_fig, use_container_width=True)
+                            # Allocation chart
+                            st.subheader("📊 Portfolio Allocation")
+                            allocation_fig = plot_portfolio_allocation(response['allocations'])
+                            if allocation_fig:
+                                st.plotly_chart(allocation_fig, use_container_width=True)
 
-                        # Detailed allocations
-                        st.subheader("💰 Capital Allocations")
-                        if response.get('strategies'):
-                            allocation_df = pd.DataFrame(response['strategies'])
-                            st.dataframe(allocation_df, use_container_width=True)
+                            # Detailed allocations
+                            st.subheader("💰 Capital Allocations")
+                            if response.get('strategies'):
+                                allocation_df = pd.DataFrame(response['strategies'])
+                                st.dataframe(allocation_df, use_container_width=True)
+                        else:
+                            st.error(f"❌ Optimization failed: {response.get('error', 'Unknown error')}")
     else:
         st.info("📋 No strategies available for portfolio optimization!")
         st.write("""
