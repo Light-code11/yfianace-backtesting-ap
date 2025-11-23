@@ -2194,14 +2194,23 @@ elif page == "🎯 Complete Trading System":
     """)
 
     st.info("""
-    **💡 Sharpe Ratio Benchmarks:**
-    - **0.5-0.7**: Good (many professional funds)
-    - **0.7-1.0**: Very Good (institutional quality)
-    - **1.0-2.0**: Excellent (top hedge funds)
-    - **> 2.0**: Exceptional (rare!)
+    **💡 Choose Your Optimization Goal:**
 
-    **Tip:** Enable "Vectorized Parameter Optimization" to improve Sharpe by 0.3-0.7 points!
-    See `STRATEGY_OPTIMIZATION_GUIDE.md` for detailed tips.
+    **Risk-Adjusted (Sharpe)** 🛡️ - Focus on consistent, smooth returns
+    - Best for: Conservative investors, retirement accounts
+    - Target: Sharpe 0.6-1.0 (good to excellent)
+
+    **Maximum Returns** 🚀 - Focus on highest total gains (accepts more volatility)
+    - Best for: Aggressive traders, growth accounts
+    - Target: 20-50%+ annual returns (with higher drawdowns)
+
+    **Best Sortino** 📊 - Focus on downside risk only
+    - Best for: Those who don't mind upside volatility
+
+    **Best Calmar** 📉 - Focus on minimizing drawdowns
+    - Best for: Risk-averse traders
+
+    **Tip:** Enable "Vectorized Parameter Optimization" in Advanced Options!
     """)
 
     st.markdown("---")
@@ -2235,12 +2244,12 @@ elif page == "🎯 Complete Trading System":
         )
 
         min_sharpe = st.number_input(
-            "Minimum Sharpe Ratio",
+            "Quality Threshold",
             min_value=0.0,
             max_value=5.0,
             value=0.6,
             step=0.1,
-            help="Only include strategies with Sharpe >= this value (0.6 = good, 1.0 = excellent, 2.0 = exceptional)"
+            help="Minimum quality threshold - used for Sharpe/Sortino/Calmar depending on optimization goal. For 'Maximum Returns' mode, this is relaxed to 0.3."
         )
 
         total_capital = st.number_input(
@@ -2254,11 +2263,22 @@ elif page == "🎯 Complete Trading System":
 
     # Advanced Options
     with st.expander("⚙️ Advanced Options"):
-        use_vectorized = st.checkbox(
-            "🚀 Use Vectorized Parameter Optimization",
-            value=True,
-            help="Automatically find optimal parameters for each strategy (100x faster). Highly recommended!"
-        )
+        col_adv1, col_adv2 = st.columns(2)
+
+        with col_adv1:
+            use_vectorized = st.checkbox(
+                "🚀 Use Vectorized Parameter Optimization",
+                value=True,
+                help="Automatically find optimal parameters for each strategy (100x faster). Highly recommended!"
+            )
+
+        with col_adv2:
+            optimization_goal = st.selectbox(
+                "Optimization Goal",
+                ["Risk-Adjusted (Sharpe)", "Maximum Returns", "Best Sortino", "Best Calmar"],
+                index=0,
+                help="What to optimize for: risk-adjusted returns (Sharpe) or maximum absolute returns"
+            )
 
         if use_vectorized:
             st.info("""
@@ -2498,8 +2518,19 @@ elif page == "🎯 Complete Trading System":
                             metrics = response['metrics']
                             sharpe = metrics['sharpe_ratio']
 
-                            # Only include if meets minimum Sharpe requirement
-                            if sharpe >= min_sharpe:
+                            # Filter based on optimization goal
+                            include_strategy = False
+                            if optimization_goal == "Risk-Adjusted (Sharpe)":
+                                include_strategy = sharpe >= min_sharpe
+                            elif optimization_goal == "Maximum Returns":
+                                # For max returns, use much lower Sharpe threshold (or total return threshold)
+                                include_strategy = sharpe >= 0.3  # Very permissive - just positive
+                            elif optimization_goal == "Best Sortino":
+                                include_strategy = metrics.get('sortino_ratio', 0) >= min_sharpe * 1.2  # Sortino usually higher
+                            elif optimization_goal == "Best Calmar":
+                                include_strategy = metrics.get('calmar_ratio', 0) >= min_sharpe * 0.8
+
+                            if include_strategy:
                                 # Get optimization results if available
                                 opt_key = f"{ticker}_{strategy}"
                                 opt_params = optimization_results.get(opt_key, {}).get('optimal_params', {})
@@ -2537,8 +2568,23 @@ elif page == "🎯 Complete Trading System":
                     # Create DataFrame
                     results_df = pd.DataFrame(backtest_results)
 
-                    # Sort by Sortino Ratio (best risk-adjusted metric)
-                    results_df = results_df.sort_values('sortino_ratio', ascending=False)
+                    # Sort by optimization goal
+                    if optimization_goal == "Risk-Adjusted (Sharpe)":
+                        sort_column = 'sharpe_ratio'
+                        st.info(f"📊 Sorted by **Sharpe Ratio** (risk-adjusted returns)")
+                    elif optimization_goal == "Maximum Returns":
+                        sort_column = 'total_return_pct'
+                        st.info(f"🚀 Sorted by **Total Return %** (maximum absolute gains)")
+                    elif optimization_goal == "Best Sortino":
+                        sort_column = 'sortino_ratio'
+                        st.info(f"📈 Sorted by **Sortino Ratio** (downside risk-adjusted)")
+                    elif optimization_goal == "Best Calmar":
+                        sort_column = 'calmar_ratio'
+                        st.info(f"📉 Sorted by **Calmar Ratio** (drawdown-adjusted)")
+                    else:
+                        sort_column = 'sortino_ratio'  # Default
+
+                    results_df = results_df.sort_values(sort_column, ascending=False)
 
                     # Display top strategies
                     st.dataframe(
