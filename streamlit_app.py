@@ -2586,6 +2586,7 @@ elif page == "🎯 Complete Trading System":
                                     'calmar_ratio': metrics.get('calmar_ratio', 0),
                                     'max_drawdown_pct': metrics['max_drawdown_pct'],
                                     'win_rate': metrics['win_rate'],
+                                    'quality_score': metrics.get('quality_score', 0),
                                     'var_95_pct': metrics.get('var_95_pct', 0),
                                     'cvar_95_pct': metrics.get('cvar_95_pct', 0),
                                     'ulcer_index': metrics.get('ulcer_index', 0),
@@ -2637,7 +2638,83 @@ elif page == "🎯 Complete Trading System":
 
             results_df = results_df.sort_values(sort_column, ascending=False)
 
-            # Display top strategies
+            # Highlight Top Performing Strategy
+            st.markdown("---")
+            st.markdown("### 🏆 Top Performing Strategy")
+
+            top_strategy = results_df.iloc[0]
+
+            col1, col2, col3 = st.columns([2, 2, 1])
+
+            with col1:
+                st.markdown(f"**Strategy:** {top_strategy['strategy'].title()} - {top_strategy['ticker']}")
+                st.markdown(f"**Total Return:** {top_strategy['total_return_pct']:.2f}%")
+
+            with col2:
+                st.markdown(f"**Sharpe Ratio:** {top_strategy['sharpe_ratio']:.2f}")
+                st.markdown(f"**Quality Score:** {top_strategy.get('quality_score', 0):.1f}/100")
+
+            with col3:
+                # Quick save button for top strategy
+                if st.button("💾 Save Best Strategy", key="save_top_strategy", use_container_width=True, type="primary"):
+                    with st.spinner(f"Saving {top_strategy['ticker']} - {top_strategy['strategy']}..."):
+                        # Build strategy config
+                        strategy_config = {
+                            "name": f"{top_strategy['ticker']} - {top_strategy['strategy'].title()}",
+                            "description": f"Top performing strategy from Complete Trading System (Return: {top_strategy['total_return_pct']:.2f}%, Sharpe: {top_strategy['sharpe_ratio']:.2f})",
+                            "tickers": [top_strategy['ticker']],
+                            "strategy_type": top_strategy['strategy'],
+                            "indicators": [],
+                            "risk_management": {
+                                "stop_loss_pct": 15.0,
+                                "take_profit_pct": 30.0,
+                                "position_size_pct": 95.0,
+                                "max_positions": 1
+                            }
+                        }
+
+                        # Add indicators based on strategy type
+                        if top_strategy['strategy'] == "momentum":
+                            strategy_config["indicators"] = [
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif top_strategy['strategy'] == "mean_reversion":
+                            strategy_config["indicators"] = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif top_strategy['strategy'] == "breakout":
+                            strategy_config["indicators"] = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "ATR", "period": 14}
+                            ]
+                        elif top_strategy['strategy'] == "trend_following":
+                            strategy_config["indicators"] = [
+                                {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50}
+                            ]
+
+                        # Save strategy via API
+                        save_response = make_api_request(
+                            "/strategies",
+                            method="POST",
+                            data=strategy_config
+                        )
+
+                        if save_response and save_response.get('success'):
+                            strategy_id = save_response['strategy_id']
+                            st.success(f"✅ Saved! Strategy ID: {strategy_id}")
+                            st.info("🔄 Go to **Backtest** page to backtest this strategy")
+                        else:
+                            st.error(f"❌ Failed to save: {save_response.get('error', 'Unknown error')}")
+
+            st.markdown("---")
+
+            # Display all qualifying strategies
+            st.markdown("#### 📊 All Qualifying Strategies")
             st.dataframe(
                 results_df[[
                     'ticker', 'strategy', 'total_return_pct', 'sharpe_ratio',
