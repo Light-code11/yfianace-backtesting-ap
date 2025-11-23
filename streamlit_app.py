@@ -2470,6 +2470,7 @@ elif page == "🎯 Complete Trading System":
                     st.markdown("---")
 
                 backtest_results = []
+                all_tested_strategies = []  # Track all strategies for debugging
 
                 for ticker in tickers:
                     for strategy in strategies:
@@ -2517,6 +2518,16 @@ elif page == "🎯 Complete Trading System":
                         if response and response.get('success'):
                             metrics = response['metrics']
                             sharpe = metrics['sharpe_ratio']
+
+                            # Track all tested strategies for debugging
+                            all_tested_strategies.append({
+                                'ticker': ticker,
+                                'strategy': strategy,
+                                'sharpe': sharpe,
+                                'return_pct': metrics['total_return_pct'],
+                                'sortino': metrics.get('sortino_ratio', 0),
+                                'calmar': metrics.get('calmar_ratio', 0)
+                            })
 
                             # Filter based on optimization goal
                             include_strategy = False
@@ -2777,15 +2788,75 @@ elif page == "🎯 Complete Trading System":
                             else:
                                 st.error("❌ Portfolio optimization failed. Try with fewer strategies or adjust constraints.")
                 else:
-                    st.warning(f"""
-                    ⚠️ No strategies met the minimum Sharpe ratio of {min_sharpe}.
+                    # Build dynamic error message based on optimization goal
+                    if optimization_goal == "Maximum Returns":
+                        threshold_text = f"minimum quality threshold (Sharpe >= 0.3 for Maximum Returns mode)"
+                        suggestions = """
+                        **Suggestions for Maximum Returns mode:**
+                        - Try more volatile tickers (NVDA, TSLA, COIN)
+                        - Use momentum or breakout strategies
+                        - Ensure you have 6+ months of price data
+                        - Lower quality threshold to 0.2-0.3
+                        - Enable Vectorized Parameter Optimization
+                        """
+                    elif optimization_goal == "Risk-Adjusted (Sharpe)":
+                        threshold_text = f"minimum Sharpe ratio of {min_sharpe}"
+                        suggestions = """
+                        **Suggestions:**
+                        - Lower the minimum Sharpe requirement (try 0.4-0.5)
+                        - Try different strategies (mean_reversion works well)
+                        - Use a longer backtest period (1y or 2y)
+                        - Try ETFs instead of individual stocks (SPY, QQQ)
+                        - Enable Vectorized Parameter Optimization
+                        """
+                    elif optimization_goal == "Best Sortino":
+                        threshold_text = f"minimum Sortino ratio of {min_sharpe * 1.2:.2f}"
+                        suggestions = """
+                        **Suggestions:**
+                        - Lower the quality threshold
+                        - Sortino is harder to achieve than Sharpe
+                        - Try mean reversion strategies
+                        """
+                    else:  # Best Calmar
+                        threshold_text = f"minimum Calmar ratio of {min_sharpe * 0.8:.2f}"
+                        suggestions = """
+                        **Suggestions:**
+                        - Lower the quality threshold
+                        - Calmar favors strategies with low drawdowns
+                        - Try conservative strategies
+                        """
 
-                    **Suggestions:**
-                    - Lower the minimum Sharpe requirement
-                    - Try different strategies
-                    - Use a longer backtest period
-                    - Train ML models for your tickers first
+                    st.warning(f"""
+                    ⚠️ No strategies met the {threshold_text}.
+
+                    {suggestions}
+
+                    **Debug Info:**
+                    - Optimization Goal: {optimization_goal}
+                    - Tickers tested: {', '.join(tickers)}
+                    - Strategies tested: {', '.join(strategies)}
+                    - Backtest Period: {lookback_period}
                     """)
+
+                    # Show all tested strategies so user can see what they got
+                    if all_tested_strategies:
+                        st.markdown("### 📊 All Tested Strategies (Even Those That Didn't Pass)")
+                        tested_df = pd.DataFrame(all_tested_strategies)
+                        tested_df = tested_df.sort_values('sharpe', ascending=False)
+                        st.dataframe(
+                            tested_df.style.format({
+                                'sharpe': '{:.3f}',
+                                'return_pct': '{:.2f}%',
+                                'sortino': '{:.3f}',
+                                'calmar': '{:.3f}'
+                            }),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+                        st.caption(f"""
+                        💡 **Tip:** The highest Sharpe ratio above is **{tested_df['sharpe'].max():.3f}**.
+                        {"If using Maximum Returns mode, strategies with Sharpe >= 0.3 should pass." if optimization_goal == "Maximum Returns" else f"Lower your quality threshold to {tested_df['sharpe'].max() - 0.05:.2f} to see results."}
+                        """)
 
     # Quick Start Guide
     st.markdown("---")
