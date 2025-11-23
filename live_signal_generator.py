@@ -78,7 +78,15 @@ class LiveSignalGenerator:
     ) -> Dict[str, Any]:
         """Generate signal for a single ticker"""
 
-        # Fetch recent data
+        # Validate ticker parameter
+        if not ticker or not isinstance(ticker, str):
+            return {
+                "ticker": str(ticker),
+                "signal": "ERROR",
+                "error": "Invalid ticker parameter"
+            }
+
+        # Fetch recent data for THIS SPECIFIC ticker only
         data = yf.download(ticker, period=period, progress=False)
 
         if data.empty:

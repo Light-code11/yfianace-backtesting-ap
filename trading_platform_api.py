@@ -855,7 +855,7 @@ async def run_market_scan(
             strategies.append({
                 'id': strategy.id,
                 'name': strategy.name,
-                'tickers': strategy.tickers,
+                # DO NOT include 'tickers' here - scanner will override per stock
                 'strategy_type': strategy.strategy_type,
                 'indicators': strategy.indicators,
                 'risk_management': {
