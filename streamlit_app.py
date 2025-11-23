@@ -836,10 +836,18 @@ elif page == "Backtest":
 
                                 # Explanation
                                 with st.expander("ℹ️ What is Kelly Criterion?"):
+                                    # Calculate win/loss ratio safely
+                                    avg_loss = abs(results['metrics']['avg_loss'])
+                                    if avg_loss > 0:
+                                        win_loss_ratio = abs(results['metrics']['avg_win']) / avg_loss
+                                        win_loss_text = f"{win_loss_ratio:.2f}"
+                                    else:
+                                        win_loss_text = "∞ (no losing trades!)"
+
                                     st.markdown(f"""
                                     **Kelly Criterion** calculates the mathematically optimal position size based on:
                                     - **Win Rate**: {results['metrics']['win_rate']:.2f}% (How often the strategy wins)
-                                    - **Win/Loss Ratio**: {abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f} (Average win vs average loss)
+                                    - **Win/Loss Ratio**: {win_loss_text} (Average win vs average loss)
 
                                     **For This Strategy:**
                                     - **Kelly Fraction**: {kelly_fraction:.4f} (Raw Kelly recommendation)
@@ -859,7 +867,7 @@ elif page == "Backtest":
                                     **Mathematical Formula**: f* = (p × b - q) / b
                                     - p = win probability ({results['metrics']['win_rate']/100:.4f})
                                     - q = loss probability ({1 - results['metrics']['win_rate']/100:.4f})
-                                    - b = win/loss ratio ({abs(results['metrics']['avg_win'])/abs(results['metrics']['avg_loss']):.2f})
+                                    - b = win/loss ratio ({win_loss_text})
                                     """)
 
                             # Advanced Risk Metrics Section
