@@ -16,7 +16,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import numpy as np
 
-from backtesting_engine import BacktestEngine
+from backtesting_engine import BacktestingEngine
 from database import SessionLocal, Strategy, BacktestResult, StrategyPerformance
 
 
@@ -64,7 +64,7 @@ class AutoStrategyGenerator:
 
     def __init__(self):
         self.db = SessionLocal()
-        self.backtest_engine = BacktestEngine()
+        self.backtest_engine = BacktestingEngine()
 
     def generate_strategies_batch(self, num_strategies: int = 20) -> List[Dict]:
         """
@@ -231,7 +231,7 @@ class AutoStrategyGenerator:
             print(f"\n   [{i}/{len(strategy_configs)}] Testing {strategy_config['name']}...")
 
             # Run backtest
-            backtest_result = self.backtest_engine.run_backtest(
+            backtest_result = self.backtest_engine.backtest_strategy(
                 tickers=strategy_config['tickers'],
                 strategy_type=strategy_config['strategy_type'],
                 indicators=strategy_config['indicators'],
