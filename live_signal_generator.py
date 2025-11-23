@@ -87,6 +87,7 @@ class LiveSignalGenerator:
             }
 
         # Fetch recent data for THIS SPECIFIC ticker only
+        print(f"[DEBUG] Downloading data for ticker: {ticker}, period: {period}")
         data = yf.download(ticker, period=period, progress=False)
 
         if data.empty:
@@ -96,9 +97,15 @@ class LiveSignalGenerator:
                 "error": "No market data available"
             }
 
+        print(f"[DEBUG] Downloaded {len(data)} rows for {ticker}")
+        print(f"[DEBUG] Columns before MultiIndex handling: {data.columns}")
+        print(f"[DEBUG] Is MultiIndex: {isinstance(data.columns, pd.MultiIndex)}")
+
         # Handle MultiIndex columns from yfinance
         if isinstance(data.columns, pd.MultiIndex):
+            print(f"[DEBUG] MultiIndex detected for {ticker}, flattening...")
             data.columns = data.columns.get_level_values(0)
+            print(f"[DEBUG] Columns after flattening: {data.columns}")
 
         close = data['Close']
         high = data['High']
@@ -106,6 +113,7 @@ class LiveSignalGenerator:
         volume = data['Volume']
 
         current_price = float(close.iloc[-1])
+        print(f"[DEBUG] {ticker} current_price extracted: ${current_price:.2f}")
 
         # Calculate indicators
         indicators = LiveSignalGenerator._calculate_indicators(
