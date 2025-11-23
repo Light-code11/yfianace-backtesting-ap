@@ -2662,12 +2662,81 @@ elif page == "🎯 Complete Trading System":
 
             strategy_names = [f"{row['ticker']} - {row['strategy']}" for _, row in results_df.iterrows()]
             selected_detail_strategy = st.selectbox(
-                "Select a strategy to view detailed trades:",
+                "Select a strategy to view/save:",
                 options=strategy_names,
                 key="detail_strategy_selector"
             )
 
-            if st.button("📊 View Detailed Backtest Results", key="view_details_btn", use_container_width=True):
+            col1, col2 = st.columns(2)
+
+            with col1:
+                view_details_btn = st.button("📊 View Detailed Results", key="view_details_btn", use_container_width=True)
+
+            with col2:
+                save_strategy_btn = st.button("💾 Save to Database", key="save_strategy_btn", use_container_width=True, type="primary")
+
+            # Handle Save to Database button
+            if save_strategy_btn:
+                parts = selected_detail_strategy.split(' - ')
+                if len(parts) == 2:
+                    detail_ticker = parts[0]
+                    detail_strategy = parts[1]
+
+                    with st.spinner(f"Saving {selected_detail_strategy} to database..."):
+                        # Build strategy config
+                        strategy_config = {
+                            "name": f"{detail_ticker} - {detail_strategy.title()}",
+                            "description": f"Auto-generated from Complete Trading System",
+                            "tickers": [detail_ticker],
+                            "strategy_type": detail_strategy,
+                            "indicators": [],
+                            "risk_management": {
+                                "stop_loss_pct": 15.0,
+                                "take_profit_pct": 30.0,
+                                "position_size_pct": 95.0,
+                                "max_positions": 1
+                            }
+                        }
+
+                        # Add indicators based on strategy type
+                        if detail_strategy == "momentum":
+                            strategy_config["indicators"] = [
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif detail_strategy == "mean_reversion":
+                            strategy_config["indicators"] = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif detail_strategy == "breakout":
+                            strategy_config["indicators"] = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "ATR", "period": 14}
+                            ]
+                        elif detail_strategy == "trend_following":
+                            strategy_config["indicators"] = [
+                                {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50}
+                            ]
+
+                        # Save strategy via API
+                        save_response = make_api_request(
+                            "/strategies",
+                            method="POST",
+                            data=strategy_config
+                        )
+
+                        if save_response and save_response.get('success'):
+                            st.success(f"✅ Strategy saved! ID: {save_response['strategy_id']}")
+                            st.info("🔄 Go to the **Backtest** page to run detailed backtests on this strategy.")
+                        else:
+                            st.error(f"❌ Failed to save strategy: {save_response.get('error', 'Unknown error')}")
+
+            # Handle View Detailed Results button
+            if view_details_btn:
                 # Parse ticker and strategy from selection
                 parts = selected_detail_strategy.split(' - ')
                 if len(parts) == 2:
