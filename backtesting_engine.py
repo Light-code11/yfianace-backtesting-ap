@@ -167,7 +167,7 @@ class BacktestingEngine:
                             commission, "stop_loss"
                         )
                         trades.append(trade)
-                        capital += trade['profit_loss_usd']
+                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
                         del positions[ticker]
 
                     # Check take profit
@@ -177,7 +177,7 @@ class BacktestingEngine:
                             commission, "take_profit"
                         )
                         trades.append(trade)
-                        capital += trade['profit_loss_usd']
+                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
                         del positions[ticker]
 
                     # Check strategy exit conditions
@@ -187,7 +187,7 @@ class BacktestingEngine:
                             commission, "signal"
                         )
                         trades.append(trade)
-                        capital += trade['profit_loss_usd']
+                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
                         del positions[ticker]
 
                 # Check entry conditions
@@ -226,7 +226,7 @@ class BacktestingEngine:
                 commission, "end_of_test"
             )
             trades.append(trade)
-            capital += trade['profit_loss_usd']
+            capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
 
         # Calculate metrics
         results['trades'] = trades
@@ -450,7 +450,8 @@ class BacktestingEngine:
             'exit_date': exit_date.strftime('%Y-%m-%d'),
             'profit_loss_usd': profit_loss,
             'profit_loss_pct': profit_loss_pct,
-            'exit_reason': exit_reason
+            'exit_reason': exit_reason,
+            'exit_value': exit_value  # Add exit value for correct capital management
         }
 
     def _calculate_metrics(
