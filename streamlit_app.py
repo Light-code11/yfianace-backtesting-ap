@@ -387,7 +387,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -1374,6 +1374,250 @@ elif page == "📡 Live Signals":
                         st.error(f"❌ Failed to generate signals: {response.get('error', 'Unknown error')}")
     else:
         st.error("❌ No strategies found. Create strategies on the **Generate Strategies** or **Complete Trading System** page first.")
+
+
+# =======================
+# MARKET SCANNER PAGE
+# =======================
+
+elif page == "🔍 Market Scanner":
+    st.markdown('<div class="main-header">🔍 Market Scanner</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    **Scan 150+ liquid stocks** to find the best trading opportunities RIGHT NOW.
+
+    This is what separates professionals from retail traders:
+    - ✅ Don't guess which stocks to trade
+    - ✅ Let your strategies scan the entire market
+    - ✅ Get a ranked list of top opportunities
+    - ✅ Multi-strategy confirmation for higher conviction
+    """)
+
+    st.markdown("---")
+
+    # Get available strategies
+    strategies_data = make_api_request("/strategies?active_only=false")
+
+    if strategies_data and strategies_data.get('strategies'):
+        strategies_with_results = [
+            s for s in strategies_data['strategies']
+            if s.get('backtest_count', 0) > 0
+        ]
+
+        if not strategies_with_results:
+            st.warning("⚠️ No strategies with backtest results found. Go to the **Backtest** page first.")
+        else:
+            st.markdown("### Scan Configuration")
+
+            col1, col2 = st.columns([2, 1])
+
+            with col1:
+                # Multi-select strategies
+                def format_strategy_name(s):
+                    tickers = s.get('tickers', [])
+                    ticker_prefix = ', '.join(tickers[:2]) + ' - ' if tickers else ''
+                    return f"{ticker_prefix}{s['name']} ({s['strategy_type']})"
+
+                strategy_options = {
+                    format_strategy_name(s): s['id']
+                    for s in strategies_with_results
+                }
+
+                selected_strategies = st.multiselect(
+                    "Select Strategies to Use",
+                    options=list(strategy_options.keys()),
+                    default=list(strategy_options.keys())[:3] if len(strategy_options) >= 3 else list(strategy_options.keys()),
+                    help="Choose 1-5 strategies. More strategies = more comprehensive scan, but slower."
+                )
+
+            with col2:
+                min_confidence = st.selectbox(
+                    "Minimum Confidence",
+                    ["LOW", "MEDIUM", "HIGH"],
+                    index=1,
+                    help="Filter out low-quality signals"
+                )
+
+            # Advanced options
+            with st.expander("⚙️ Advanced Options"):
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    use_custom_universe = st.checkbox(
+                        "Use Custom Stock Universe",
+                        value=False,
+                        help="Scan only specific stocks instead of the default 150+ curated list"
+                    )
+
+                    if use_custom_universe:
+                        custom_tickers = st.text_area(
+                            "Enter Tickers (comma-separated)",
+                            "AAPL, MSFT, GOOGL, NVDA, AMD, TSLA, META, AMZN",
+                            help="Example: AAPL, MSFT, GOOGL, TSLA"
+                        )
+
+                with col2:
+                    st.info("""
+                    **Default Universe (150+ stocks):**
+                    - Top tech stocks (AAPL, MSFT, NVDA, etc.)
+                    - Major indices/ETFs (SPY, QQQ, etc.)
+                    - Finance, Healthcare, Energy sectors
+                    - Crypto stocks (COIN, MARA, MSTR)
+                    - High-volume liquid stocks
+                    """)
+
+            st.markdown("---")
+
+            if st.button("🚀 Run Market Scan", type="primary", use_container_width=True):
+                if not selected_strategies:
+                    st.error("❌ Please select at least one strategy")
+                else:
+                    strategy_ids = [strategy_options[s] for s in selected_strategies]
+
+                    # Parse custom universe if provided
+                    universe = None
+                    if use_custom_universe and custom_tickers:
+                        universe = [t.strip().upper() for t in custom_tickers.split(',')]
+
+                    with st.spinner(f"🔍 Scanning {len(universe) if universe else '150+'} stocks with {len(strategy_ids)} strategies... This may take 30-60 seconds..."):
+                        response = make_api_request(
+                            "/scanner/run",
+                            method="POST",
+                            data={
+                                "strategy_ids": strategy_ids,
+                                "universe": universe,
+                                "min_confidence": min_confidence
+                            }
+                        )
+
+                        if response and response.get('success'):
+                            scan_results = response['scan_results']
+                            confirmations = response.get('multi_strategy_confirmations', [])
+
+                            st.success(f"✅ Scan complete! Scanned {scan_results['stocks_scanned']} stocks")
+
+                            # Summary metrics
+                            col1, col2, col3, col4 = st.columns(4)
+
+                            with col1:
+                                st.metric("Total Signals", scan_results['total_signals'])
+
+                            with col2:
+                                st.metric("BUY Signals", scan_results['buy_signals'], delta="Opportunities")
+
+                            with col3:
+                                st.metric("SELL Signals", scan_results['sell_signals'], delta="Shorts")
+
+                            with col4:
+                                st.metric("Confirmed Signals", len(confirmations), delta="Multi-strategy")
+
+                            st.markdown("---")
+
+                            # Multi-Strategy Confirmations (Highest Conviction)
+                            if confirmations:
+                                st.markdown("### 🔥 High Conviction Trades (Multi-Strategy Confirmation)")
+                                st.markdown("These signals are confirmed by **multiple strategies** - highest probability trades!")
+
+                                for conf in confirmations[:5]:  # Top 5
+                                    signal_color = '🟢' if conf['signal'] == 'BUY' else '🔴'
+                                    st.markdown(f"#### {signal_color} **{conf['ticker']}**: {conf['signal']}")
+
+                                    col1, col2, col3, col4 = st.columns(4)
+
+                                    with col1:
+                                        st.metric("Price", f"${conf['current_price']:,.2f}")
+                                        st.caption(f"Confirmed by **{conf['confirmation_count']} strategies**")
+
+                                    with col2:
+                                        st.metric("Stop Loss", f"${conf['stop_loss']:,.2f}" if conf.get('stop_loss') else "N/A")
+
+                                    with col3:
+                                        st.metric("Take Profit", f"${conf['take_profit']:,.2f}" if conf.get('take_profit') else "N/A")
+
+                                    with col4:
+                                        st.metric("Quality Score", f"{conf['avg_quality_score']:.1f}/100")
+                                        st.caption(f"Confidence: {conf['confidence']}")
+
+                                    st.caption(f"**Strategies:** {', '.join(conf['strategies'])}")
+                                    st.caption(f"**Reasoning:** {conf['reasoning']}")
+                                    st.markdown("---")
+
+                            # Top BUY Opportunities
+                            if scan_results['top_buys']:
+                                st.markdown("### 🟢 Top 10 BUY Opportunities")
+
+                                buy_data = []
+                                for sig in scan_results['top_buys'][:10]:
+                                    risk_pct = abs((sig['current_price'] - sig['stop_loss']) / sig['current_price'] * 100) if sig.get('stop_loss') else 0
+                                    reward_pct = abs((sig['take_profit'] - sig['current_price']) / sig['current_price'] * 100) if sig.get('take_profit') else 0
+                                    rr_ratio = reward_pct / risk_pct if risk_pct > 0 else 0
+
+                                    buy_data.append({
+                                        'Ticker': sig['ticker'],
+                                        'Strategy': sig['strategy_type'].title(),
+                                        'Price': f"${sig['current_price']:.2f}",
+                                        'Stop': f"${sig['stop_loss']:.2f}" if sig.get('stop_loss') else "N/A",
+                                        'Target': f"${sig['take_profit']:.2f}" if sig.get('take_profit') else "N/A",
+                                        'R:R': f"{rr_ratio:.1f}:1",
+                                        'Quality': f"{sig['quality_score']:.0f}/100",
+                                        'Confidence': sig['confidence']
+                                    })
+
+                                st.dataframe(
+                                    pd.DataFrame(buy_data),
+                                    use_container_width=True,
+                                    hide_index=True
+                                )
+
+                                # Expandable details
+                                with st.expander("📋 View Detailed BUY Signals"):
+                                    for idx, sig in enumerate(scan_results['top_buys'][:10]):
+                                        st.markdown(f"**{idx+1}. {sig['ticker']}** - {sig['strategy_name']}")
+                                        st.caption(sig['reasoning'])
+                                        st.markdown("---")
+
+                            # Top SELL Opportunities
+                            if scan_results['top_sells']:
+                                st.markdown("### 🔴 Top 10 SELL/Short Opportunities")
+
+                                sell_data = []
+                                for sig in scan_results['top_sells'][:10]:
+                                    risk_pct = abs((sig['stop_loss'] - sig['current_price']) / sig['current_price'] * 100) if sig.get('stop_loss') else 0
+                                    reward_pct = abs((sig['current_price'] - sig['take_profit']) / sig['current_price'] * 100) if sig.get('take_profit') else 0
+                                    rr_ratio = reward_pct / risk_pct if risk_pct > 0 else 0
+
+                                    sell_data.append({
+                                        'Ticker': sig['ticker'],
+                                        'Strategy': sig['strategy_type'].title(),
+                                        'Price': f"${sig['current_price']:.2f}",
+                                        'Stop': f"${sig['stop_loss']:.2f}" if sig.get('stop_loss') else "N/A",
+                                        'Target': f"${sig['take_profit']:.2f}" if sig.get('take_profit') else "N/A",
+                                        'R:R': f"{rr_ratio:.1f}:1",
+                                        'Quality': f"{sig['quality_score']:.0f}/100",
+                                        'Confidence': sig['confidence']
+                                    })
+
+                                st.dataframe(
+                                    pd.DataFrame(sell_data),
+                                    use_container_width=True,
+                                    hide_index=True
+                                )
+
+                            st.markdown("---")
+                            st.info("""
+                            💡 **How to use these results:**
+                            1. **High Conviction Trades**: Start with multi-strategy confirmations
+                            2. **Quality Score**: Focus on signals with 60+ quality score
+                            3. **Risk/Reward**: Look for minimum 2:1 R:R ratio
+                            4. **Diversify**: Don't put all capital in one signal
+                            5. **Paper Trade**: Test signals before going live
+                            """)
+
+                        else:
+                            st.error(f"❌ Scan failed: {response.get('error', 'Unknown error')}")
+
+    else:
+        st.error("❌ No strategies found. Create strategies first on the **Generate Strategies** or **Complete Trading System** page.")
 
 
 # =======================

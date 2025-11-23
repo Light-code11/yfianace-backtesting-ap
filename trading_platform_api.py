@@ -39,6 +39,7 @@ from strategy_visualizer import StrategyVisualizer
 from ml_price_predictor import MLPricePredictor
 from hmm_regime_detector import HMMRegimeDetector
 from live_signal_generator import LiveSignalGenerator
+from market_scanner import MarketScanner
 import threading
 
 # Helper function to convert numpy types to Python types for PostgreSQL
@@ -823,6 +824,73 @@ async def get_live_signals(strategy_id: int, capital: float = 100000, db=Depends
         import traceback
         error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
         print(f"LIVE SIGNALS ERROR: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =======================
+# MARKET SCANNER ENDPOINT
+# =======================
+
+@app.post("/scanner/run")
+async def run_market_scan(
+    strategy_ids: List[int],
+    universe: Optional[List[str]] = None,
+    min_confidence: str = "MEDIUM",
+    db=Depends(get_db)
+):
+    """
+    Scan market for best trading opportunities across multiple stocks and strategies
+
+    Returns ranked list of BUY and SELL signals with quality scores
+    """
+    try:
+        # Get strategy configurations
+        strategies = []
+        for strategy_id in strategy_ids:
+            strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+
+            if not strategy:
+                continue
+
+            strategies.append({
+                'id': strategy.id,
+                'name': strategy.name,
+                'tickers': strategy.tickers,
+                'strategy_type': strategy.strategy_type,
+                'indicators': strategy.indicators,
+                'risk_management': {
+                    'stop_loss_pct': strategy.stop_loss_pct,
+                    'take_profit_pct': strategy.take_profit_pct,
+                    'position_size_pct': strategy.position_size_pct
+                }
+            })
+
+        if not strategies:
+            raise HTTPException(status_code=400, detail="No valid strategies found")
+
+        # Run scan
+        scan_results = MarketScanner.scan_market(
+            strategies=strategies,
+            universe=universe,
+            max_workers=20,  # Parallel processing
+            min_confidence=min_confidence
+        )
+
+        # Get multi-strategy confirmations
+        confirmations = MarketScanner.get_multi_strategy_confirmations(
+            scan_results.get('all_signals', [])
+        )
+
+        return {
+            "success": True,
+            "scan_results": scan_results,
+            "multi_strategy_confirmations": confirmations[:10]  # Top 10 confirmed signals
+        }
+
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"MARKET SCANNER ERROR: {error_detail}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
