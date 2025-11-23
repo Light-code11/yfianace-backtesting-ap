@@ -2518,10 +2518,10 @@ elif page == "🎯 Complete Trading System":
                             "strategy_type": strategy,
                             "indicators": indicators,  # Now populated with correct indicators!
                             "risk_management": {
-                                "stop_loss_pct": 5.0,
-                                "take_profit_pct": 10.0,
-                                "position_size_pct": 10.0,
-                                "max_positions": 3
+                                "stop_loss_pct": 15.0,     # Wider stops - avoid whipsaws (was 5%)
+                                "take_profit_pct": 30.0,   # Let winners run (was 10%)
+                                "position_size_pct": 95.0, # Use full capital (was 10%)
+                                "max_positions": 1          # Single position focus
                             }
                         }
 
