@@ -2481,12 +2481,42 @@ elif page == "🎯 Complete Trading System":
                         opt_key = f"{ticker}_{strategy}"
                         opt_params = optimization_results.get(opt_key, {}).get('optimal_params', {})
 
+                        # Build indicators list based on strategy type
+                        if strategy == "momentum":
+                            indicators = [
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif strategy == "mean_reversion":
+                            indicators = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "RSI", "period": 14}
+                            ]
+                        elif strategy == "breakout":
+                            indicators = [
+                                {"name": "BOLLINGER_BANDS", "period": 20},
+                                {"name": "ATR", "period": 14}
+                            ]
+                        elif strategy == "trend_following":
+                            indicators = [
+                                {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
+                                {"name": "SMA", "period": 20},
+                                {"name": "SMA", "period": 50}
+                            ]
+                        else:
+                            # Default indicators for unknown strategies
+                            indicators = [
+                                {"name": "SMA", "period": 20},
+                                {"name": "RSI", "period": 14}
+                            ]
+
                         # Create strategy config for backtest API
                         strategy_config = {
                             "name": f"{strategy.replace('_', ' ').title()} - {ticker}",
                             "tickers": [ticker],
                             "strategy_type": strategy,
-                            "indicators": [],  # Will be determined by strategy_type in backtesting_engine
+                            "indicators": indicators,  # Now populated with correct indicators!
                             "risk_management": {
                                 "stop_loss_pct": 5.0,
                                 "take_profit_pct": 10.0,
