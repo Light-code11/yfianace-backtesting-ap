@@ -21,48 +21,32 @@ class MarketScanner:
     - Multi-strategy confirmation
     """
 
-    # Curated universe of liquid stocks across sectors
+    # Curated universe of top 50 liquid stocks across all major sectors
+    # Optimized for fast scanning with thread-safe yfinance downloads
     DEFAULT_UNIVERSE = {
-        # Technology
-        "AAPL", "MSFT", "NVDA", "AMD", "GOOGL", "META", "AMZN", "TSLA", "CRM", "ADBE",
-        "NFLX", "INTC", "QCOM", "AVGO", "ORCL", "NOW", "SNOW", "PLTR", "SHOP", "SQ",
+        # Technology (Top 10)
+        "AAPL", "MSFT", "NVDA", "AMD", "GOOGL", "META", "AMZN", "TSLA", "CRM", "NFLX",
 
-        # Finance
-        "JPM", "BAC", "WFC", "GS", "MS", "C", "BLK", "SCHW", "AXP", "V", "MA", "PYPL",
+        # Finance (Top 8)
+        "JPM", "BAC", "WFC", "GS", "V", "MA", "AXP", "BLK",
 
-        # Healthcare
-        "JNJ", "UNH", "PFE", "ABBV", "TMO", "MRK", "ABT", "LLY", "DHR", "BMY",
+        # Healthcare (Top 6)
+        "JNJ", "UNH", "PFE", "ABBV", "LLY", "TMO",
 
-        # Consumer
-        "WMT", "HD", "MCD", "NKE", "SBUX", "TGT", "COST", "LOW", "DIS", "CMCSA",
+        # Consumer (Top 6)
+        "WMT", "HD", "MCD", "NKE", "COST", "DIS",
 
-        # Energy
-        "XOM", "CVX", "COP", "SLB", "EOG", "MPC", "PSX", "VLO", "OXY", "HAL",
+        # Energy (Top 4)
+        "XOM", "CVX", "COP", "SLB",
 
-        # Industrials
-        "BA", "CAT", "GE", "HON", "UPS", "LMT", "RTX", "DE", "MMM", "GD",
+        # Industrials (Top 4)
+        "BA", "CAT", "GE", "HON",
 
-        # Crypto/Alternative
-        "COIN", "MARA", "RIOT", "MSTR", "SQ", "HOOD",
+        # Crypto/Alternative (4)
+        "COIN", "MARA", "MSTR", "HOOD",
 
-        # ETFs
-        "SPY", "QQQ", "IWM", "DIA", "TLT", "GLD", "SLV", "USO", "XLE", "XLF",
-        "XLK", "XLV", "XLI", "XLP", "XLU", "XLB", "XLRE", "XLC", "XLY", "XBI",
-
-        # Semiconductors
-        "TSM", "ASML", "MU", "LRCX", "AMAT", "KLAC", "MRVL", "ADI", "NXPI",
-
-        # Cloud/SaaS
-        "DDOG", "NET", "CRWD", "ZS", "OKTA", "SNOW", "MDB", "ESTC",
-
-        # E-commerce
-        "BABA", "JD", "PDD", "MELI", "SE", "ETSY",
-
-        # Biotech
-        "GILD", "AMGN", "VRTX", "REGN", "BIIB", "MRNA", "BNTX",
-
-        # Communication
-        "T", "VZ", "TMUS", "NFLX", "DIS", "PARA",
+        # Major ETFs (8)
+        "SPY", "QQQ", "IWM", "DIA", "TLT", "GLD", "XLE", "XLK",
     }
 
     @staticmethod

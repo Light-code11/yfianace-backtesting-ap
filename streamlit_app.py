@@ -1392,7 +1392,7 @@ elif page == "🔍 Market Scanner":
     st.markdown('<div class="main-header">🔍 Market Scanner</div>', unsafe_allow_html=True)
 
     st.markdown("""
-    **Scan 150+ liquid stocks** to find the best trading opportunities RIGHT NOW.
+    **Scan 50+ liquid stocks** across all major sectors to find the best trading opportunities RIGHT NOW.
 
     This is what separates professionals from retail traders:
     - ✅ Don't guess which stocks to trade
@@ -1466,7 +1466,7 @@ elif page == "🔍 Market Scanner":
 
                 with col2:
                     st.info("""
-                    **Default Universe (150+ stocks):**
+                    **Default Universe (50+ stocks):**
                     - Top tech stocks (AAPL, MSFT, NVDA, etc.)
                     - Major indices/ETFs (SPY, QQQ, etc.)
                     - Finance, Healthcare, Energy sectors
@@ -1487,7 +1487,7 @@ elif page == "🔍 Market Scanner":
                     if use_custom_universe and custom_tickers:
                         universe = [t.strip().upper() for t in custom_tickers.split(',')]
 
-                    with st.spinner(f"🔍 Scanning {len(universe) if universe else '150+'} stocks with {len(strategy_ids)} strategies... This may take 30-60 seconds..."):
+                    with st.spinner(f"🔍 Scanning {len(universe) if universe else '50+'} stocks with {len(strategy_ids)} strategies... This may take 2-3 minutes..."):
                         response = make_api_request(
                             "/scanner/run",
                             method="POST",
@@ -1495,7 +1495,8 @@ elif page == "🔍 Market Scanner":
                                 "strategy_ids": strategy_ids,
                                 "universe": universe,
                                 "min_confidence": min_confidence
-                            }
+                            },
+                            timeout=300  # 5 minutes for large scans
                         )
 
                         if response and response.get('success'):
