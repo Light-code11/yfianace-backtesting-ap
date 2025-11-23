@@ -2646,6 +2646,141 @@ elif page == "🎯 Complete Trading System":
                         hide_index=True
                     )
 
+                    # View detailed trades for individual strategies
+                    st.markdown("---")
+                    st.markdown("#### 📋 View Detailed Strategy Results")
+
+                    strategy_names = [f"{row['ticker']} - {row['strategy']}" for _, row in results_df.iterrows()]
+                    selected_detail_strategy = st.selectbox(
+                        "Select a strategy to view detailed trades:",
+                        options=strategy_names,
+                        key="detail_strategy_selector"
+                    )
+
+                    if st.button("📊 View Detailed Backtest Results", key="view_details_btn", use_container_width=True):
+                        # Parse ticker and strategy from selection
+                        parts = selected_detail_strategy.split(' - ')
+                        if len(parts) == 2:
+                            detail_ticker = parts[0]
+                            detail_strategy = parts[1]
+
+                            with st.spinner(f"Loading detailed results for {selected_detail_strategy}..."):
+                                # Find the backtest result for this strategy
+                                matching_result = None
+                                for result in backtest_results:
+                                    if result['ticker'] == detail_ticker and result['strategy'] == detail_strategy:
+                                        matching_result = result
+                                        break
+
+                                if matching_result:
+                                    # Re-run backtest to get trade details
+                                    strategy_config = {
+                                        "name": f"{detail_ticker} {detail_strategy}",
+                                        "tickers": [detail_ticker],
+                                        "strategy_type": detail_strategy,
+                                        "indicators": [],
+                                        "risk_management": {
+                                            "stop_loss_pct": 15.0,
+                                            "take_profit_pct": 30.0,
+                                            "position_size_pct": 95.0,
+                                            "max_positions": 1
+                                        }
+                                    }
+
+                                    # Add indicators based on strategy type
+                                    if detail_strategy == "momentum":
+                                        strategy_config["indicators"] = [
+                                            {"name": "SMA", "period": 20},
+                                            {"name": "SMA", "period": 50},
+                                            {"name": "RSI", "period": 14}
+                                        ]
+                                    elif detail_strategy == "mean_reversion":
+                                        strategy_config["indicators"] = [
+                                            {"name": "BOLLINGER_BANDS", "period": 20},
+                                            {"name": "RSI", "period": 14}
+                                        ]
+                                    elif detail_strategy == "breakout":
+                                        strategy_config["indicators"] = [
+                                            {"name": "BOLLINGER_BANDS", "period": 20},
+                                            {"name": "ATR", "period": 14}
+                                        ]
+                                    elif detail_strategy == "trend_following":
+                                        strategy_config["indicators"] = [
+                                            {"name": "MACD", "fast_period": 12, "slow_period": 26, "signal_period": 9},
+                                            {"name": "SMA", "period": 20},
+                                            {"name": "SMA", "period": 50}
+                                        ]
+
+                                    backtest_response = make_api_request(
+                                        "/backtest",
+                                        method="POST",
+                                        data={
+                                            "strategy_config": strategy_config,
+                                            "initial_capital": total_capital
+                                        }
+                                    )
+
+                                    if backtest_response and backtest_response.get('success'):
+                                        backtest_id = backtest_response['backtest_id']
+                                        detailed_results = make_api_request(f"/backtest/results/{backtest_id}")
+
+                                        if detailed_results:
+                                            st.success(f"✅ Detailed results for {selected_detail_strategy}")
+
+                                            # Show metrics
+                                            col1, col2, col3, col4 = st.columns(4)
+                                            with col1:
+                                                st.metric("Total Return", f"{detailed_results['metrics']['total_return_pct']:.2f}%")
+                                            with col2:
+                                                st.metric("Sharpe Ratio", f"{detailed_results['metrics']['sharpe_ratio']:.2f}")
+                                            with col3:
+                                                st.metric("Win Rate", f"{detailed_results['metrics']['win_rate']:.2f}%")
+                                            with col4:
+                                                st.metric("Total Trades", detailed_results['metrics']['total_trades'])
+
+                                            # Show trades table
+                                            if detailed_results.get('trades'):
+                                                st.markdown("#### 📈 All Trades")
+                                                trades_df = pd.DataFrame(detailed_results['trades'])
+                                                st.dataframe(
+                                                    trades_df[[
+                                                        'entry_date', 'exit_date', 'entry_price', 'exit_price',
+                                                        'profit_loss_pct', 'profit_loss_usd', 'exit_reason'
+                                                    ]].style.format({
+                                                        'entry_price': '${:.2f}',
+                                                        'exit_price': '${:.2f}',
+                                                        'profit_loss_pct': '{:.2f}%',
+                                                        'profit_loss_usd': '${:,.2f}'
+                                                    }),
+                                                    use_container_width=True,
+                                                    height=400
+                                                )
+
+                                                # Show equity curve
+                                                if detailed_results.get('equity_curve'):
+                                                    st.markdown("#### 📊 Equity Curve")
+                                                    equity_df = pd.DataFrame(detailed_results['equity_curve'])
+                                                    fig = px.line(
+                                                        equity_df,
+                                                        x='date',
+                                                        y='equity',
+                                                        title=f'Equity Curve - {selected_detail_strategy}'
+                                                    )
+                                                    fig.update_layout(
+                                                        xaxis_title="Date",
+                                                        yaxis_title="Portfolio Value ($)",
+                                                        hovermode='x unified'
+                                                    )
+                                                    st.plotly_chart(fig, use_container_width=True)
+                                            else:
+                                                st.warning("No trades were generated for this strategy")
+                                        else:
+                                            st.error("Failed to load detailed results")
+                                    else:
+                                        st.error(f"Backtest failed: {backtest_response.get('error', 'Unknown error')}")
+                                else:
+                                    st.error("Could not find matching strategy result")
+
                     # Step 5: Portfolio Optimization
                     st.markdown("---")
                     st.markdown("### Step 5️⃣: Portfolio Optimization")
@@ -2743,7 +2878,7 @@ elif page == "🎯 Complete Trading System":
                                     alloc_df.style.format({
                                         'Allocation %': '{:.2f}%',
                                         'Capital $': '${:,.2f}'
-                                    }).background_gradient(subset=['Allocation %'], cmap='Blues'),
+                                    }),
                                     use_container_width=True,
                                     hide_index=True
                                 )
