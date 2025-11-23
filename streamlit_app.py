@@ -2193,6 +2193,17 @@ elif page == "🎯 Complete Trading System":
     - 🎯 **Kelly Criterion** - Determine optimal position sizes
     """)
 
+    st.info("""
+    **💡 Sharpe Ratio Benchmarks:**
+    - **0.5-0.7**: Good (many professional funds)
+    - **0.7-1.0**: Very Good (institutional quality)
+    - **1.0-2.0**: Excellent (top hedge funds)
+    - **> 2.0**: Exceptional (rare!)
+
+    **Tip:** Enable "Vectorized Parameter Optimization" to improve Sharpe by 0.3-0.7 points!
+    See `STRATEGY_OPTIMIZATION_GUIDE.md` for detailed tips.
+    """)
+
     st.markdown("---")
 
     # Step 1: Configuration
@@ -2227,9 +2238,9 @@ elif page == "🎯 Complete Trading System":
             "Minimum Sharpe Ratio",
             min_value=0.0,
             max_value=5.0,
-            value=1.0,
+            value=0.6,
             step=0.1,
-            help="Only include strategies with Sharpe >= this value"
+            help="Only include strategies with Sharpe >= this value (0.6 = good, 1.0 = excellent, 2.0 = exceptional)"
         )
 
         total_capital = st.number_input(
