@@ -145,6 +145,7 @@ class BacktestRequest(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     initial_capital: float = 100000
+    period: str = "1y"  # Backtest period (1mo, 3mo, 6mo, 1y, 2y, 5y, 10y)
 
 
 class PaperTradeRequest(BaseModel):
@@ -573,7 +574,7 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
 
         # Fetch historical data
         tickers = strategy_config.get('tickers', [])
-        period = "1y"  # Use 1 year for backtesting
+        period = request.period if request.period else "1y"
         market_data = fetch_market_data(tickers, period)
 
         if market_data.empty:
@@ -588,11 +589,18 @@ async def backtest_strategy(request: BacktestRequest, db=Depends(get_db)):
         equity_curve_clean = convert_numpy_types(results['equity_curve'])
         metrics_clean = convert_numpy_types(results['metrics'])
 
+        # Calculate start date based on period
+        period_days = {
+            "1mo": 30, "3mo": 90, "6mo": 180,
+            "1y": 365, "2y": 730, "5y": 1825, "10y": 3650
+        }
+        days_back = period_days.get(period, 365)
+
         # Save backtest results
         backtest_result = BacktestResult(
             strategy_id=request.strategy_id,
             strategy_name=results['strategy_name'],
-            start_date=datetime.now() - timedelta(days=365),
+            start_date=datetime.now() - timedelta(days=days_back),
             end_date=datetime.now(),
             initial_capital=request.initial_capital,
             tickers_tested=results['tickers'],

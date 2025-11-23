@@ -710,26 +710,38 @@ elif page == "Backtest":
                 options=list(strategy_options.keys())
             )
 
-            initial_capital = st.number_input(
-                "Initial Capital ($)",
-                min_value=1000,
-                max_value=10000000,
-                value=100000,
-                step=10000
-            )
+            col1, col2 = st.columns(2)
+
+            with col1:
+                initial_capital = st.number_input(
+                    "Initial Capital ($)",
+                    min_value=1000,
+                    max_value=10000000,
+                    value=100000,
+                    step=10000
+                )
+
+            with col2:
+                backtest_period = st.selectbox(
+                    "Backtest Period",
+                    ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y"],
+                    index=3,
+                    help="Use 5-10y for swing trading strategies to get 30+ trades"
+                )
 
             submitted = st.form_submit_button("🧪 Run Backtest", use_container_width=True)
 
             if submitted:
                 strategy_id = strategy_options[selected_strategy]
 
-                with st.spinner("Running backtest... This may take a minute."):
+                with st.spinner(f"Running backtest over {backtest_period}... This may take a minute."):
                     response = make_api_request(
                         "/backtest",
                         method="POST",
                         data={
                             "strategy_id": strategy_id,
-                            "initial_capital": initial_capital
+                            "initial_capital": initial_capital,
+                            "period": backtest_period
                         }
                     )
 
