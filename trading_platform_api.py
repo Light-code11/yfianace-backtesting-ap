@@ -153,7 +153,8 @@ class PaperTradeRequest(BaseModel):
 
 
 class PortfolioOptimizationRequest(BaseModel):
-    strategy_ids: List[int]
+    strategy_ids: Optional[List[int]] = None  # For saved strategies from database
+    strategies: Optional[List[Dict]] = None   # For on-the-fly strategies (Complete Trading System)
     total_capital: float = 100000
     method: str = "sharpe"  # sharpe, min_variance, max_return, risk_parity
     constraints: Optional[Dict] = None
@@ -854,34 +855,73 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         strategies = []
         backtest_results = []
 
-        for strategy_id in request.strategy_ids:
-            strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
-            if not strategy:
-                continue
+        # Case 1: Using strategy_ids (from database)
+        if request.strategy_ids:
+            for strategy_id in request.strategy_ids:
+                strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
+                if not strategy:
+                    continue
 
-            # Get latest backtest result
-            backtest = db.query(BacktestResult).filter(
-                BacktestResult.strategy_id == strategy_id
-            ).order_by(BacktestResult.created_at.desc()).first()
+                # Get latest backtest result
+                backtest = db.query(BacktestResult).filter(
+                    BacktestResult.strategy_id == strategy_id
+                ).order_by(BacktestResult.created_at.desc()).first()
 
-            if not backtest:
-                continue
+                if not backtest:
+                    continue
 
-            strategies.append({
-                "id": strategy.id,
-                "name": strategy.name,
-                "strategy_type": strategy.strategy_type
-            })
+                strategies.append({
+                    "id": strategy.id,
+                    "name": strategy.name,
+                    "strategy_type": strategy.strategy_type
+                })
 
-            backtest_results.append({
-                "strategy_name": strategy.name,
-                "equity_curve": backtest.equity_curve,
-                "total_return_pct": backtest.total_return_pct,
-                "sharpe_ratio": backtest.sharpe_ratio
-            })
+                backtest_results.append({
+                    "strategy_name": strategy.name,
+                    "equity_curve": backtest.equity_curve,
+                    "total_return_pct": backtest.total_return_pct,
+                    "sharpe_ratio": backtest.sharpe_ratio
+                })
+
+        # Case 2: Using strategies directly (from Complete Trading System)
+        elif request.strategies:
+            for idx, strat_data in enumerate(request.strategies):
+                # Generate synthetic equity curve from expected return and volatility
+                # This is a simplification - ideally we'd re-run backtest
+                expected_return = strat_data.get('expected_return', 0)
+                volatility = strat_data.get('volatility', 20)
+                sharpe = strat_data.get('sharpe_ratio', 0)
+
+                # Create synthetic equity curve (252 trading days)
+                days = 252
+                daily_return = expected_return / 100 / days
+                daily_vol = volatility / 100 / np.sqrt(days)
+
+                # Generate random walk with drift
+                np.random.seed(idx)  # For reproducibility
+                returns = np.random.normal(daily_return, daily_vol, days)
+                equity = request.total_capital * (1 + returns).cumprod()
+
+                strategies.append({
+                    "id": strat_data.get('id', f"strategy_{idx}"),
+                    "name": strat_data.get('name', f"Strategy {idx}"),
+                    "strategy_type": "custom"
+                })
+
+                backtest_results.append({
+                    "strategy_name": strat_data.get('name', f"Strategy {idx}"),
+                    "equity_curve": [
+                        {"date": f"2024-{i//21+1:02d}-{i%21+1:02d}", "equity": float(equity[i])}
+                        for i in range(days)
+                    ],
+                    "total_return_pct": expected_return,
+                    "sharpe_ratio": sharpe
+                })
+        else:
+            return {"success": False, "error": "Must provide either strategy_ids or strategies"}
 
         if len(strategies) < 2:
-            return {"success": False, "error": "Need at least 2 strategies with backtest results"}
+            return {"success": False, "error": "Need at least 2 strategies for portfolio optimization"}
 
         # Use advanced optimizer
         optimizer = AdvancedPortfolioOptimizer(risk_free_rate=0.02)
@@ -899,10 +939,13 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
             return optimization_result  # Return error from optimizer
 
         # Save optimization
+        # Use strategy_ids if provided, otherwise use strategy identifiers from strategies
+        strategy_list = request.strategy_ids if request.strategy_ids else [s.get('id') for s in request.strategies]
+
         portfolio = PortfolioAllocation(
             name=f"Portfolio {request.method} {datetime.now().strftime('%Y-%m-%d')}",
             total_capital=request.total_capital,
-            strategies=request.strategy_ids,
+            strategies=strategy_list,
             optimization_method=request.method,
             constraints=request.constraints or {},
             expected_return=optimization_result['expected_return'],
