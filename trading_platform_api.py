@@ -390,7 +390,8 @@ async def list_strategies(
                 "strategy_type": s.strategy_type,
                 "tickers": s.tickers,
                 "created_at": s.created_at.isoformat(),
-                "is_active": s.is_active
+                "is_active": s.is_active,
+                "backtest_count": db.query(BacktestResult).filter(BacktestResult.strategy_id == s.id).count()
             }
             for s in strategies
         ]
