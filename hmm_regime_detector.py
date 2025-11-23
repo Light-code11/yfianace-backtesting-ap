@@ -213,14 +213,24 @@ class HMMRegimeDetector:
         - BEAR: Negative or lowest returns, higher volatility
         - CONSOLIDATION: Low returns, low volatility
         """
-        if len(characteristics) < 3:
-            # If less than 3 regimes, use simple labels
-            return {i: f"State_{i}" for i in range(len(characteristics))}
-
-        # Sort by mean return
-        sorted_by_return = sorted(characteristics, key=lambda x: x['mean_return'])
-
+        # Initialize labels dict with all states
         labels = {}
+
+        if len(characteristics) < 2:
+            # If less than 2 regimes, label all as states
+            for char in characteristics:
+                labels[char['state']] = f"State_{char['state']}"
+            return labels
+
+        if len(characteristics) < 3:
+            # If exactly 2 regimes, use BULL/BEAR
+            sorted_by_return = sorted(characteristics, key=lambda x: x['mean_return'])
+            labels[sorted_by_return[-1]['state']] = "BULL"
+            labels[sorted_by_return[0]['state']] = "BEAR"
+            return labels
+
+        # Sort by mean return (for 3+ regimes)
+        sorted_by_return = sorted(characteristics, key=lambda x: x['mean_return'])
 
         # Highest return = BULL
         bull_state = sorted_by_return[-1]['state']
@@ -231,17 +241,21 @@ class HMMRegimeDetector:
         labels[bear_state] = "BEAR"
 
         # Middle = CONSOLIDATION (or high volatility regime if vol is high)
-        if len(sorted_by_return) > 2:
-            consolidation_state = sorted_by_return[1]['state']
+        consolidation_state = sorted_by_return[1]['state']
 
-            # Check if it's actually high volatility
-            consolidation_char = next(c for c in characteristics if c['state'] == consolidation_state)
-            bear_char = next(c for c in characteristics if c['state'] == bear_state)
+        # Check if it's actually high volatility
+        consolidation_char = next(c for c in characteristics if c['state'] == consolidation_state)
+        bear_char = next(c for c in characteristics if c['state'] == bear_state)
 
-            if consolidation_char['mean_volatility'] > bear_char['mean_volatility'] * 1.2:
-                labels[consolidation_state] = "HIGH_VOLATILITY"
-            else:
-                labels[consolidation_state] = "CONSOLIDATION"
+        if consolidation_char['mean_volatility'] > bear_char['mean_volatility'] * 1.2:
+            labels[consolidation_state] = "HIGH_VOLATILITY"
+        else:
+            labels[consolidation_state] = "CONSOLIDATION"
+
+        # Fallback: Ensure ALL states have labels
+        for char in characteristics:
+            if char['state'] not in labels:
+                labels[char['state']] = f"REGIME_{char['state']}"
 
         return labels
 

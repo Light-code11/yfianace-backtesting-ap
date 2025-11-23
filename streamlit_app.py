@@ -66,16 +66,24 @@ st.markdown("""
 
 
 # Helper functions
-def make_api_request(endpoint, method="GET", data=None):
-    """Make API request with error handling"""
+def make_api_request(endpoint, method="GET", data=None, timeout=120):
+    """
+    Make API request with error handling
+
+    Args:
+        endpoint: API endpoint path
+        method: HTTP method (GET/POST/DELETE)
+        data: Request payload for POST requests
+        timeout: Timeout in seconds (default 120 = 2 minutes)
+    """
     try:
         url = f"{API_BASE_URL}{endpoint}"
         if method == "GET":
-            response = requests.get(url)
+            response = requests.get(url, timeout=timeout)
         elif method == "POST":
-            response = requests.post(url, json=data)
+            response = requests.post(url, json=data, timeout=timeout)
         elif method == "DELETE":
-            response = requests.delete(url)
+            response = requests.delete(url, timeout=timeout)
         else:
             st.error(f"Unsupported HTTP method: {method}")
             return None
@@ -2984,14 +2992,15 @@ elif page == "🎯 Complete Trading System":
                         # Debug: Show what we're sending (can remove later)
                         # st.write(f"Debug - Sending to /backtest: {strategy_config}")
 
-                        # Run backtest
+                        # Run backtest (with longer timeout for multi-stock workflows)
                         response = make_api_request(
                             "/backtest",
                             method="POST",
                             data={
                                 "strategy_config": strategy_config,
                                 "initial_capital": 100000
-                            }
+                            },
+                            timeout=180  # 3 minutes for backtests
                         )
 
                         current_step += 1
