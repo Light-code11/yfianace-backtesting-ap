@@ -7,10 +7,14 @@ import yfinance as yf
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from backtesting_engine import TechnicalIndicators
+import threading
 
 
 class LiveSignalGenerator:
     """Generate live trading signals from backtested strategies"""
+
+    # Thread lock for yfinance downloads (fixes parallel download data mixing bug)
+    _yf_lock = threading.Lock()
 
     @staticmethod
     def generate_signals(strategy_config: Dict[str, Any], period: str = "3mo") -> Dict[str, Any]:
@@ -87,8 +91,10 @@ class LiveSignalGenerator:
             }
 
         # Fetch recent data for THIS SPECIFIC ticker only
+        # Use thread lock to prevent yfinance data mixing in parallel downloads
         print(f"[DEBUG] Downloading data for ticker: {ticker}, period: {period}")
-        data = yf.download(ticker, period=period, progress=False)
+        with LiveSignalGenerator._yf_lock:
+            data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
 
         if data.empty:
             return {
