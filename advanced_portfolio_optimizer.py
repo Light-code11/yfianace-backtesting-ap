@@ -310,17 +310,39 @@ class AdvancedPortfolioOptimizer:
         # Optimize based on method
         if method in ["max_sharpe", "sharpe"]:
             result = minimize(negative_sharpe, init_weights, method='SLSQP',
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options={'maxiter': 1000})
         elif method in ["min_volatility", "min_variance"]:
             result = minimize(portfolio_volatility, init_weights, method='SLSQP',
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options={'maxiter': 1000})
         elif method in ["max_return"]:
             result = minimize(lambda w: -portfolio_return(w), init_weights, method='SLSQP',
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options={'maxiter': 1000})
         else:
             # Default to max Sharpe
             result = minimize(negative_sharpe, init_weights, method='SLSQP',
-                            bounds=bounds, constraints=constraints)
+                            bounds=bounds, constraints=constraints, options={'maxiter': 1000})
+
+        # Check if optimization succeeded
+        if not result.success:
+            # Map scipy status codes to meaningful messages
+            error_messages = {
+                1: "Maximum iterations exceeded",
+                2: "Precision loss",
+                3: "NaN result encountered",
+                4: "Positive directional derivative for linesearch (may indicate infeasible constraints)",
+                5: "Number of iterations exceeds maxiter",
+                6: "Could not satisfy equality constraints",
+                7: "Rank-deficient equality constraint subproblem",
+                8: "Positive directional derivative for linesearch (try adjusting max_allocation constraint)",
+                9: "Iteration limit reached"
+            }
+            error_msg = error_messages.get(result.status, f"Optimization failed with status {result.status}")
+
+            # If status 4, provide helpful guidance
+            if result.status == 4:
+                error_msg += ". Try: 1) Increase max allocation per strategy to 50-60%, 2) Select strategies with different risk profiles, 3) Use fewer strategies (2-3)"
+
+            raise ValueError(error_msg)
 
         weights = result.x
 
