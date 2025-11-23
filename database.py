@@ -205,6 +205,163 @@ class AILearning(Base):
     confidence_score = Column(Float)  # 0-1
 
 
+class LivePosition(Base):
+    """Live positions in Alpaca account (synced from broker)"""
+    __tablename__ = "live_positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Position details
+    ticker = Column(String, index=True)
+    strategy_id = Column(Integer, index=True, nullable=True)
+    strategy_name = Column(String, nullable=True)
+
+    # Quantities and prices
+    qty = Column(Float)
+    entry_price = Column(Float)
+    current_price = Column(Float)
+
+    # P&L
+    unrealized_pl = Column(Float)
+    unrealized_plpc = Column(Float)  # Percent
+
+    # Risk management
+    stop_loss_price = Column(Float, nullable=True)
+    take_profit_price = Column(Float, nullable=True)
+
+    # Alpaca data
+    alpaca_position_id = Column(String, unique=True, index=True)
+    alpaca_data = Column(JSON)  # Full Alpaca position response
+
+    # Status
+    is_open = Column(Boolean, default=True)
+    exit_reason = Column(String, nullable=True)
+
+
+class TradeExecution(Base):
+    """Log of all order executions (complete audit trail)"""
+    __tablename__ = "trade_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Order details
+    ticker = Column(String, index=True)
+    strategy_id = Column(Integer, index=True)
+    strategy_name = Column(String)
+
+    # Signal that triggered this
+    signal_type = Column(String)  # BUY, SELL, HOLD
+    signal_confidence = Column(String)  # HIGH, MEDIUM, LOW
+    signal_price = Column(Float)  # Price when signal was generated
+
+    # Order execution
+    order_type = Column(String)  # market, limit
+    side = Column(String)  # buy, sell
+    qty = Column(Float, nullable=True)
+    notional = Column(Float, nullable=True)  # Dollar amount
+
+    # Execution details
+    filled_qty = Column(Float, nullable=True)
+    filled_avg_price = Column(Float, nullable=True)
+    commission = Column(Float, nullable=True)
+
+    # Status
+    order_status = Column(String)  # new, filled, partially_filled, canceled, rejected
+    alpaca_order_id = Column(String, unique=True, index=True)
+    alpaca_order_data = Column(JSON)
+
+    # Why this decision was made
+    decision_reasoning = Column(Text)
+    decision_factors = Column(JSON)
+
+
+class StrategyPerformance(Base):
+    """Live strategy performance tracking (vs backtest)"""
+    __tablename__ = "strategy_performance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    strategy_id = Column(Integer, index=True, unique=True)
+    strategy_name = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Backtest baseline (for comparison)
+    backtest_sharpe = Column(Float)
+    backtest_win_rate = Column(Float)
+    backtest_avg_return = Column(Float)
+    backtest_max_drawdown = Column(Float)
+
+    # Live performance (updated daily)
+    live_sharpe = Column(Float, nullable=True)
+    live_win_rate = Column(Float, nullable=True)
+    live_avg_return = Column(Float, nullable=True)
+    live_max_drawdown = Column(Float, nullable=True)
+
+    # Trade counts
+    live_total_trades = Column(Integer, default=0)
+    live_winning_trades = Column(Integer, default=0)
+    live_losing_trades = Column(Integer, default=0)
+
+    # Performance delta (how different from backtest)
+    sharpe_delta = Column(Float, nullable=True)
+    win_rate_delta = Column(Float, nullable=True)
+
+    # Status and weighting
+    performance_score = Column(Float, nullable=True)  # 0-100
+    allocation_weight = Column(Float, default=1.0)  # Multiplier for position sizing
+    is_deprecated = Column(Boolean, default=False)
+    deprecation_reason = Column(String, nullable=True)
+
+    # Last evaluation
+    last_evaluated_at = Column(DateTime, nullable=True)
+    next_evaluation_at = Column(DateTime, nullable=True)
+
+
+class AutoTradingState(Base):
+    """Autonomous trading system state"""
+    __tablename__ = "auto_trading_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # System status
+    is_enabled = Column(Boolean, default=False)
+    is_running = Column(Boolean, default=False)
+    last_run_at = Column(DateTime, nullable=True)
+    next_run_at = Column(DateTime, nullable=True)
+
+    # Daily metrics
+    daily_pnl = Column(Float, default=0.0)
+    daily_pnl_pct = Column(Float, default=0.0)
+    daily_trades = Column(Integer, default=0)
+
+    # Portfolio state
+    portfolio_value = Column(Float)
+    cash_balance = Column(Float)
+    buying_power = Column(Float)
+    num_positions = Column(Integer, default=0)
+
+    # Risk limits
+    max_daily_loss_hit = Column(Boolean, default=False)
+    circuit_breaker_triggered = Column(Boolean, default=False)
+    circuit_breaker_reason = Column(String, nullable=True)
+
+    # Execution stats
+    total_signals_generated = Column(Integer, default=0)
+    total_trades_executed = Column(Integer, default=0)
+    total_trades_rejected = Column(Integer, default=0)
+
+    # Learning stats
+    last_reoptimization_at = Column(DateTime, nullable=True)
+    strategies_deprecated_count = Column(Integer, default=0)
+
+    # Logs
+    recent_activity = Column(JSON)  # Last 10 activities
+
+
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
