@@ -854,12 +854,15 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         # Get strategies and backtest results
         strategies = []
         backtest_results = []
+        missing_backtests = []
+        missing_strategies = []
 
         # Case 1: Using strategy_ids (from database)
         if request.strategy_ids:
             for strategy_id in request.strategy_ids:
                 strategy = db.query(Strategy).filter(Strategy.id == strategy_id).first()
                 if not strategy:
+                    missing_strategies.append(strategy_id)
                     continue
 
                 # Get latest backtest result
@@ -868,6 +871,7 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
                 ).order_by(BacktestResult.created_at.desc()).first()
 
                 if not backtest:
+                    missing_backtests.append(strategy.name)
                     continue
 
                 strategies.append({
@@ -931,8 +935,22 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         else:
             return {"success": False, "error": "Must provide either strategy_ids or strategies"}
 
+        # Build helpful error message if not enough strategies
         if len(strategies) < 2:
-            return {"success": False, "error": "Need at least 2 strategies for portfolio optimization"}
+            error_parts = []
+
+            if missing_backtests:
+                error_parts.append(f"These strategies need backtest results: {', '.join(missing_backtests)}")
+                error_parts.append("Go to the Backtest page and run backtests for these strategies first.")
+
+            if missing_strategies:
+                error_parts.append(f"Strategy IDs not found: {', '.join(map(str, missing_strategies))}")
+
+            if not error_parts:
+                error_parts.append("Need at least 2 strategies with backtest results for portfolio optimization")
+
+            error_msg = " ".join(error_parts)
+            return {"success": False, "error": error_msg}
 
         # Use advanced optimizer
         optimizer = AdvancedPortfolioOptimizer(risk_free_rate=0.02)
