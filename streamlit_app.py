@@ -2641,7 +2641,7 @@ elif page == "🎯 Complete Trading System":
                             'max_drawdown_pct': '{:.2f}%',
                             'win_rate': '{:.2f}%',
                             'var_95_pct': '{:.2f}%'
-                        }).background_gradient(subset=['sortino_ratio'], cmap='RdYlGn'),
+                        }),
                         use_container_width=True,
                         hide_index=True
                     )
