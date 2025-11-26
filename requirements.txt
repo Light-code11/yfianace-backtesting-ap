@@ -20,6 +20,10 @@ frozendict>=2.3.0
 pytz>=2023.3
 python-dateutil>=2.8.0
 lxml>=4.9.0
+peewee>=3.16.0
+platformdirs>=3.10.0
+websockets>=11.0.0
+protobuf>=4.24.0
 
 # Note: This is a minimal requirements file for Streamlit Cloud
 # For full local platform with AI features, use requirements-trading-platform.txt
