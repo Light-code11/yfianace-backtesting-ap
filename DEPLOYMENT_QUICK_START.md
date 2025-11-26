@@ -41,9 +41,8 @@ Your Streamlit app **needs** the backend API to work. Deploy it first:
 2. Sign in with GitHub
 3. New app → Select your repo → `streamlit_app.py`
 4. **Advanced Settings** → **Secrets** → Add:
-   ```toml
-   API_BASE_URL = "https://your-api.railway.app"
-   ```
+
+
    (Use your actual Railway/Render URL from Step 2)
 5. Click Deploy!
 

@@ -836,12 +836,21 @@ async def run_market_scan(
     strategy_ids: List[int],
     universe: Optional[List[str]] = None,
     min_confidence: str = "MEDIUM",
+    include_backtest: bool = False,
+    backtest_period: str = "6mo",
     db=Depends(get_db)
 ):
     """
     Scan market for best trading opportunities across multiple stocks and strategies
 
-    Returns ranked list of BUY and SELL signals with quality scores
+    Args:
+        strategy_ids: List of strategy IDs to use for scanning
+        universe: Optional list of tickers to scan (default: curated 50+ stocks)
+        min_confidence: Minimum signal confidence (LOW, MEDIUM, HIGH)
+        include_backtest: Whether to run backtests on top signals (slower but shows historical performance)
+        backtest_period: Period for backtesting (3mo, 6mo, 1y)
+
+    Returns ranked list of BUY and SELL signals with quality scores and optional backtest results
     """
     try:
         # Get strategy configurations
@@ -868,13 +877,22 @@ async def run_market_scan(
         if not strategies:
             raise HTTPException(status_code=400, detail="No valid strategies found")
 
-        # Run scan
-        scan_results = MarketScanner.scan_market(
-            strategies=strategies,
-            universe=universe,
-            max_workers=20,  # Parallel processing
-            min_confidence=min_confidence
-        )
+        # Run scan - with or without backtesting
+        if include_backtest:
+            scan_results = MarketScanner.scan_with_backtest(
+                strategies=strategies,
+                universe=universe,
+                max_workers=10,  # Fewer workers when backtesting to avoid rate limits
+                min_confidence=min_confidence,
+                backtest_period=backtest_period
+            )
+        else:
+            scan_results = MarketScanner.scan_market(
+                strategies=strategies,
+                universe=universe,
+                max_workers=20,  # Parallel processing
+                min_confidence=min_confidence
+            )
 
         # Get multi-strategy confirmations
         confirmations = MarketScanner.get_multi_strategy_confirmations(
@@ -884,7 +902,8 @@ async def run_market_scan(
         return {
             "success": True,
             "scan_results": scan_results,
-            "multi_strategy_confirmations": confirmations[:10]  # Top 10 confirmed signals
+            "multi_strategy_confirmations": confirmations[:10],  # Top 10 confirmed signals
+            "backtest_included": include_backtest
         }
 
     except Exception as e:

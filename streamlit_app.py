@@ -1446,6 +1446,29 @@ elif page == "🔍 Market Scanner":
                     help="Filter out low-quality signals"
                 )
 
+            # Backtest options
+            st.markdown("### 📊 Backtest Options")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                include_backtest = st.checkbox(
+                    "Include Historical Backtests",
+                    value=True,
+                    help="Run backtests on top signals to show how the strategy performed historically on each stock"
+                )
+
+            with col2:
+                backtest_period = st.selectbox(
+                    "Backtest Period",
+                    ["3mo", "6mo", "1y"],
+                    index=1,
+                    help="Historical period to backtest each signal",
+                    disabled=not include_backtest
+                )
+
+            if include_backtest:
+                st.info("📈 Backtesting shows how each strategy would have performed on the recommended stocks. This adds ~1-2 minutes to scan time.")
+
             # Advanced options
             with st.expander("⚙️ Advanced Options"):
                 col1, col2 = st.columns(2)
@@ -1487,16 +1510,23 @@ elif page == "🔍 Market Scanner":
                     if use_custom_universe and custom_tickers:
                         universe = [t.strip().upper() for t in custom_tickers.split(',')]
 
-                    with st.spinner(f"🔍 Scanning {len(universe) if universe else '50+'} stocks with {len(strategy_ids)} strategies... This may take 2-3 minutes..."):
+                    spinner_msg = f"🔍 Scanning {len(universe) if universe else '50+'} stocks with {len(strategy_ids)} strategies..."
+                    if include_backtest:
+                        spinner_msg += " Running backtests on top signals..."
+                    spinner_msg += " This may take 2-5 minutes..."
+
+                    with st.spinner(spinner_msg):
                         response = make_api_request(
                             "/scanner/run",
                             method="POST",
                             data={
                                 "strategy_ids": strategy_ids,
                                 "universe": universe,
-                                "min_confidence": min_confidence
+                                "min_confidence": min_confidence,
+                                "include_backtest": include_backtest,
+                                "backtest_period": backtest_period
                             },
-                            timeout=300  # 5 minutes for large scans
+                            timeout=600  # 10 minutes for scans with backtests
                         )
 
                         if response and response.get('success'):
@@ -1555,13 +1585,16 @@ elif page == "🔍 Market Scanner":
                             if scan_results['top_buys']:
                                 st.markdown("### 🟢 Top 10 BUY Opportunities")
 
+                                # Check if backtests are included
+                                has_backtests = response.get('backtest_included', False)
+
                                 buy_data = []
                                 for sig in scan_results['top_buys'][:10]:
                                     risk_pct = abs((sig['current_price'] - sig['stop_loss']) / sig['current_price'] * 100) if sig.get('stop_loss') else 0
                                     reward_pct = abs((sig['take_profit'] - sig['current_price']) / sig['current_price'] * 100) if sig.get('take_profit') else 0
                                     rr_ratio = reward_pct / risk_pct if risk_pct > 0 else 0
 
-                                    buy_data.append({
+                                    row_data = {
                                         'Ticker': sig['ticker'],
                                         'Strategy': sig['strategy_type'].title(),
                                         'Price': f"${sig['current_price']:.2f}",
@@ -1570,7 +1603,16 @@ elif page == "🔍 Market Scanner":
                                         'R:R': f"{rr_ratio:.1f}:1",
                                         'Quality': f"{sig['quality_score']:.0f}/100",
                                         'Confidence': sig['confidence']
-                                    })
+                                    }
+
+                                    # Add backtest columns if available
+                                    if has_backtests and sig.get('backtest', {}).get('success'):
+                                        bt = sig['backtest']['metrics']
+                                        row_data['BT Return'] = f"{bt.get('total_return_pct', 0):.1f}%"
+                                        row_data['BT Win Rate'] = f"{bt.get('win_rate', 0):.0f}%"
+                                        row_data['BT Sharpe'] = f"{bt.get('sharpe_ratio', 0):.2f}"
+
+                                    buy_data.append(row_data)
 
                                 st.dataframe(
                                     pd.DataFrame(buy_data),
@@ -1578,11 +1620,59 @@ elif page == "🔍 Market Scanner":
                                     hide_index=True
                                 )
 
-                                # Expandable details
-                                with st.expander("📋 View Detailed BUY Signals"):
+                                # Expandable details with backtest info
+                                with st.expander("📋 View Detailed BUY Signals with Backtest Results"):
                                     for idx, sig in enumerate(scan_results['top_buys'][:10]):
-                                        st.markdown(f"**{idx+1}. {sig['ticker']}** - {sig['strategy_name']}")
+                                        st.markdown(f"#### {idx+1}. {sig['ticker']} - {sig['strategy_name']}")
                                         st.caption(sig['reasoning'])
+
+                                        # Show backtest results if available
+                                        if has_backtests and sig.get('backtest', {}).get('success'):
+                                            bt = sig['backtest']
+                                            metrics = bt.get('metrics', {})
+
+                                            st.markdown("**📊 Historical Backtest Performance:**")
+                                            col1, col2, col3, col4 = st.columns(4)
+
+                                            with col1:
+                                                ret_color = "green" if metrics.get('total_return_pct', 0) > 0 else "red"
+                                                st.metric("Return", f"{metrics.get('total_return_pct', 0):.1f}%")
+
+                                            with col2:
+                                                st.metric("Win Rate", f"{metrics.get('win_rate', 0):.0f}%")
+
+                                            with col3:
+                                                st.metric("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.2f}")
+
+                                            with col4:
+                                                st.metric("Max Drawdown", f"{metrics.get('max_drawdown_pct', 0):.1f}%")
+
+                                            col1, col2, col3, col4 = st.columns(4)
+
+                                            with col1:
+                                                st.metric("Total Trades", metrics.get('total_trades', 0))
+
+                                            with col2:
+                                                st.metric("Profit Factor", f"{metrics.get('profit_factor', 0):.2f}")
+
+                                            with col3:
+                                                st.metric("Avg Win", f"${metrics.get('avg_win', 0):.0f}")
+
+                                            with col4:
+                                                st.metric("Avg Loss", f"${metrics.get('avg_loss', 0):.0f}")
+
+                                            # Show last few trades
+                                            if bt.get('last_trades'):
+                                                st.markdown("**Recent Simulated Trades:**")
+                                                trades_df = pd.DataFrame(bt['last_trades'])
+                                                if not trades_df.empty:
+                                                    display_cols = ['entry_date', 'exit_date', 'entry_price', 'exit_price', 'profit_loss_pct', 'exit_reason']
+                                                    available_cols = [c for c in display_cols if c in trades_df.columns]
+                                                    st.dataframe(trades_df[available_cols], use_container_width=True, hide_index=True)
+
+                                        elif has_backtests:
+                                            st.warning("⚠️ Backtest data not available for this signal")
+
                                         st.markdown("---")
 
                             # Top SELL Opportunities
@@ -1595,7 +1685,7 @@ elif page == "🔍 Market Scanner":
                                     reward_pct = abs((sig['current_price'] - sig['take_profit']) / sig['current_price'] * 100) if sig.get('take_profit') else 0
                                     rr_ratio = reward_pct / risk_pct if risk_pct > 0 else 0
 
-                                    sell_data.append({
+                                    row_data = {
                                         'Ticker': sig['ticker'],
                                         'Strategy': sig['strategy_type'].title(),
                                         'Price': f"${sig['current_price']:.2f}",
@@ -1604,7 +1694,16 @@ elif page == "🔍 Market Scanner":
                                         'R:R': f"{rr_ratio:.1f}:1",
                                         'Quality': f"{sig['quality_score']:.0f}/100",
                                         'Confidence': sig['confidence']
-                                    })
+                                    }
+
+                                    # Add backtest columns if available
+                                    if has_backtests and sig.get('backtest', {}).get('success'):
+                                        bt = sig['backtest']['metrics']
+                                        row_data['BT Return'] = f"{bt.get('total_return_pct', 0):.1f}%"
+                                        row_data['BT Win Rate'] = f"{bt.get('win_rate', 0):.0f}%"
+                                        row_data['BT Sharpe'] = f"{bt.get('sharpe_ratio', 0):.2f}"
+
+                                    sell_data.append(row_data)
 
                                 st.dataframe(
                                     pd.DataFrame(sell_data),
@@ -1612,14 +1711,76 @@ elif page == "🔍 Market Scanner":
                                     hide_index=True
                                 )
 
+                                # Expandable details with backtest info
+                                with st.expander("📋 View Detailed SELL Signals with Backtest Results"):
+                                    for idx, sig in enumerate(scan_results['top_sells'][:10]):
+                                        st.markdown(f"#### {idx+1}. {sig['ticker']} - {sig['strategy_name']}")
+                                        st.caption(sig['reasoning'])
+
+                                        # Show backtest results if available
+                                        if has_backtests and sig.get('backtest', {}).get('success'):
+                                            bt = sig['backtest']
+                                            metrics = bt.get('metrics', {})
+
+                                            st.markdown("**📊 Historical Backtest Performance:**")
+                                            col1, col2, col3, col4 = st.columns(4)
+
+                                            with col1:
+                                                st.metric("Return", f"{metrics.get('total_return_pct', 0):.1f}%")
+
+                                            with col2:
+                                                st.metric("Win Rate", f"{metrics.get('win_rate', 0):.0f}%")
+
+                                            with col3:
+                                                st.metric("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.2f}")
+
+                                            with col4:
+                                                st.metric("Max Drawdown", f"{metrics.get('max_drawdown_pct', 0):.1f}%")
+
+                                            col1, col2, col3, col4 = st.columns(4)
+
+                                            with col1:
+                                                st.metric("Total Trades", metrics.get('total_trades', 0))
+
+                                            with col2:
+                                                st.metric("Profit Factor", f"{metrics.get('profit_factor', 0):.2f}")
+
+                                            with col3:
+                                                st.metric("Avg Win", f"${metrics.get('avg_win', 0):.0f}")
+
+                                            with col4:
+                                                st.metric("Avg Loss", f"${metrics.get('avg_loss', 0):.0f}")
+
+                                        elif has_backtests:
+                                            st.warning("⚠️ Backtest data not available for this signal")
+
+                                        st.markdown("---")
+
                             st.markdown("---")
+
+                            # Show backtest summary if backtests were included
+                            if has_backtests:
+                                st.markdown("### 📈 Backtest Summary")
+                                backtest_period_display = scan_results.get('backtest_period', '6mo')
+                                backtests_run = scan_results.get('backtests_run', 0)
+                                st.success(f"✅ Ran {backtests_run} backtests over {backtest_period_display} period")
+
+                                st.info("""
+                                **Understanding Backtest Results:**
+                                - **BT Return**: Historical return if this strategy was applied to this stock
+                                - **BT Win Rate**: Percentage of profitable trades in backtest
+                                - **BT Sharpe**: Risk-adjusted return (>1 is good, >2 is excellent)
+                                - Quality scores are adjusted based on backtest performance
+                                """)
+
                             st.info("""
                             💡 **How to use these results:**
                             1. **High Conviction Trades**: Start with multi-strategy confirmations
                             2. **Quality Score**: Focus on signals with 60+ quality score
-                            3. **Risk/Reward**: Look for minimum 2:1 R:R ratio
-                            4. **Diversify**: Don't put all capital in one signal
-                            5. **Paper Trade**: Test signals before going live
+                            3. **Backtest Performance**: Prefer signals with positive historical returns
+                            4. **Risk/Reward**: Look for minimum 2:1 R:R ratio
+                            5. **Diversify**: Don't put all capital in one signal
+                            6. **Paper Trade**: Test signals before going live
                             """)
 
                         else:
