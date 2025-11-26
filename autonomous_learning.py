@@ -2,16 +2,13 @@
 Autonomous AI Learning System
 Runs in background, continuously generating, testing, and improving strategies
 """
-import os
 import time
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict
-import asyncio
-from sqlalchemy.orm import Session
+from typing import List, Optional, Any
 import numpy as np
 
-from database import SessionLocal, Strategy, BacktestResult, AILearning, PerformanceLog
+from database import SessionLocal, Strategy, BacktestResult, AILearning
 from ai_strategy_generator import AIStrategyGenerator
 from backtesting_engine import BacktestingEngine
 import yfinance as yf
@@ -21,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def convert_numpy_types(obj):
+def convert_numpy_types(obj: Any) -> Any:
     """Recursively convert numpy types to native Python types for PostgreSQL"""
     if isinstance(obj, np.integer):
         return int(obj)
@@ -40,9 +37,9 @@ class AutonomousLearningAgent:
     """Autonomous agent that learns and improves trading strategies over time"""
 
     def __init__(self,
-                 tickers: List[str] = None,
-                 learning_interval_minutes: int = None,
-                 learning_interval_hours: int = None,
+                 tickers: Optional[List[str]] = None,
+                 learning_interval_minutes: Optional[int] = None,
+                 learning_interval_hours: Optional[int] = None,
                  strategies_per_cycle: int = 3,
                  min_quality_score: float = 70.0):
         """
@@ -89,7 +86,8 @@ class AutonomousLearningAgent:
 
             ticker_string = " ".join(all_tickers)
             data = yf.download(ticker_string, period=period, progress=False)
-            logger.info(f"Fetched market data for {all_tickers}: {data.shape}")
+            if data is not None and not data.empty:
+                logger.info(f"Fetched market data for {all_tickers}: {data.shape}")
             return data
         except Exception as e:
             logger.error(f"Error fetching market data: {e}")
@@ -262,7 +260,8 @@ class AutonomousLearningAgent:
                         "stop_loss_pct": s.stop_loss_pct,
                         "take_profit_pct": s.take_profit_pct
                     }
-                    for s in [db.query(Strategy).get(br.strategy_id) for br in backtest_results]
+                    for s in [db.get(Strategy, br.strategy_id) for br in backtest_results]
+                    if s is not None
                 ]
 
                 results_data = [
@@ -303,7 +302,7 @@ class AutonomousLearningAgent:
             ]
 
             for br in poor_performers:
-                strategy = db.query(Strategy).get(br.strategy_id)
+                strategy = db.get(Strategy, br.strategy_id)
                 if strategy:
                     strategy.is_active = False
                     logger.info(f"  Archived: {strategy.name} (Quality: {br.quality_score:.1f})")
