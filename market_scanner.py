@@ -10,6 +10,7 @@ import yfinance as yf
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from live_signal_generator import LiveSignalGenerator
 from backtesting_engine import BacktestingEngine
+from pair_trading_strategy import PairScanner, PairAnalysis
 
 
 class MarketScanner:
@@ -480,3 +481,97 @@ class MarketScanner:
             key=lambda x: (x['confirmation_count'], x['avg_quality_score']),
             reverse=True
         )
+
+    @staticmethod
+    def scan_for_pairs(
+        universe: Optional[List[str]] = None,
+        universe_name: str = "tech",
+        period: str = "1y",
+        min_quality_score: float = 50.0,
+        correlation_threshold: float = 0.7,
+        max_workers: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Scan for cointegrated trading pairs using pair trading strategy.
+
+        This method integrates with the PairScanner from pair_trading_strategy.py
+        to find pairs suitable for mean reversion trading.
+
+        Args:
+            universe: Optional list of tickers to scan
+            universe_name: Name of predefined universe (tech, finance, healthcare, etc.)
+            period: Historical data period (default 1 year)
+            min_quality_score: Minimum quality score to include (default 50)
+            correlation_threshold: Minimum correlation for pre-filter (default 0.7)
+            max_workers: Number of parallel threads (default 10)
+
+        Returns:
+            Dict with:
+            - pairs_found: Number of cointegrated pairs
+            - top_pairs: Top 20 pairs by quality score
+            - actionable_signals: Pairs with immediate trading signals
+            - all_pairs: Complete list of pairs
+        """
+        print(f"Scanning for cointegrated pairs in {universe_name} universe...")
+
+        # Create pair scanner
+        scanner = PairScanner(
+            correlation_threshold=correlation_threshold,
+            max_workers=max_workers
+        )
+
+        # Run scan
+        pairs = scanner.scan_for_pairs(
+            universe=universe,
+            universe_name=universe_name if not universe else None,
+            period=period,
+            min_quality_score=min_quality_score
+        )
+
+        # Convert to dict format
+        pairs_data = []
+        actionable_signals = []
+
+        for pair in pairs:
+            pair_dict = {
+                "stock_a": pair.stock_a,
+                "stock_b": pair.stock_b,
+                "quality_score": pair.quality_score,
+                "correlation": pair.correlation,
+                "cointegration_pvalue": pair.cointegration.p_value,
+                "hedge_ratio": pair.cointegration.hedge_ratio,
+                "hurst_exponent": pair.hurst_exponent,
+                "half_life_days": pair.half_life,
+                "adf_pvalue": pair.adf_p_value,
+                "current_zscore": pair.current_zscore,
+                "recommendation": pair.recommendation,
+                "spread_mean": pair.spread_mean,
+                "spread_std": pair.spread_std
+            }
+            pairs_data.append(pair_dict)
+
+            # Identify actionable signals (z-score > 2 or < -2)
+            if pair.recommendation in ["LONG_SPREAD", "SHORT_SPREAD"]:
+                actionable_signals.append({
+                    **pair_dict,
+                    "action": "BUY" if pair.recommendation == "LONG_SPREAD" else "SELL",
+                    "description": f"{'Buy' if pair.recommendation == 'LONG_SPREAD' else 'Sell'} {pair.stock_a}, "
+                                   f"{'Sell' if pair.recommendation == 'LONG_SPREAD' else 'Buy'} {pair.stock_b} "
+                                   f"(z-score: {pair.current_zscore:.2f})"
+                })
+
+        # Sort actionable signals by quality score
+        actionable_signals.sort(key=lambda x: x['quality_score'], reverse=True)
+
+        print(f"Found {len(pairs)} cointegrated pairs, {len(actionable_signals)} with actionable signals")
+
+        return {
+            "scan_time": datetime.now().isoformat(),
+            "universe": universe_name if not universe else "custom",
+            "period": period,
+            "pairs_found": len(pairs),
+            "actionable_signals_count": len(actionable_signals),
+            "top_pairs": pairs_data[:20],
+            "actionable_signals": actionable_signals[:10],  # Top 10 actionable
+            "all_pairs": pairs_data
+        }

@@ -572,7 +572,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "📊 Pair Trading", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -2531,6 +2531,378 @@ elif page == "🔍 Market Scanner":
 
     else:
         st.error("❌ No strategies found. Create strategies first on the **Generate Strategies** or **Complete Trading System** page.")
+
+
+# =======================
+# PAIR TRADING PAGE
+# =======================
+
+elif page == "📊 Pair Trading":
+    st.markdown('<div class="main-header">📊 Pair Trading</div>', unsafe_allow_html=True)
+
+    st.write("Mean reversion strategy using cointegrated stock pairs. Find pairs that move together and trade when they diverge.")
+
+    # Tabs for different functions
+    pair_tab1, pair_tab2, pair_tab3, pair_tab4 = st.tabs([
+        "🔬 Analyze Pair", "🔍 Scan for Pairs", "📈 Backtest Pair", "📋 Active Pairs"
+    ])
+
+    # =======================
+    # TAB 1: ANALYZE PAIR
+    # =======================
+    with pair_tab1:
+        st.subheader("Analyze a Specific Pair")
+        st.write("Test if two stocks are cointegrated and suitable for pair trading.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            stock_a = st.text_input("Stock A", value="GLD", help="First stock ticker").upper()
+        with col2:
+            stock_b = st.text_input("Stock B", value="GDX", help="Second stock ticker").upper()
+
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            analyze_period = st.selectbox("Period", ["6mo", "1y", "2y"], index=1, key="analyze_period")
+        with col4:
+            entry_thresh = st.number_input("Entry Threshold (σ)", value=2.0, min_value=1.0, max_value=4.0, step=0.1)
+        with col5:
+            exit_thresh = st.number_input("Exit Threshold (σ)", value=0.5, min_value=0.0, max_value=2.0, step=0.1)
+
+        if st.button("🔬 Analyze Pair", type="primary", key="analyze_pair_btn"):
+            with st.spinner(f"Analyzing {stock_a}/{stock_b}..."):
+                response = make_api_request("/pairs/analyze", method="POST", data={
+                    "stock_a": stock_a,
+                    "stock_b": stock_b,
+                    "period": analyze_period,
+                    "entry_threshold": entry_thresh,
+                    "exit_threshold": exit_thresh
+                })
+
+                if response and response.get('success'):
+                    analysis = response.get('analysis', {})
+                    current_state = response.get('current_state', {})
+                    recommendation = response.get('recommendation', 'N/A')
+
+                    # Recommendation banner
+                    if recommendation == "LONG_SPREAD":
+                        st.success(f"🟢 **LONG SPREAD**: Buy {stock_a}, Sell {stock_b}")
+                    elif recommendation == "SHORT_SPREAD":
+                        st.error(f"🔴 **SHORT SPREAD**: Sell {stock_a}, Buy {stock_b}")
+                    elif recommendation == "SPREAD_AT_MEAN":
+                        st.info(f"⚪ **AT MEAN**: Spread is near equilibrium, wait for divergence")
+                    elif recommendation == "WAIT":
+                        st.warning(f"⏳ **WAIT**: Cointegrated but no signal yet")
+                    else:
+                        st.error(f"❌ **NOT SUITABLE**: Pair is not cointegrated")
+
+                    # Metrics row
+                    m1, m2, m3, m4 = st.columns(4)
+                    with m1:
+                        coint = analysis.get('cointegration', {})
+                        is_coint = "✅ Yes" if coint.get('is_cointegrated') else "❌ No"
+                        st.metric("Cointegrated", is_coint)
+                    with m2:
+                        st.metric("Quality Score", f"{analysis.get('quality_score', 0):.1f}/100")
+                    with m3:
+                        st.metric("Current Z-Score", f"{current_state.get('current_zscore', 0):.2f}")
+                    with m4:
+                        st.metric("Hedge Ratio", f"{coint.get('hedge_ratio', 0):.3f}")
+
+                    # Detailed statistics
+                    st.markdown("---")
+                    st.subheader("📊 Statistical Analysis")
+
+                    col_a, col_b = st.columns(2)
+
+                    with col_a:
+                        st.markdown("**Cointegration Test (Engle-Granger)**")
+                        coint_data = analysis.get('cointegration', {})
+                        st.write(f"- P-Value: `{coint_data.get('p_value', 'N/A'):.4f}`")
+                        st.write(f"- Test Statistic: `{coint_data.get('test_statistic', 'N/A'):.4f}`")
+                        crit = coint_data.get('critical_values', {})
+                        st.write(f"- Critical Values: 1%={crit.get('1%', 'N/A'):.2f}, 5%={crit.get('5%', 'N/A'):.2f}")
+
+                        st.markdown("**ADF Test (Spread Stationarity)**")
+                        adf = analysis.get('adf_test', {})
+                        adf_status = "✅ Stationary" if adf.get('is_stationary') else "❌ Non-stationary"
+                        st.write(f"- Status: {adf_status}")
+                        st.write(f"- P-Value: `{adf.get('p_value', 'N/A'):.4f}`")
+
+                    with col_b:
+                        st.markdown("**Mean Reversion Metrics**")
+                        hurst = analysis.get('hurst_exponent', 0.5)
+                        hurst_interp = analysis.get('hurst_interpretation', 'Unknown')
+                        st.write(f"- Hurst Exponent: `{hurst:.3f}` ({hurst_interp})")
+                        st.write(f"- Half-Life: `{analysis.get('half_life_days', 'N/A'):.1f}` days")
+                        st.write(f"- Correlation: `{analysis.get('correlation', 'N/A'):.3f}`")
+
+                        st.markdown("**Current Spread State**")
+                        st.write(f"- Spread Mean: `{current_state.get('spread_mean', 0):.2f}`")
+                        st.write(f"- Spread Std: `{current_state.get('spread_std', 0):.2f}`")
+                        st.write(f"- Price {stock_a}: `${current_state.get('price_a', 0):.2f}`")
+                        st.write(f"- Price {stock_b}: `${current_state.get('price_b', 0):.2f}`")
+
+                    # Interpretation help
+                    with st.expander("📖 How to Interpret"):
+                        st.markdown("""
+                        **Cointegration**: P-value < 0.05 means the pair moves together long-term.
+
+                        **Hurst Exponent**:
+                        - H < 0.5 = Mean reverting (good for pair trading)
+                        - H = 0.5 = Random walk
+                        - H > 0.5 = Trending
+
+                        **Half-Life**: Time for spread to revert halfway to mean. Ideal: 5-20 days.
+
+                        **Z-Score Signals**:
+                        - Z < -2: LONG spread (buy A, sell B)
+                        - Z > +2: SHORT spread (sell A, buy B)
+                        - |Z| < 0.5: EXIT (close positions)
+                        """)
+                else:
+                    st.error(f"Analysis failed: {response.get('detail', 'Unknown error') if response else 'API error'}")
+
+    # =======================
+    # TAB 2: SCAN FOR PAIRS
+    # =======================
+    with pair_tab2:
+        st.subheader("Auto-Discover Cointegrated Pairs")
+        st.write("Scan a universe of stocks to find the best pair trading opportunities.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            universe_options = {
+                "Technology": "tech",
+                "Finance": "finance",
+                "Healthcare": "healthcare",
+                "Energy": "energy",
+                "Consumer": "consumer",
+                "ETFs": "etf",
+                "Gold & Miners": "gold"
+            }
+            selected_universe = st.selectbox("Universe", list(universe_options.keys()))
+            universe_code = universe_options[selected_universe]
+
+        with col2:
+            scan_period = st.selectbox("Period", ["6mo", "1y", "2y"], index=1, key="scan_period")
+
+        col3, col4 = st.columns(2)
+        with col3:
+            min_quality = st.slider("Min Quality Score", 30, 80, 50)
+        with col4:
+            min_corr = st.slider("Min Correlation", 0.5, 0.9, 0.7)
+
+        if st.button("🔍 Scan for Pairs", type="primary", key="scan_pairs_btn"):
+            with st.spinner(f"Scanning {selected_universe} universe for cointegrated pairs..."):
+                response = make_api_request("/pairs/scan", method="POST", data={
+                    "universe": universe_code,
+                    "period": scan_period,
+                    "min_quality_score": min_quality,
+                    "correlation_threshold": min_corr
+                })
+
+                if response and response.get('success'):
+                    st.success(f"✅ Found **{response.get('pairs_found', 0)}** cointegrated pairs in {response.get('scan_duration_seconds', 0):.1f}s")
+
+                    top_pairs = response.get('top_pairs', [])
+
+                    if top_pairs:
+                        # Create DataFrame for display
+                        df_pairs = pd.DataFrame(top_pairs)
+                        df_pairs['pair'] = df_pairs['stock_a'] + '/' + df_pairs['stock_b']
+
+                        # Reorder columns
+                        display_cols = ['pair', 'quality_score', 'correlation', 'cointegration_pvalue',
+                                        'hurst_exponent', 'half_life_days', 'current_zscore', 'recommendation']
+                        df_display = df_pairs[display_cols].copy()
+                        df_display.columns = ['Pair', 'Quality', 'Corr', 'Coint P-val', 'Hurst', 'Half-Life', 'Z-Score', 'Signal']
+
+                        # Format columns
+                        df_display['Quality'] = df_display['Quality'].round(1)
+                        df_display['Corr'] = df_display['Corr'].round(3)
+                        df_display['Coint P-val'] = df_display['Coint P-val'].round(4)
+                        df_display['Hurst'] = df_display['Hurst'].round(3)
+                        df_display['Half-Life'] = df_display['Half-Life'].round(1)
+                        df_display['Z-Score'] = df_display['Z-Score'].round(2)
+
+                        st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+                        # Highlight actionable signals
+                        actionable = [p for p in top_pairs if p.get('recommendation') in ['LONG_SPREAD', 'SHORT_SPREAD']]
+                        if actionable:
+                            st.markdown("---")
+                            st.subheader("🎯 Actionable Signals")
+                            for p in actionable[:5]:
+                                if p['recommendation'] == 'LONG_SPREAD':
+                                    st.success(f"**{p['stock_a']}/{p['stock_b']}** - LONG SPREAD (Z={p['current_zscore']:.2f}) - Buy {p['stock_a']}, Sell {p['stock_b']}")
+                                else:
+                                    st.error(f"**{p['stock_a']}/{p['stock_b']}** - SHORT SPREAD (Z={p['current_zscore']:.2f}) - Sell {p['stock_a']}, Buy {p['stock_b']}")
+                    else:
+                        st.warning("No cointegrated pairs found. Try lowering the quality threshold.")
+                else:
+                    st.error(f"Scan failed: {response.get('detail', 'Unknown error') if response else 'API error'}")
+
+    # =======================
+    # TAB 3: BACKTEST PAIR
+    # =======================
+    with pair_tab3:
+        st.subheader("Backtest Pair Strategy")
+        st.write("Test historical performance of a pair trading strategy.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            bt_stock_a = st.text_input("Stock A", value="GLD", key="bt_stock_a").upper()
+        with col2:
+            bt_stock_b = st.text_input("Stock B", value="GDX", key="bt_stock_b").upper()
+
+        col3, col4, col5 = st.columns(3)
+        with col3:
+            bt_period = st.selectbox("Period", ["6mo", "1y", "2y", "5y"], index=1, key="bt_period")
+        with col4:
+            bt_capital = st.number_input("Initial Capital ($)", value=100000, min_value=10000, step=10000)
+        with col5:
+            bt_entry = st.number_input("Entry Threshold", value=2.0, min_value=1.0, max_value=4.0, step=0.1, key="bt_entry")
+
+        if st.button("📈 Run Backtest", type="primary", key="backtest_pair_btn"):
+            with st.spinner(f"Backtesting {bt_stock_a}/{bt_stock_b}..."):
+                response = make_api_request("/pairs/backtest", method="POST", data={
+                    "stock_a": bt_stock_a,
+                    "stock_b": bt_stock_b,
+                    "period": bt_period,
+                    "initial_capital": bt_capital,
+                    "entry_threshold": bt_entry
+                })
+
+                if response and response.get('success'):
+                    metrics = response.get('metrics', {})
+
+                    # Performance summary
+                    st.markdown("---")
+                    st.subheader("📊 Performance Summary")
+
+                    m1, m2, m3, m4 = st.columns(4)
+                    with m1:
+                        ret_pct = metrics.get('total_return_pct', 0)
+                        st.metric("Total Return", f"{ret_pct:.2f}%",
+                                  delta=f"${metrics.get('final_equity', bt_capital) - bt_capital:,.0f}")
+                    with m2:
+                        st.metric("Sharpe Ratio", f"{metrics.get('sharpe_ratio', 0):.2f}")
+                    with m3:
+                        st.metric("Win Rate", f"{metrics.get('win_rate', 0):.1f}%")
+                    with m4:
+                        st.metric("Max Drawdown", f"{metrics.get('max_drawdown_pct', 0):.2f}%")
+
+                    m5, m6, m7, m8 = st.columns(4)
+                    with m5:
+                        st.metric("Total Trades", metrics.get('total_trades', 0))
+                    with m6:
+                        st.metric("Winning Trades", metrics.get('winning_trades', 0))
+                    with m7:
+                        st.metric("Avg Win", f"${metrics.get('avg_win', 0):,.0f}")
+                    with m8:
+                        st.metric("Avg Loss", f"${metrics.get('avg_loss', 0):,.0f}")
+
+                    # Equity curve
+                    equity_curve = response.get('equity_curve', [])
+                    if equity_curve:
+                        st.markdown("---")
+                        st.subheader("📈 Equity Curve")
+
+                        import plotly.graph_objects as go
+
+                        df_equity = pd.DataFrame(equity_curve)
+                        fig = go.Figure()
+                        fig.add_trace(go.Scatter(
+                            x=df_equity['date'],
+                            y=df_equity['equity'],
+                            mode='lines',
+                            name='Portfolio Value',
+                            line=dict(color='#00D4AA', width=2)
+                        ))
+                        fig.add_hline(y=bt_capital, line_dash="dash", line_color="gray",
+                                      annotation_text="Initial Capital")
+                        fig.update_layout(
+                            title=f"{bt_stock_a}/{bt_stock_b} Pair Trading Equity Curve",
+                            xaxis_title="Date",
+                            yaxis_title="Portfolio Value ($)",
+                            template="plotly_dark" if st.session_state.get('dark_mode', False) else "plotly_white"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+
+                    # Trade history
+                    trades = response.get('trades', [])
+                    if trades:
+                        with st.expander(f"📋 Trade History ({len(trades)} trades)"):
+                            df_trades = pd.DataFrame(trades)
+                            st.dataframe(df_trades, use_container_width=True, hide_index=True)
+                else:
+                    st.error(f"Backtest failed: {response.get('detail', 'Unknown error') if response else 'API error'}")
+
+    # =======================
+    # TAB 4: ACTIVE PAIRS
+    # =======================
+    with pair_tab4:
+        st.subheader("Active Cointegrated Pairs")
+        st.write("View all discovered pairs from the database with current signals.")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            active_min_quality = st.slider("Min Quality Score", 0, 100, 50, key="active_quality")
+        with col2:
+            active_limit = st.selectbox("Show", [20, 50, 100], index=0)
+
+        if st.button("🔄 Refresh Pairs", key="refresh_pairs_btn"):
+            st.rerun()
+
+        response = make_api_request(f"/pairs/active?min_quality_score={active_min_quality}&limit={active_limit}")
+
+        if response and response.get('success'):
+            pairs = response.get('pairs', [])
+
+            if pairs:
+                st.success(f"Found **{len(pairs)}** active pairs")
+
+                # Create DataFrame
+                df_active = pd.DataFrame(pairs)
+                df_active['pair'] = df_active['stock_a'] + '/' + df_active['stock_b']
+
+                # Summary metrics
+                signals_long = len([p for p in pairs if p.get('current_signal') == 'LONG_SPREAD'])
+                signals_short = len([p for p in pairs if p.get('current_signal') == 'SHORT_SPREAD'])
+
+                m1, m2, m3 = st.columns(3)
+                with m1:
+                    st.metric("Total Pairs", len(pairs))
+                with m2:
+                    st.metric("Long Signals", signals_long)
+                with m3:
+                    st.metric("Short Signals", signals_short)
+
+                # Display table
+                display_cols = ['pair', 'quality_score', 'current_zscore', 'current_signal',
+                                'half_life_days', 'hurst_exponent', 'total_trades', 'total_pnl']
+                df_display = df_active[[c for c in display_cols if c in df_active.columns]].copy()
+
+                st.dataframe(df_display, use_container_width=True, hide_index=True)
+
+                # Quick actions for pairs with signals
+                actionable = [p for p in pairs if p.get('current_signal') in ['LONG_SPREAD', 'SHORT_SPREAD']]
+                if actionable:
+                    st.markdown("---")
+                    st.subheader("🎯 Pairs with Active Signals")
+                    for p in actionable[:10]:
+                        col_a, col_b = st.columns([3, 1])
+                        with col_a:
+                            signal_type = "🟢 LONG" if p['current_signal'] == 'LONG_SPREAD' else "🔴 SHORT"
+                            st.write(f"**{p['stock_a']}/{p['stock_b']}** - {signal_type} (Z={p['current_zscore']:.2f}, Quality={p['quality_score']:.0f})")
+                        with col_b:
+                            if st.button("Analyze", key=f"analyze_{p['id']}"):
+                                st.session_state['analyze_pair'] = (p['stock_a'], p['stock_b'])
+                                st.rerun()
+            else:
+                st.info("No active pairs found. Run a scan to discover cointegrated pairs.")
+        else:
+            st.warning("Could not load active pairs. The API may not have any pairs stored yet. Run a scan first!")
 
 
 # =======================
