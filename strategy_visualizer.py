@@ -122,7 +122,8 @@ class StrategyVisualizer:
         ticker: str,
         strategy: Dict,
         trades: List[Dict],
-        period: str = '1y'
+        period: str = '1y',
+        template: str = 'plotly_dark'
     ) -> go.Figure:
         """
         Create interactive chart showing strategy signals and trades
@@ -132,6 +133,7 @@ class StrategyVisualizer:
             strategy: Strategy configuration
             trades: List of executed trades
             period: Time period for chart
+            template: Plotly template for theming ('plotly_dark' or 'plotly_white')
 
         Returns:
             Plotly figure with price, indicators, and trade signals
@@ -350,7 +352,7 @@ class StrategyVisualizer:
             yaxis_title='Price',
             hovermode='x unified',
             height=600 if subplot_count == 1 else 800,
-            template='plotly_dark',
+            template=template,
             showlegend=True,
             legend=dict(
                 orientation="h",

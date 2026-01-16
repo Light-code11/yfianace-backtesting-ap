@@ -1,0 +1,13 @@
+[theme]
+# Use dark base theme - the app provides a toggle to switch between light and dark
+base = "dark"
+
+# Primary accent color for interactive elements (same in both themes)
+primaryColor = "#1f77b4"
+
+# Font family (sans serif, serif, or monospace)
+font = "sans serif"
+
+[server]
+# Enable static serving for assets
+enableStaticServing = true

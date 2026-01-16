@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 import json
 import os
 import time
+from dataclasses import dataclass, asdict, field
+from typing import Optional, Dict, Any, List
+from enum import Enum
 from strategy_visualizer import StrategyVisualizer
 
 # Page configuration
@@ -31,36 +34,194 @@ API_BASE_URL = os.getenv("API_BASE_URL", st.secrets.get("API_BASE_URL", "http://
 if 'tickers' not in st.session_state:
     st.session_state.tickers = "SPY,QQQ,AAPL"
 
-# Custom CSS
-st.markdown("""
+# Initialize dark mode state
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = True  # Default to dark mode
+
+# Theme-aware CSS and Plotly template helper
+def get_theme_colors():
+    """Get color scheme based on current theme"""
+    if st.session_state.dark_mode:
+        return {
+            'bg_primary': '#0e1117',
+            'bg_secondary': '#262730',
+            'bg_card': '#1e1e2e',
+            'text_primary': '#fafafa',
+            'text_secondary': '#b0b0b0',
+            'accent': '#1f77b4',
+            'success_bg': '#1e4620',
+            'success_border': '#2ecc71',
+            'success_text': '#4ade80',
+            'warning_bg': '#4a3f1a',
+            'warning_border': '#ffc107',
+            'warning_text': '#ffd93d',
+            'error_bg': '#4a1a1a',
+            'error_border': '#e74c3c',
+            'error_text': '#f87171',
+            'plotly_template': 'plotly_dark',
+            'chart_bg': 'rgba(0,0,0,0)',
+            'grid_color': '#333333',
+        }
+    else:
+        return {
+            'bg_primary': '#ffffff',
+            'bg_secondary': '#f0f2f6',
+            'bg_card': '#f8f9fa',
+            'text_primary': '#1e1e1e',
+            'text_secondary': '#666666',
+            'accent': '#1f77b4',
+            'success_bg': '#d4edda',
+            'success_border': '#c3e6cb',
+            'success_text': '#155724',
+            'warning_bg': '#fff3cd',
+            'warning_border': '#ffc107',
+            'warning_text': '#856404',
+            'error_bg': '#f8d7da',
+            'error_border': '#f5c6cb',
+            'error_text': '#721c24',
+            'plotly_template': 'plotly_white',
+            'chart_bg': 'rgba(255,255,255,1)',
+            'grid_color': '#e0e0e0',
+        }
+
+def get_plotly_template():
+    """Get Plotly template based on current theme"""
+    return 'plotly_dark' if st.session_state.dark_mode else 'plotly_white'
+
+def get_plotly_layout_theme():
+    """Get Plotly layout settings for current theme"""
+    colors = get_theme_colors()
+    return {
+        'template': colors['plotly_template'],
+        'paper_bgcolor': colors['chart_bg'],
+        'plot_bgcolor': colors['chart_bg'],
+        'font': {'color': colors['text_primary']},
+        'xaxis': {'gridcolor': colors['grid_color'], 'zerolinecolor': colors['grid_color']},
+        'yaxis': {'gridcolor': colors['grid_color'], 'zerolinecolor': colors['grid_color']},
+    }
+
+# Apply theme-aware CSS
+colors = get_theme_colors()
+st.markdown(f"""
 <style>
-    .main-header {
+    /* Main app background and text colors */
+    .stApp {{
+        background-color: {colors['bg_primary']};
+        color: {colors['text_primary']};
+    }}
+
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {{
+        background-color: {colors['bg_secondary']};
+    }}
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {{
+        color: {colors['text_primary']};
+    }}
+
+    /* Headers */
+    .main-header {{
         font-size: 3rem;
         font-weight: bold;
-        color: #1f77b4;
+        color: {colors['accent']};
         text-align: center;
         margin-bottom: 2rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
+    }}
+    h1, h2, h3, h4, h5, h6 {{
+        color: {colors['text_primary']} !important;
+    }}
+
+    /* Metric cards */
+    .metric-card {{
+        background-color: {colors['bg_card']};
         padding: 1rem;
         border-radius: 0.5rem;
         margin: 0.5rem 0;
-    }
-    .success-box {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
+        color: {colors['text_primary']};
+    }}
+    [data-testid="stMetric"] {{
+        background-color: {colors['bg_card']};
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }}
+    [data-testid="stMetricValue"] {{
+        color: {colors['text_primary']};
+    }}
+    [data-testid="stMetricLabel"] {{
+        color: {colors['text_secondary']};
+    }}
+
+    /* Alert boxes */
+    .success-box {{
+        background-color: {colors['success_bg']};
+        border: 1px solid {colors['success_border']};
         border-radius: 0.25rem;
         padding: 1rem;
         margin: 1rem 0;
-    }
-    .warning-box {
-        background-color: #fff3cd;
-        border: 1px solid #ffc107;
+        color: {colors['success_text']};
+    }}
+    .warning-box {{
+        background-color: {colors['warning_bg']};
+        border: 1px solid {colors['warning_border']};
         border-radius: 0.25rem;
         padding: 1rem;
         margin: 1rem 0;
-    }
+        color: {colors['warning_text']};
+    }}
+    .error-box {{
+        background-color: {colors['error_bg']};
+        border: 1px solid {colors['error_border']};
+        border-radius: 0.25rem;
+        padding: 1rem;
+        margin: 1rem 0;
+        color: {colors['error_text']};
+    }}
+
+    /* Dataframes and tables */
+    [data-testid="stDataFrame"] {{
+        background-color: {colors['bg_card']};
+    }}
+    .stDataFrame {{
+        color: {colors['text_primary']};
+    }}
+
+    /* Expander styling */
+    [data-testid="stExpander"] {{
+        background-color: {colors['bg_card']};
+        border-radius: 0.5rem;
+    }}
+
+    /* Tabs styling */
+    .stTabs [data-baseweb="tab-list"] {{
+        background-color: {colors['bg_secondary']};
+        border-radius: 0.5rem;
+    }}
+    .stTabs [data-baseweb="tab"] {{
+        color: {colors['text_primary']};
+    }}
+
+    /* Input fields */
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input,
+    [data-testid="stSelectbox"] select {{
+        background-color: {colors['bg_card']} !important;
+        color: {colors['text_primary']} !important;
+    }}
+
+    /* Markdown text */
+    [data-testid="stMarkdownContainer"] p {{
+        color: {colors['text_primary']};
+    }}
+
+    /* Code blocks */
+    code {{
+        background-color: {colors['bg_card']};
+        color: {colors['accent']};
+    }}
+
+    /* Dividers */
+    hr {{
+        border-color: {colors['bg_secondary']};
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +287,7 @@ def plot_equity_curve(equity_curve):
         xaxis_title="Date",
         yaxis_title="Portfolio Value ($)",
         hovermode='x unified',
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -166,7 +327,7 @@ def plot_drawdown(equity_curve):
         xaxis_title="Date",
         yaxis_title="Drawdown (%)",
         hovermode='x unified',
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -195,7 +356,7 @@ def plot_trade_distribution(trades):
         title="Trade P&L Distribution",
         xaxis_title="Profit/Loss (%)",
         yaxis_title="Number of Trades",
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -248,7 +409,7 @@ def plot_monthly_returns(equity_curve):
         title="Monthly Returns Heatmap",
         xaxis_title="Year",
         yaxis_title="Month",
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -274,7 +435,7 @@ def plot_win_loss_distribution(trades):
 
     fig.update_layout(
         title=f"Trade Outcome Distribution (Total: {len(df)} trades)",
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -317,7 +478,7 @@ def plot_rolling_sharpe(equity_curve, window=30):
         xaxis_title="Date",
         yaxis_title="Sharpe Ratio",
         hovermode='x unified',
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -356,7 +517,7 @@ def plot_cumulative_returns(equity_curve):
         xaxis_title="Date",
         yaxis_title="Cumulative Return (%)",
         hovermode='x unified',
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -380,7 +541,7 @@ def plot_portfolio_allocation(allocations):
 
     fig.update_layout(
         title="Portfolio Allocation",
-        template='plotly_white'
+        template=get_plotly_template()
     )
 
     return fig
@@ -391,6 +552,22 @@ def plot_portfolio_allocation(allocations):
 # =======================
 
 st.sidebar.title("📈 AI Trading Platform")
+
+# Dark mode toggle
+dark_mode_col1, dark_mode_col2 = st.sidebar.columns([1, 3])
+with dark_mode_col1:
+    theme_icon = "🌙" if st.session_state.dark_mode else "☀️"
+    st.markdown(f"<span style='font-size: 1.5rem;'>{theme_icon}</span>", unsafe_allow_html=True)
+with dark_mode_col2:
+    if st.toggle("Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle"):
+        if not st.session_state.dark_mode:
+            st.session_state.dark_mode = True
+            st.rerun()
+    else:
+        if st.session_state.dark_mode:
+            st.session_state.dark_mode = False
+            st.rerun()
+
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
@@ -403,6 +580,569 @@ st.sidebar.info("AI-powered trading strategy platform with backtesting and portf
 
 
 # =======================
+# STRATEGY PROCESS LOGGER
+# =======================
+
+class LogStepType(Enum):
+    CONFIG = "config"
+    ML_PREDICTION = "ml_prediction"
+    ML_TRAINING = "ml_training"
+    REGIME_DETECTION = "regime"
+    PARAMETER_OPTIMIZATION = "optimization"
+    BACKTEST = "backtest"
+    FILTERING = "filtering"
+    SUMMARY = "summary"
+
+@dataclass
+class StrategyLogEntry:
+    timestamp: str
+    step_type: str
+    ticker: Optional[str]
+    strategy: Optional[str]
+    title: str
+    status: str  # "started", "success", "warning", "error"
+    duration_ms: Optional[float]
+    details: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+class StrategyProcessLogger:
+    """Manages log entries for the strategy generation process"""
+
+    def __init__(self):
+        self.entries: List[StrategyLogEntry] = []
+        self._step_start_times: Dict[str, datetime] = {}
+
+    def start_step(self, step_id: str):
+        """Mark the start of a step for duration calculation"""
+        self._step_start_times[step_id] = datetime.now()
+
+    def log(
+        self,
+        step_type: LogStepType,
+        title: str,
+        status: str,
+        ticker: Optional[str] = None,
+        strategy: Optional[str] = None,
+        details: Optional[Dict[str, Any]] = None,
+        step_id: Optional[str] = None
+    ) -> StrategyLogEntry:
+        """Add a log entry"""
+        duration_ms = None
+        if step_id and step_id in self._step_start_times:
+            duration_ms = (datetime.now() - self._step_start_times[step_id]).total_seconds() * 1000
+            del self._step_start_times[step_id]
+
+        entry = StrategyLogEntry(
+            timestamp=datetime.now().strftime("%H:%M:%S.%f")[:-3],
+            step_type=step_type.value,
+            ticker=ticker,
+            strategy=strategy,
+            title=title,
+            status=status,
+            duration_ms=duration_ms,
+            details=details or {}
+        )
+        self.entries.append(entry)
+        return entry
+
+    def get_entries(self) -> List[Dict[str, Any]]:
+        """Get all entries as list of dicts"""
+        return [e.to_dict() for e in self.entries]
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get summary statistics"""
+        return {
+            "total_steps": len(self.entries),
+            "successful": len([e for e in self.entries if e.status == "success"]),
+            "warnings": len([e for e in self.entries if e.status == "warning"]),
+            "errors": len([e for e in self.entries if e.status == "error"]),
+            "strategies_passed": len([e for e in self.entries if e.step_type == "filtering" and e.status == "success"]),
+            "strategies_failed": len([e for e in self.entries if e.step_type == "filtering" and e.status == "warning"])
+        }
+
+
+# Log Entry Formatters
+def format_ml_prediction_details(ml_response: Dict, trained: bool = False) -> Dict[str, Any]:
+    """Format ML prediction response for logging"""
+    if not ml_response or not ml_response.get('success'):
+        return {"error": ml_response.get('error', 'Unknown error') if ml_response else 'No response'}
+
+    confidence = ml_response.get('confidence', {})
+    details = {
+        "prediction": ml_response.get('prediction', 'N/A'),
+        "confidence_score": f"{confidence.get('confidence_score', 0) * 100:.1f}%",
+        "up_probability": f"{confidence.get('up_probability', 0) * 100:.1f}%",
+        "down_probability": f"{confidence.get('down_probability', 0) * 100:.1f}%",
+        "current_price": f"${ml_response.get('current_price', 0):.2f}"
+    }
+    if trained:
+        details["model_status"] = "Newly trained"
+    return details
+
+def format_ml_training_details(train_response: Dict) -> Dict[str, Any]:
+    """Format ML training response for logging"""
+    if not train_response or not train_response.get('success'):
+        return {"error": train_response.get('error', 'Unknown error') if train_response else 'No response'}
+
+    test_metrics = train_response.get('test_metrics', {})
+    samples = train_response.get('samples', {})
+    return {
+        "test_accuracy": f"{test_metrics.get('accuracy', 0) * 100:.1f}%",
+        "test_precision": f"{test_metrics.get('precision', 0) * 100:.1f}%",
+        "test_recall": f"{test_metrics.get('recall', 0) * 100:.1f}%",
+        "test_f1": f"{test_metrics.get('f1_score', 0) * 100:.1f}%",
+        "roc_auc": f"{test_metrics.get('roc_auc', 0) * 100:.1f}%",
+        "samples_total": samples.get('total', 0),
+        "samples_train": samples.get('train', 0),
+        "samples_test": samples.get('test', 0),
+        "feature_importance_top5": [
+            {"feature": f['feature'], "importance": f"{f['importance'] * 100:.2f}%"}
+            for f in train_response.get('top_features', [])[:5]
+        ]
+    }
+
+def format_regime_details(regime_response: Dict) -> Dict[str, Any]:
+    """Format regime detection response for logging"""
+    if not regime_response or not regime_response.get('success'):
+        return {"error": regime_response.get('error', 'Unknown error') if regime_response else 'No response'}
+
+    current_regime = regime_response.get('current_regime', {})
+    regime_label = current_regime.get('label', 'UNKNOWN') if isinstance(current_regime, dict) else str(current_regime)
+    regime_conf = current_regime.get('confidence', 0) if isinstance(current_regime, dict) else 0
+
+    return {
+        "current_regime": regime_label,
+        "regime_confidence": f"{regime_conf * 100:.1f}%",
+        "regime_probabilities": {
+            k: f"{v * 100:.1f}%"
+            for k, v in regime_response.get('regime_probabilities', {}).items()
+        },
+        "next_regime_probabilities": {
+            k: f"{v * 100:.1f}%"
+            for k, v in regime_response.get('next_regime_probabilities', {}).items()
+        }
+    }
+
+def format_optimization_details(opt_response: Dict) -> Dict[str, Any]:
+    """Format vectorized optimization response for logging"""
+    if not opt_response or not opt_response.get('success'):
+        return {"error": opt_response.get('error', 'Unknown error') if opt_response else 'No response'}
+
+    metrics = opt_response.get('metrics', {})
+    return {
+        "optimal_parameters": opt_response.get('optimal_parameters', {}),
+        "combinations_tested": opt_response.get('combinations_tested', 0),
+        "optimization_method": opt_response.get('method', 'unknown'),
+        "optimized_metrics": {
+            "sharpe_ratio": f"{metrics.get('sharpe_ratio', 0):.2f}",
+            "total_return": f"{metrics.get('total_return', 0):.2f}%",
+            "max_drawdown": f"{metrics.get('max_drawdown', 0):.2f}%",
+            "win_rate": f"{metrics.get('win_rate', 0):.1f}%",
+            "total_trades": metrics.get('total_trades', 0)
+        }
+    }
+
+def format_backtest_details(response: Dict, strategy_config: Dict) -> Dict[str, Any]:
+    """Format backtest response for logging"""
+    if not response or not response.get('success'):
+        return {"error": response.get('error', 'Unknown error') if response else 'No response'}
+
+    metrics = response.get('metrics', {})
+    return {
+        "strategy_config": {
+            "strategy_type": strategy_config.get('strategy_type', 'N/A'),
+            "indicators": [ind.get('name', 'N/A') for ind in strategy_config.get('indicators', [])],
+            "risk_management": strategy_config.get('risk_management', {})
+        },
+        "performance_metrics": {
+            "total_return": f"{metrics.get('total_return_pct', 0):.2f}%",
+            "sharpe_ratio": f"{metrics.get('sharpe_ratio', 0):.2f}",
+            "sortino_ratio": f"{metrics.get('sortino_ratio', 0):.2f}",
+            "calmar_ratio": f"{metrics.get('calmar_ratio', 0):.2f}",
+            "max_drawdown": f"{metrics.get('max_drawdown_pct', 0):.2f}%",
+            "win_rate": f"{metrics.get('win_rate', 0):.2f}%",
+            "total_trades": metrics.get('total_trades', 0)
+        },
+        "risk_metrics": {
+            "var_95": f"{metrics.get('var_95_pct', 0):.2f}%",
+            "cvar_95": f"{metrics.get('cvar_95_pct', 0):.2f}%",
+            "ulcer_index": f"{metrics.get('ulcer_index', 0):.3f}",
+            "pain_index": f"{metrics.get('pain_index', 0):.3f}"
+        },
+        "kelly_criterion": {
+            "kelly_fraction": f"{metrics.get('kelly_criterion', 0):.4f}",
+            "recommended_position": f"{metrics.get('kelly_position_pct', 0):.1f}%",
+            "risk_level": metrics.get('kelly_risk_level', 'UNKNOWN')
+        },
+        "quality_score": metrics.get('quality_score', 0)
+    }
+
+def format_filtering_details(
+    ticker: str,
+    strategy: str,
+    metrics: Dict,
+    optimization_goal: str,
+    threshold: float,
+    passed: bool
+) -> Dict[str, Any]:
+    """Format filtering/ranking decision for logging"""
+    sharpe = metrics.get('sharpe_ratio', 0)
+    sortino = metrics.get('sortino_ratio', 0)
+    calmar = metrics.get('calmar_ratio', 0)
+    total_return = metrics.get('total_return_pct', 0)
+
+    # Determine which metric was used for filtering
+    if optimization_goal == "Risk-Adjusted (Sharpe)":
+        filter_metric = "sharpe_ratio"
+        filter_value = sharpe
+        effective_threshold = threshold
+    elif optimization_goal == "Maximum Returns":
+        filter_metric = "sharpe_ratio"
+        filter_value = sharpe
+        effective_threshold = 0.3
+    elif optimization_goal == "Best Sortino":
+        filter_metric = "sortino_ratio"
+        filter_value = sortino
+        effective_threshold = threshold * 1.2
+    elif optimization_goal == "Best Calmar":
+        filter_metric = "calmar_ratio"
+        filter_value = calmar
+        effective_threshold = threshold * 0.8
+    else:
+        filter_metric = "sharpe_ratio"
+        filter_value = sharpe
+        effective_threshold = threshold
+
+    return {
+        "optimization_goal": optimization_goal,
+        "filter_metric": filter_metric,
+        "filter_value": f"{filter_value:.3f}",
+        "threshold": f"{effective_threshold:.3f}",
+        "passed": passed,
+        "reason": f"{filter_metric} ({filter_value:.3f}) >= threshold ({effective_threshold:.3f})" if passed
+                  else f"{filter_metric} ({filter_value:.3f}) < threshold ({effective_threshold:.3f})",
+        "all_metrics": {
+            "sharpe": f"{sharpe:.3f}",
+            "sortino": f"{sortino:.3f}",
+            "calmar": f"{calmar:.3f}",
+            "total_return": f"{total_return:.2f}%"
+        },
+        "ranking_score": filter_value
+    }
+
+
+# Log Panel Rendering Functions
+def render_log_panel(logger: StrategyProcessLogger, expanded: bool = False):
+    """Render the expandable log panel"""
+    summary = logger.get_summary()
+
+    expander_title = (
+        f"📋 Strategy Generation Log - "
+        f"{summary['total_steps']} steps | "
+        f"✅ {summary['successful']} | "
+        f"⚠️ {summary['warnings']} | "
+        f"❌ {summary['errors']} | "
+        f"Passed: {summary['strategies_passed']} | "
+        f"Filtered: {summary['strategies_failed']}"
+    )
+
+    with st.expander(expander_title, expanded=expanded):
+        tab_timeline, tab_details, tab_filtering, tab_raw = st.tabs([
+            "📊 Timeline", "🔍 Step Details", "🎯 Filtering Decisions", "📄 Raw Log"
+        ])
+
+        with tab_timeline:
+            render_timeline_view(logger)
+
+        with tab_details:
+            render_details_view(logger)
+
+        with tab_filtering:
+            render_filtering_view(logger)
+
+        with tab_raw:
+            render_raw_log(logger)
+
+def render_timeline_view(logger: StrategyProcessLogger):
+    """Render timeline of all steps"""
+    entries = logger.get_entries()
+
+    if not entries:
+        st.info("No log entries yet")
+        return
+
+    # Group by ticker
+    by_ticker = {}
+    for entry in entries:
+        ticker = entry.get('ticker') or 'General'
+        if ticker not in by_ticker:
+            by_ticker[ticker] = []
+        by_ticker[ticker].append(entry)
+
+    for ticker, ticker_entries in by_ticker.items():
+        st.markdown(f"#### {ticker}")
+
+        for entry in ticker_entries:
+            status_icon = {
+                "success": "✅",
+                "warning": "⚠️",
+                "error": "❌",
+                "started": "🔄"
+            }.get(entry['status'], "ℹ️")
+
+            duration_str = f"({entry['duration_ms']:.0f}ms)" if entry.get('duration_ms') else ""
+
+            col1, col2, col3 = st.columns([1, 3, 1])
+            with col1:
+                st.caption(entry['timestamp'])
+            with col2:
+                st.markdown(f"{status_icon} **{entry['title']}** {duration_str}")
+            with col3:
+                st.caption(entry['step_type'])
+
+def render_details_view(logger: StrategyProcessLogger):
+    """Render detailed view of each step with expandable details"""
+    entries = logger.get_entries()
+
+    if not entries:
+        st.info("No log entries yet")
+        return
+
+    # Filter by step type
+    step_types = list(set(e['step_type'] for e in entries))
+    selected_type = st.selectbox(
+        "Filter by Step Type",
+        options=["All"] + step_types,
+        key="log_step_filter"
+    )
+
+    filtered = entries if selected_type == "All" else [e for e in entries if e['step_type'] == selected_type]
+
+    for i, entry in enumerate(filtered):
+        status_icon = {"success": "✅", "warning": "⚠️", "error": "❌", "started": "🔄"}.get(entry['status'], "ℹ️")
+
+        with st.container():
+            st.markdown(f"**{status_icon} {entry['timestamp']}** - {entry['title']}")
+
+            if entry['ticker']:
+                st.caption(f"Ticker: {entry['ticker']} | Strategy: {entry.get('strategy') or 'N/A'}")
+
+            if entry.get('details'):
+                with st.expander("View Details", expanded=False):
+                    # Render based on step type
+                    if entry['step_type'] == 'ml_prediction':
+                        render_ml_details_ui(entry['details'])
+                    elif entry['step_type'] == 'ml_training':
+                        render_training_details_ui(entry['details'])
+                    elif entry['step_type'] == 'regime':
+                        render_regime_details_ui(entry['details'])
+                    elif entry['step_type'] == 'optimization':
+                        render_optimization_details_ui(entry['details'])
+                    elif entry['step_type'] == 'backtest':
+                        render_backtest_details_ui(entry['details'])
+                    elif entry['step_type'] == 'filtering':
+                        render_filtering_details_ui(entry['details'])
+                    else:
+                        st.json(entry['details'])
+
+            st.divider()
+
+def render_ml_details_ui(details: Dict):
+    """Render ML prediction details"""
+    if 'error' in details:
+        st.error(details['error'])
+        return
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Prediction", details.get('prediction', 'N/A'))
+        st.metric("Confidence", details.get('confidence_score', 'N/A'))
+    with col2:
+        st.metric("Up Probability", details.get('up_probability', 'N/A'))
+        st.metric("Down Probability", details.get('down_probability', 'N/A'))
+    st.caption(f"Current Price: {details.get('current_price', 'N/A')}")
+
+def render_training_details_ui(details: Dict):
+    """Render ML training details with feature importance"""
+    if 'error' in details:
+        st.error(details['error'])
+        return
+
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Accuracy", details.get('test_accuracy', 'N/A'))
+    with col2:
+        st.metric("Precision", details.get('test_precision', 'N/A'))
+    with col3:
+        st.metric("Recall", details.get('test_recall', 'N/A'))
+    with col4:
+        st.metric("ROC AUC", details.get('roc_auc', 'N/A'))
+
+    st.caption(f"Samples: {details.get('samples_total', 0)} total ({details.get('samples_train', 0)} train / {details.get('samples_test', 0)} test)")
+
+    if details.get('feature_importance_top5'):
+        st.markdown("**Top 5 Feature Importance:**")
+        for feat in details['feature_importance_top5']:
+            importance_val = float(feat['importance'].rstrip('%')) / 100
+            st.progress(min(importance_val * 5, 1.0), text=f"{feat['feature']}: {feat['importance']}")
+
+def render_regime_details_ui(details: Dict):
+    """Render regime detection details"""
+    if 'error' in details:
+        st.error(details['error'])
+        return
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Current Regime", details.get('current_regime', 'N/A'))
+        st.metric("Confidence", details.get('regime_confidence', 'N/A'))
+
+    with col2:
+        st.markdown("**Regime Probabilities:**")
+        for regime, prob in details.get('regime_probabilities', {}).items():
+            st.caption(f"{regime}: {prob}")
+
+def render_optimization_details_ui(details: Dict):
+    """Render optimization details"""
+    if 'error' in details:
+        st.error(details['error'])
+        return
+
+    st.markdown("**Optimal Parameters Found:**")
+    st.json(details.get('optimal_parameters', {}))
+
+    st.metric("Combinations Tested", details.get('combinations_tested', 0))
+
+    if details.get('optimized_metrics'):
+        st.markdown("**Optimized Performance:**")
+        metrics = details['optimized_metrics']
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Sharpe", metrics.get('sharpe_ratio', 'N/A'))
+        with col2:
+            st.metric("Return", metrics.get('total_return', 'N/A'))
+        with col3:
+            st.metric("Win Rate", metrics.get('win_rate', 'N/A'))
+
+def render_backtest_details_ui(details: Dict):
+    """Render backtest details"""
+    if 'error' in details:
+        st.error(details['error'])
+        return
+
+    config = details.get('strategy_config', {})
+    st.caption(f"Type: {config.get('strategy_type')} | Indicators: {', '.join(config.get('indicators', []))}")
+
+    perf = details.get('performance_metrics', {})
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Return", perf.get('total_return', 'N/A'))
+        st.metric("Sharpe", perf.get('sharpe_ratio', 'N/A'))
+    with col2:
+        st.metric("Sortino", perf.get('sortino_ratio', 'N/A'))
+        st.metric("Calmar", perf.get('calmar_ratio', 'N/A'))
+    with col3:
+        st.metric("Max DD", perf.get('max_drawdown', 'N/A'))
+        st.metric("Win Rate", perf.get('win_rate', 'N/A'))
+    with col4:
+        st.metric("Trades", perf.get('total_trades', 'N/A'))
+        st.metric("Quality", details.get('quality_score', 'N/A'))
+
+    with st.expander("Risk Metrics"):
+        risk = details.get('risk_metrics', {})
+        for k, v in risk.items():
+            st.caption(f"{k}: {v}")
+
+    with st.expander("Kelly Criterion"):
+        kelly = details.get('kelly_criterion', {})
+        for k, v in kelly.items():
+            st.caption(f"{k}: {v}")
+
+def render_filtering_details_ui(details: Dict):
+    """Render filtering decision details"""
+    passed = details.get('passed', False)
+
+    if passed:
+        st.success(f"**PASSED** - {details.get('reason', 'Met threshold')}")
+    else:
+        st.warning(f"**FILTERED OUT** - {details.get('reason', 'Below threshold')}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("**Filter Criteria:**")
+        st.caption(f"Goal: {details.get('optimization_goal', 'N/A')}")
+        st.caption(f"Metric: {details.get('filter_metric', 'N/A')}")
+        st.caption(f"Value: {details.get('filter_value', 'N/A')}")
+        st.caption(f"Threshold: {details.get('threshold', 'N/A')}")
+
+    with col2:
+        st.markdown("**All Metrics:**")
+        for k, v in details.get('all_metrics', {}).items():
+            st.caption(f"{k}: {v}")
+
+def render_filtering_view(logger: StrategyProcessLogger):
+    """Render a dedicated filtering decisions view"""
+    entries = [e for e in logger.get_entries() if e['step_type'] == 'filtering']
+
+    if not entries:
+        st.info("No filtering decisions recorded yet")
+        return
+
+    # Summary table
+    data = []
+    for entry in entries:
+        details = entry.get('details', {})
+        data.append({
+            'Ticker': entry.get('ticker', 'N/A'),
+            'Strategy': entry.get('strategy', 'N/A'),
+            'Passed': '✅' if details.get('passed') else '❌',
+            'Metric': details.get('filter_metric', 'N/A'),
+            'Value': details.get('filter_value', 'N/A'),
+            'Threshold': details.get('threshold', 'N/A'),
+        })
+
+    df = pd.DataFrame(data)
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    # Ranking visualization
+    passed_entries = [e for e in entries if e.get('details', {}).get('passed')]
+    if passed_entries:
+        st.markdown("**Ranking by Score:**")
+        ranking_data = []
+        for entry in passed_entries:
+            ranking_data.append({
+                'Strategy': f"{entry.get('ticker')} - {entry.get('strategy')}",
+                'Score': float(entry.get('details', {}).get('ranking_score', 0))
+            })
+        ranking_df = pd.DataFrame(ranking_data).sort_values('Score', ascending=False)
+        st.bar_chart(ranking_df.set_index('Strategy'))
+
+def render_raw_log(logger: StrategyProcessLogger):
+    """Render raw JSON log for debugging"""
+    entries = logger.get_entries()
+
+    # Download button
+    log_json = json.dumps(entries, indent=2, default=str)
+    st.download_button(
+        label="📥 Download Full Log (JSON)",
+        data=log_json,
+        file_name=f"strategy_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        mime="application/json"
+    )
+
+    # Searchable view
+    search = st.text_input("Search log entries", key="log_search")
+
+    for entry in entries:
+        entry_str = json.dumps(entry, default=str)
+        if not search or search.lower() in entry_str.lower():
+            with st.expander(f"{entry['timestamp']} - {entry['title']}", expanded=False):
+                st.json(entry)
+
+
+# =======================
 # DASHBOARD PAGE
 # =======================
 
@@ -412,7 +1152,7 @@ if page == "Dashboard":
     # Fetch dashboard data
     analytics = make_api_request("/analytics/dashboard")
 
-    if analytics:
+    if analytics and analytics.get('summary'):
         # Summary metrics
         col1, col2, col3, col4 = st.columns(4)
 
@@ -574,7 +1314,9 @@ if page == "Dashboard":
                         """)
             else:
                 st.info("💡 Tip: Run a new backtest to see Kelly Criterion recommendations!")
-
+    else:
+        st.error(f"⚠️ Cannot connect to API at: `{API_BASE_URL}`")
+        st.info("Make sure the API is running and the URL is correct in your Streamlit secrets.")
 
 
 # =======================
@@ -1107,7 +1849,8 @@ elif page == "Backtest":
                                             ticker=selected_ticker,
                                             strategy=strategy_config,
                                             trades=trades,
-                                            period=chart_period
+                                            period=chart_period,
+                                            template=get_plotly_template()
                                         )
 
                                         if chart_fig:
@@ -2795,11 +3538,6 @@ elif page == "📊 Market Regimes":
         - Backtest strategies separately by regime to validate performance
         """)
 
-
-# =======================
-# COMPLETE TRADING SYSTEM PAGE
-# =======================
-
 elif page == "🎯 Complete Trading System":
     st.markdown('<div class="main-header">🎯 Complete Trading System</div>', unsafe_allow_html=True)
 
@@ -2920,6 +3658,28 @@ elif page == "🎯 Complete Trading System":
         if not tickers or not strategies:
             st.error("⚠️ Please select at least one ticker and one strategy")
         else:
+            # Initialize process logger
+            process_logger = StrategyProcessLogger()
+
+            # Log configuration
+            process_logger.log(
+                LogStepType.CONFIG,
+                title="Analysis Configuration",
+                status="success",
+                details={
+                    "tickers": tickers,
+                    "strategies": strategies,
+                    "lookback_period": lookback_period,
+                    "min_sharpe_threshold": min_sharpe,
+                    "total_capital": total_capital,
+                    "use_vectorized_optimization": use_vectorized,
+                    "optimization_goal": optimization_goal
+                }
+            )
+
+            # Create placeholder for log panel
+            log_placeholder = st.empty()
+
             # Create progress tracking
             progress_bar = st.progress(0)
             status_text = st.empty()
@@ -2948,12 +3708,19 @@ elif page == "🎯 Complete Trading System":
                             st.markdown("#### 🤖 ML Prediction")
                             status_text.text(f"Getting ML prediction for {ticker}...")
 
+                            ml_step_id = f"ml_{ticker}"
+                            process_logger.start_step(ml_step_id)
+                            ml_trained = False
+
                             ml_response = make_api_request(f"/ml/predict/{ticker}")
 
                             # If no model exists, train it automatically
                             if ml_response and not ml_response.get('success') and "No trained model" in ml_response.get('error', ''):
                                 with st.spinner(f"🔄 Training ML model for {ticker}... (30-60 seconds)"):
                                     status_text.text(f"🔄 Training ML model for {ticker}... (this may take 30-60 seconds)")
+
+                                    train_step_id = f"ml_train_{ticker}"
+                                    process_logger.start_step(train_step_id)
 
                                     # Train the model
                                     train_response = make_api_request(
@@ -2967,12 +3734,33 @@ elif page == "🎯 Complete Trading System":
                                         }
                                     )
 
+                                    # Log training
+                                    process_logger.log(
+                                        LogStepType.ML_TRAINING,
+                                        title=f"ML Model Training for {ticker}",
+                                        status="success" if train_response and train_response.get('success') else "error",
+                                        ticker=ticker,
+                                        details=format_ml_training_details(train_response),
+                                        step_id=train_step_id
+                                    )
+
                                     if train_response and train_response.get('success'):
                                         st.info(f"✅ Model trained successfully (Accuracy: {train_response['test_metrics']['accuracy']*100:.1f}%)")
+                                        ml_trained = True
                                         # Now get prediction with newly trained model
                                         ml_response = make_api_request(f"/ml/predict/{ticker}")
                                     else:
                                         st.warning(f"⚠️ Failed to train model: {train_response.get('error', 'Unknown error')}")
+
+                            # Log ML prediction
+                            process_logger.log(
+                                LogStepType.ML_PREDICTION,
+                                title=f"ML Prediction for {ticker}",
+                                status="success" if ml_response and ml_response.get('success') else "error",
+                                ticker=ticker,
+                                details=format_ml_prediction_details(ml_response, trained=ml_trained),
+                                step_id=ml_step_id
+                            )
 
                             current_step += 1
                             progress_bar.progress(current_step / total_steps)
@@ -3007,8 +3795,21 @@ elif page == "🎯 Complete Trading System":
                             st.markdown("#### 📊 Market Regime")
                             status_text.text(f"Detecting market regime for {ticker}... (auto-training if needed)")
 
+                            regime_step_id = f"regime_{ticker}"
+                            process_logger.start_step(regime_step_id)
+
                             # Note: /regime/predict automatically trains on-demand
                             regime_response = make_api_request(f"/regime/predict/{ticker}")
+
+                            # Log regime detection
+                            process_logger.log(
+                                LogStepType.REGIME_DETECTION,
+                                title=f"Regime Detection for {ticker}",
+                                status="success" if regime_response and regime_response.get('success') else "error",
+                                ticker=ticker,
+                                details=format_regime_details(regime_response),
+                                step_id=regime_step_id
+                            )
 
                             current_step += 1
                             progress_bar.progress(current_step / total_steps)
@@ -3051,6 +3852,9 @@ elif page == "🎯 Complete Trading System":
                         for strategy in strategies:
                             opt_status.text(f"Optimizing {strategy} parameters for {ticker}...")
 
+                            opt_step_id = f"opt_{ticker}_{strategy}"
+                            process_logger.start_step(opt_step_id)
+
                             # Run vectorized optimization
                             opt_response = make_api_request(
                                 "/vectorized/optimize",
@@ -3060,6 +3864,17 @@ elif page == "🎯 Complete Trading System":
                                     "strategy_type": strategy,
                                     "period": lookback_period
                                 }
+                            )
+
+                            # Log optimization
+                            process_logger.log(
+                                LogStepType.PARAMETER_OPTIMIZATION,
+                                title=f"Parameter Optimization: {ticker} - {strategy}",
+                                status="success" if opt_response and opt_response.get('success') else "warning",
+                                ticker=ticker,
+                                strategy=strategy,
+                                details=format_optimization_details(opt_response),
+                                step_id=opt_step_id
                             )
 
                             if opt_response and opt_response.get('success'):
@@ -3093,10 +3908,14 @@ elif page == "🎯 Complete Trading System":
 
                 backtest_results = []
                 all_tested_strategies = []  # Track all strategies for debugging
+                log_update_counter = 0  # For batched log updates
 
                 for ticker in tickers:
                     for strategy in strategies:
                         status_text.text(f"Backtesting {strategy} on {ticker}...")
+
+                        bt_step_id = f"bt_{ticker}_{strategy}"
+                        process_logger.start_step(bt_step_id)
 
                         # Build strategy_config from strategy type
                         # Get optimized parameters if available
@@ -3168,6 +3987,17 @@ elif page == "🎯 Complete Trading System":
                         current_step += 1
                         progress_bar.progress(current_step / total_steps)
 
+                        # Log backtest result
+                        process_logger.log(
+                            LogStepType.BACKTEST,
+                            title=f"Backtest: {ticker} - {strategy}",
+                            status="success" if response and response.get('success') else "error",
+                            ticker=ticker,
+                            strategy=strategy,
+                            details=format_backtest_details(response, strategy_config) if response else {"error": "No response"},
+                            step_id=bt_step_id
+                        )
+
                         if response and response.get('success'):
                             metrics = response['metrics']
                             sharpe = metrics['sharpe_ratio']
@@ -3193,6 +4023,18 @@ elif page == "🎯 Complete Trading System":
                                 include_strategy = metrics.get('sortino_ratio', 0) >= min_sharpe * 1.2  # Sortino usually higher
                             elif optimization_goal == "Best Calmar":
                                 include_strategy = metrics.get('calmar_ratio', 0) >= min_sharpe * 0.8
+
+                            # Log filtering decision
+                            process_logger.log(
+                                LogStepType.FILTERING,
+                                title=f"Filter Decision: {ticker} - {strategy}",
+                                status="success" if include_strategy else "warning",
+                                ticker=ticker,
+                                strategy=strategy,
+                                details=format_filtering_details(
+                                    ticker, strategy, metrics, optimization_goal, min_sharpe, include_strategy
+                                )
+                            )
 
                             if include_strategy:
                                 # Get optimization results if available
@@ -3223,19 +4065,34 @@ elif page == "🎯 Complete Trading System":
                                 }
                                 backtest_results.append(result)
 
+                        # Update log panel periodically (every 3 steps)
+                        log_update_counter += 1
+                        if log_update_counter % 3 == 0:
+                            with log_placeholder.container():
+                                render_log_panel(process_logger, expanded=False)
+
                 status_text.text("✅ Analysis complete!")
                 progress_bar.progress(1.0)
 
-                # Store results in session state to persist across reruns
+                # Store results and logger in session state
                 st.session_state.complete_trading_results = backtest_results
                 st.session_state.complete_trading_total_capital = total_capital
                 st.session_state.complete_trading_optimization_goal = optimization_goal
+                st.session_state.process_logger = process_logger
+
+                # Final log panel display
+                with log_placeholder.container():
+                    render_log_panel(process_logger, expanded=True)
 
     # Display results from session state (persists across button clicks)
     if 'complete_trading_results' in st.session_state and st.session_state.complete_trading_results:
         backtest_results = st.session_state.complete_trading_results
         total_capital = st.session_state.complete_trading_total_capital
         optimization_goal = st.session_state.complete_trading_optimization_goal
+
+        # Display log panel if available in session state
+        if 'process_logger' in st.session_state:
+            render_log_panel(st.session_state.process_logger, expanded=False)
 
         if backtest_results:
             st.markdown("---")
