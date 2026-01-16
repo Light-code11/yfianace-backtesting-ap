@@ -1784,11 +1784,11 @@ async def analyze_pair(request: PairAnalyzeRequest, db=Depends(get_db)):
     - Current z-score and signal
     """
     try:
-        # Download price data
-        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close']
-        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close']
+        # Download price data (squeeze to convert DataFrame to Series)
+        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close'].squeeze()
+        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close'].squeeze()
 
-        if data_a.empty or data_b.empty:
+        if len(data_a) == 0 or len(data_b) == 0:
             raise HTTPException(status_code=400, detail="Failed to download price data")
 
         # Initialize analyzers
@@ -2066,11 +2066,11 @@ async def backtest_pair(request: PairBacktestRequest, db=Depends(get_db)):
     Returns performance metrics and trade history.
     """
     try:
-        # Download price data
-        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close']
-        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close']
+        # Download price data (squeeze to convert DataFrame to Series)
+        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close'].squeeze()
+        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close'].squeeze()
 
-        if data_a.empty or data_b.empty:
+        if len(data_a) == 0 or len(data_b) == 0:
             raise HTTPException(status_code=400, detail="Failed to download price data")
 
         # Initialize strategy and backtester
@@ -2132,11 +2132,11 @@ async def get_pair_signal(
     - HOLD: Maintain current position
     """
     try:
-        # Download recent price data
-        data_a = yf.download(stock_a, period=period, progress=False)['Close']
-        data_b = yf.download(stock_b, period=period, progress=False)['Close']
+        # Download recent price data (squeeze to convert DataFrame to Series)
+        data_a = yf.download(stock_a, period=period, progress=False)['Close'].squeeze()
+        data_b = yf.download(stock_b, period=period, progress=False)['Close'].squeeze()
 
-        if data_a.empty or data_b.empty:
+        if len(data_a) == 0 or len(data_b) == 0:
             raise HTTPException(status_code=400, detail="Failed to download price data")
 
         strategy = PairTradingStrategy(

@@ -1052,11 +1052,11 @@ def analyze_pair_cli(ticker_a: str, ticker_b: str, period: str = "1y") -> Dict[s
     print(f"\nAnalyzing pair: {ticker_a} / {ticker_b}")
     print("=" * 50)
 
-    # Download data
-    data_a = yf.download(ticker_a, period=period, progress=False)['Close']
-    data_b = yf.download(ticker_b, period=period, progress=False)['Close']
+    # Download data (squeeze to convert DataFrame to Series)
+    data_a = yf.download(ticker_a, period=period, progress=False)['Close'].squeeze()
+    data_b = yf.download(ticker_b, period=period, progress=False)['Close'].squeeze()
 
-    if data_a.empty or data_b.empty:
+    if len(data_a) == 0 or len(data_b) == 0:
         return {"error": "Failed to download data"}
 
     stats = PairTradingStatistics()
@@ -1152,11 +1152,11 @@ def backtest_pair_cli(
     print(f"Period: {period}, Initial Capital: ${initial_capital:,.0f}")
     print("=" * 50)
 
-    # Download data
-    data_a = yf.download(ticker_a, period=period, progress=False)['Close']
-    data_b = yf.download(ticker_b, period=period, progress=False)['Close']
+    # Download data (squeeze to convert DataFrame to Series)
+    data_a = yf.download(ticker_a, period=period, progress=False)['Close'].squeeze()
+    data_b = yf.download(ticker_b, period=period, progress=False)['Close'].squeeze()
 
-    if data_a.empty or data_b.empty:
+    if len(data_a) == 0 or len(data_b) == 0:
         return {"error": "Failed to download data"}
 
     strategy = PairTradingStrategy()
