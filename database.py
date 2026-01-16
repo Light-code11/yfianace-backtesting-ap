@@ -362,6 +362,145 @@ class AutoTradingState(Base):
     recent_activity = Column(JSON)  # Last 10 activities
 
 
+# =======================
+# PAIR TRADING MODELS
+# =======================
+
+class PairTradingPair(Base):
+    """Store discovered cointegrated pairs with statistics"""
+    __tablename__ = "pair_trading_pairs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Pair identifiers
+    stock_a = Column(String, index=True)
+    stock_b = Column(String, index=True)
+
+    # Cointegration statistics
+    is_cointegrated = Column(Boolean, default=True)
+    cointegration_pvalue = Column(Float)
+    hedge_ratio = Column(Float)
+    correlation = Column(Float)
+
+    # Mean reversion metrics
+    hurst_exponent = Column(Float)
+    half_life_days = Column(Float)
+    adf_pvalue = Column(Float)
+
+    # Quality scoring
+    quality_score = Column(Float)  # 0-100
+
+    # Current state
+    spread_mean = Column(Float)
+    spread_std = Column(Float)
+    current_zscore = Column(Float)
+    current_signal = Column(String)  # LONG_SPREAD, SHORT_SPREAD, EXIT, HOLD
+
+    # Performance tracking
+    total_trades = Column(Integer, default=0)
+    winning_trades = Column(Integer, default=0)
+    total_pnl = Column(Float, default=0.0)
+    last_signal_date = Column(DateTime, nullable=True)
+
+    # Configuration
+    entry_threshold = Column(Float, default=2.0)
+    exit_threshold = Column(Float, default=0.5)
+    stop_loss_threshold = Column(Float, default=4.0)
+
+    # Status
+    is_active = Column(Boolean, default=True)
+    last_tested = Column(DateTime, nullable=True)
+
+
+class PairTradingPosition(Base):
+    """Track open/closed pair trading positions"""
+    __tablename__ = "pair_trading_positions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Link to pair
+    pair_id = Column(Integer, index=True)
+    stock_a = Column(String, index=True)
+    stock_b = Column(String, index=True)
+
+    # Position type
+    position_type = Column(String)  # LONG_SPREAD or SHORT_SPREAD
+
+    # Stock A position (long or short)
+    shares_a = Column(Float)
+    entry_price_a = Column(Float)
+    exit_price_a = Column(Float, nullable=True)
+
+    # Stock B position (opposite of A)
+    shares_b = Column(Float)
+    entry_price_b = Column(Float)
+    exit_price_b = Column(Float, nullable=True)
+
+    # Entry details
+    entry_date = Column(DateTime, default=datetime.utcnow)
+    entry_zscore = Column(Float)
+    entry_spread = Column(Float)
+    hedge_ratio = Column(Float)
+
+    # Exit details
+    exit_date = Column(DateTime, nullable=True)
+    exit_zscore = Column(Float, nullable=True)
+    exit_spread = Column(Float, nullable=True)
+    exit_reason = Column(String, nullable=True)  # mean_reversion, stop_loss, manual
+
+    # Position sizing
+    capital_allocated = Column(Float)
+    notional_long = Column(Float)
+    notional_short = Column(Float)
+
+    # P&L
+    pnl_stock_a = Column(Float, nullable=True)
+    pnl_stock_b = Column(Float, nullable=True)
+    total_pnl = Column(Float, nullable=True)
+    return_pct = Column(Float, nullable=True)
+
+    # Transaction costs
+    transaction_costs = Column(Float, default=0.0)
+    borrowing_costs = Column(Float, default=0.0)
+
+    # Status
+    is_open = Column(Boolean, default=True)
+
+
+class PairScanResult(Base):
+    """Store scan history and results"""
+    __tablename__ = "pair_scan_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Scan parameters
+    universe_name = Column(String)  # tech, finance, healthcare, etc.
+    tickers_scanned = Column(JSON)  # List of tickers
+    pairs_tested = Column(Integer)
+    period = Column(String)  # 1y, 2y, etc.
+
+    # Scan configuration
+    correlation_threshold = Column(Float)
+    significance_level = Column(Float)
+    min_quality_score = Column(Float)
+
+    # Results summary
+    pairs_found = Column(Integer)
+    avg_quality_score = Column(Float, nullable=True)
+    best_pair = Column(String, nullable=True)  # "AAPL/MSFT"
+    best_quality_score = Column(Float, nullable=True)
+
+    # Detailed results
+    results = Column(JSON)  # Full list of discovered pairs
+
+    # Execution time
+    scan_duration_seconds = Column(Float, nullable=True)
+
+
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)

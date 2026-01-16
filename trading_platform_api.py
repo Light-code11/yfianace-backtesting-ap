@@ -27,7 +27,8 @@ else:
 
 from database import (
     init_db, get_db, Strategy, BacktestResult, PaperTrade,
-    PortfolioAllocation, AILearning, PerformanceLog
+    PortfolioAllocation, AILearning, PerformanceLog,
+    PairTradingPair, PairTradingPosition, PairScanResult
 )
 from ai_strategy_generator import AIStrategyGenerator
 from backtesting_engine import BacktestingEngine
@@ -40,7 +41,12 @@ from ml_price_predictor import MLPricePredictor
 from hmm_regime_detector import HMMRegimeDetector
 from live_signal_generator import LiveSignalGenerator
 from market_scanner import MarketScanner
+from pair_trading_strategy import (
+    PairTradingStatistics, PairTradingStrategy, PairBacktester, PairScanner,
+    PairAnalysis, CointegrationResult
+)
 import threading
+import time
 
 # Helper function to convert numpy types to Python types for PostgreSQL
 def convert_numpy_types(obj):
@@ -1731,6 +1737,591 @@ async def get_dashboard_analytics(db=Depends(get_db)):
             "sharpe_ratio": best_backtest.sharpe_ratio if best_backtest else None,
             "total_return_pct": best_backtest.total_return_pct if best_backtest else None
         } if best_backtest else None
+    }
+
+
+# =======================
+# PAIR TRADING ENDPOINTS
+# =======================
+
+class PairAnalyzeRequest(BaseModel):
+    stock_a: str
+    stock_b: str
+    period: str = "1y"
+    entry_threshold: float = 2.0
+    exit_threshold: float = 0.5
+    stop_loss_threshold: float = 4.0
+
+
+class PairScanRequest(BaseModel):
+    universe: Optional[str] = "tech"  # tech, finance, healthcare, energy, consumer, etf, gold
+    custom_tickers: Optional[List[str]] = None
+    period: str = "1y"
+    min_quality_score: float = 50.0
+    correlation_threshold: float = 0.7
+
+
+class PairBacktestRequest(BaseModel):
+    stock_a: str
+    stock_b: str
+    period: str = "1y"
+    initial_capital: float = 100000
+    entry_threshold: float = 2.0
+    exit_threshold: float = 0.5
+    stop_loss_threshold: float = 4.0
+
+
+@app.post("/pairs/analyze")
+async def analyze_pair(request: PairAnalyzeRequest, db=Depends(get_db)):
+    """
+    Analyze a specific pair for cointegration and trading suitability.
+
+    Returns full statistical analysis including:
+    - Engle-Granger cointegration test
+    - ADF stationarity test
+    - Hurst exponent (mean reversion tendency)
+    - Half-life (time to mean reversion)
+    - Current z-score and signal
+    """
+    try:
+        # Download price data
+        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close']
+        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close']
+
+        if data_a.empty or data_b.empty:
+            raise HTTPException(status_code=400, detail="Failed to download price data")
+
+        # Initialize analyzers
+        stats = PairTradingStatistics()
+        strategy = PairTradingStrategy(
+            entry_threshold=request.entry_threshold,
+            exit_threshold=request.exit_threshold,
+            stop_loss_threshold=request.stop_loss_threshold
+        )
+
+        # Cointegration test
+        coint_result = stats.engle_granger_test(data_a, data_b)
+
+        # Calculate spread
+        spread, hedge_ratio = strategy.calculate_spread(data_a, data_b, coint_result.hedge_ratio)
+
+        # ADF test on spread
+        adf_result = stats.adf_test(spread)
+
+        # Hurst exponent
+        hurst = stats.calculate_hurst_exponent(spread)
+
+        # Half-life
+        half_life = stats.calculate_half_life(spread)
+
+        # Correlation
+        common_idx = data_a.index.intersection(data_b.index)
+        correlation = data_a.loc[common_idx].corr(data_b.loc[common_idx])
+
+        # Current signal
+        current_signal = strategy.get_current_signal(data_a, data_b)
+
+        # Calculate quality score
+        scanner = PairScanner()
+        quality_score = scanner._calculate_quality_score(
+            coint_p_value=coint_result.p_value,
+            adf_p_value=adf_result['p_value'],
+            hurst=hurst,
+            half_life=half_life
+        )
+
+        # Determine recommendation
+        recommendation = "NOT_SUITABLE"
+        if coint_result.is_cointegrated and quality_score >= 50:
+            if current_signal['zscore'] < -request.entry_threshold:
+                recommendation = "LONG_SPREAD"
+            elif current_signal['zscore'] > request.entry_threshold:
+                recommendation = "SHORT_SPREAD"
+            elif abs(current_signal['zscore']) < request.exit_threshold:
+                recommendation = "SPREAD_AT_MEAN"
+            else:
+                recommendation = "WAIT"
+
+        # Save to database if cointegrated
+        if coint_result.is_cointegrated:
+            existing_pair = db.query(PairTradingPair).filter(
+                PairTradingPair.stock_a == request.stock_a,
+                PairTradingPair.stock_b == request.stock_b
+            ).first()
+
+            if existing_pair:
+                # Update existing
+                existing_pair.cointegration_pvalue = coint_result.p_value
+                existing_pair.hedge_ratio = coint_result.hedge_ratio
+                existing_pair.correlation = float(correlation)
+                existing_pair.hurst_exponent = hurst
+                existing_pair.half_life_days = half_life
+                existing_pair.adf_pvalue = adf_result['p_value']
+                existing_pair.quality_score = quality_score
+                existing_pair.spread_mean = float(spread.mean())
+                existing_pair.spread_std = float(spread.std())
+                existing_pair.current_zscore = current_signal['zscore']
+                existing_pair.current_signal = current_signal['signal']
+                existing_pair.last_tested = datetime.utcnow()
+            else:
+                # Create new
+                new_pair = PairTradingPair(
+                    stock_a=request.stock_a,
+                    stock_b=request.stock_b,
+                    is_cointegrated=True,
+                    cointegration_pvalue=coint_result.p_value,
+                    hedge_ratio=coint_result.hedge_ratio,
+                    correlation=float(correlation),
+                    hurst_exponent=hurst,
+                    half_life_days=half_life,
+                    adf_pvalue=adf_result['p_value'],
+                    quality_score=quality_score,
+                    spread_mean=float(spread.mean()),
+                    spread_std=float(spread.std()),
+                    current_zscore=current_signal['zscore'],
+                    current_signal=current_signal['signal'],
+                    entry_threshold=request.entry_threshold,
+                    exit_threshold=request.exit_threshold,
+                    stop_loss_threshold=request.stop_loss_threshold,
+                    last_tested=datetime.utcnow()
+                )
+                db.add(new_pair)
+
+            db.commit()
+
+        return {
+            "success": True,
+            "pair": f"{request.stock_a}/{request.stock_b}",
+            "analysis": {
+                "cointegration": {
+                    "is_cointegrated": coint_result.is_cointegrated,
+                    "p_value": coint_result.p_value,
+                    "hedge_ratio": coint_result.hedge_ratio,
+                    "test_statistic": coint_result.test_statistic,
+                    "critical_values": coint_result.critical_values
+                },
+                "adf_test": adf_result,
+                "hurst_exponent": hurst,
+                "hurst_interpretation": "Mean Reverting" if hurst < 0.5 else "Trending" if hurst > 0.5 else "Random Walk",
+                "half_life_days": half_life,
+                "correlation": float(correlation),
+                "quality_score": quality_score
+            },
+            "current_state": {
+                "spread_mean": float(spread.mean()),
+                "spread_std": float(spread.std()),
+                "current_zscore": current_signal['zscore'],
+                "current_signal": current_signal['signal'],
+                "price_a": current_signal['price_a'],
+                "price_b": current_signal['price_b']
+            },
+            "recommendation": recommendation,
+            "thresholds": {
+                "entry": request.entry_threshold,
+                "exit": request.exit_threshold,
+                "stop_loss": request.stop_loss_threshold
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"PAIR ANALYZE ERROR: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/pairs/scan")
+async def scan_for_pairs(request: PairScanRequest, db=Depends(get_db)):
+    """
+    Auto-discover cointegrated pairs from a universe of stocks.
+
+    Scans all possible pairs using:
+    1. Correlation pre-filter
+    2. Engle-Granger cointegration test
+    3. Quality scoring
+
+    Returns ranked list of suitable pairs.
+    """
+    try:
+        start_time = time.time()
+
+        scanner = PairScanner(
+            correlation_threshold=request.correlation_threshold
+        )
+
+        # Run scan
+        results = scanner.scan_for_pairs(
+            universe=request.custom_tickers,
+            universe_name=request.universe if not request.custom_tickers else None,
+            period=request.period,
+            min_quality_score=request.min_quality_score
+        )
+
+        scan_duration = time.time() - start_time
+
+        # Convert results to dicts
+        pairs_data = []
+        for pair in results:
+            pairs_data.append({
+                "stock_a": pair.stock_a,
+                "stock_b": pair.stock_b,
+                "quality_score": pair.quality_score,
+                "correlation": pair.correlation,
+                "cointegration_pvalue": pair.cointegration.p_value,
+                "hedge_ratio": pair.cointegration.hedge_ratio,
+                "hurst_exponent": pair.hurst_exponent,
+                "half_life_days": pair.half_life,
+                "adf_pvalue": pair.adf_p_value,
+                "current_zscore": pair.current_zscore,
+                "recommendation": pair.recommendation
+            })
+
+        # Save scan result to database
+        tickers_list = request.custom_tickers or PairScanner.UNIVERSES.get(
+            request.universe.lower(), []
+        )
+        n_tickers = len(tickers_list)
+        n_pairs_tested = n_tickers * (n_tickers - 1) // 2
+
+        scan_record = PairScanResult(
+            universe_name=request.universe if not request.custom_tickers else "custom",
+            tickers_scanned=tickers_list,
+            pairs_tested=n_pairs_tested,
+            period=request.period,
+            correlation_threshold=request.correlation_threshold,
+            significance_level=0.05,
+            min_quality_score=request.min_quality_score,
+            pairs_found=len(results),
+            avg_quality_score=np.mean([p.quality_score for p in results]) if results else None,
+            best_pair=f"{results[0].stock_a}/{results[0].stock_b}" if results else None,
+            best_quality_score=results[0].quality_score if results else None,
+            results=pairs_data,
+            scan_duration_seconds=scan_duration
+        )
+        db.add(scan_record)
+
+        # Also save/update individual pairs
+        for pair in results:
+            existing = db.query(PairTradingPair).filter(
+                PairTradingPair.stock_a == pair.stock_a,
+                PairTradingPair.stock_b == pair.stock_b
+            ).first()
+
+            if existing:
+                existing.quality_score = pair.quality_score
+                existing.current_zscore = pair.current_zscore
+                existing.current_signal = pair.recommendation
+                existing.last_tested = datetime.utcnow()
+            else:
+                new_pair = PairTradingPair(
+                    stock_a=pair.stock_a,
+                    stock_b=pair.stock_b,
+                    is_cointegrated=True,
+                    cointegration_pvalue=pair.cointegration.p_value,
+                    hedge_ratio=pair.cointegration.hedge_ratio,
+                    correlation=pair.correlation,
+                    hurst_exponent=pair.hurst_exponent,
+                    half_life_days=pair.half_life,
+                    adf_pvalue=pair.adf_p_value,
+                    quality_score=pair.quality_score,
+                    spread_mean=pair.spread_mean,
+                    spread_std=pair.spread_std,
+                    current_zscore=pair.current_zscore,
+                    current_signal=pair.recommendation,
+                    last_tested=datetime.utcnow()
+                )
+                db.add(new_pair)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "scan_id": scan_record.id,
+            "universe": request.universe if not request.custom_tickers else "custom",
+            "tickers_scanned": n_tickers,
+            "pairs_tested": n_pairs_tested,
+            "pairs_found": len(results),
+            "scan_duration_seconds": round(scan_duration, 2),
+            "top_pairs": pairs_data[:20],  # Top 20
+            "all_pairs": pairs_data
+        }
+
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"PAIR SCAN ERROR: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/pairs/backtest")
+async def backtest_pair(request: PairBacktestRequest, db=Depends(get_db)):
+    """
+    Backtest a pair trading strategy.
+
+    Simulates dollar-neutral trading with:
+    - Transaction costs (0.1%)
+    - Borrowing costs (2% annual)
+    - Slippage (0.05%)
+
+    Returns performance metrics and trade history.
+    """
+    try:
+        # Download price data
+        data_a = yf.download(request.stock_a, period=request.period, progress=False)['Close']
+        data_b = yf.download(request.stock_b, period=request.period, progress=False)['Close']
+
+        if data_a.empty or data_b.empty:
+            raise HTTPException(status_code=400, detail="Failed to download price data")
+
+        # Initialize strategy and backtester
+        strategy = PairTradingStrategy(
+            entry_threshold=request.entry_threshold,
+            exit_threshold=request.exit_threshold,
+            stop_loss_threshold=request.stop_loss_threshold
+        )
+
+        backtester = PairBacktester(initial_capital=request.initial_capital)
+
+        # Run backtest
+        results = backtester.backtest_pair(data_a, data_b, strategy)
+
+        if not results.get('success'):
+            raise HTTPException(status_code=400, detail=results.get('error', 'Backtest failed'))
+
+        # Convert numpy types
+        results = convert_numpy_types(results)
+
+        return {
+            "success": True,
+            "pair": f"{request.stock_a}/{request.stock_b}",
+            "period": request.period,
+            "initial_capital": request.initial_capital,
+            "strategy_params": {
+                "entry_threshold": request.entry_threshold,
+                "exit_threshold": request.exit_threshold,
+                "stop_loss_threshold": request.stop_loss_threshold
+            },
+            **results
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_detail = f"{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        print(f"PAIR BACKTEST ERROR: {error_detail}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pairs/signal/{stock_a}/{stock_b}")
+async def get_pair_signal(
+    stock_a: str,
+    stock_b: str,
+    period: str = "3mo",
+    entry_threshold: float = 2.0,
+    exit_threshold: float = 0.5,
+    db=Depends(get_db)
+):
+    """
+    Get current trading signal for a pair.
+
+    Returns real-time signal based on current z-score:
+    - LONG_SPREAD: Buy stock A, Sell stock B
+    - SHORT_SPREAD: Sell stock A, Buy stock B
+    - EXIT: Close positions
+    - HOLD: Maintain current position
+    """
+    try:
+        # Download recent price data
+        data_a = yf.download(stock_a, period=period, progress=False)['Close']
+        data_b = yf.download(stock_b, period=period, progress=False)['Close']
+
+        if data_a.empty or data_b.empty:
+            raise HTTPException(status_code=400, detail="Failed to download price data")
+
+        strategy = PairTradingStrategy(
+            entry_threshold=entry_threshold,
+            exit_threshold=exit_threshold
+        )
+
+        signal = strategy.get_current_signal(data_a, data_b)
+
+        # Update database if pair exists
+        existing = db.query(PairTradingPair).filter(
+            PairTradingPair.stock_a == stock_a,
+            PairTradingPair.stock_b == stock_b
+        ).first()
+
+        if existing:
+            existing.current_zscore = signal['zscore']
+            existing.current_signal = signal['signal']
+            existing.last_signal_date = datetime.utcnow()
+            db.commit()
+
+        return {
+            "success": True,
+            "pair": f"{stock_a}/{stock_b}",
+            **signal,
+            "action_required": signal['signal'] in ['LONG_SPREAD', 'SHORT_SPREAD', 'EXIT']
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pairs/active")
+async def list_active_pairs(
+    min_quality_score: float = 50.0,
+    limit: int = 50,
+    db=Depends(get_db)
+):
+    """
+    List all active cointegrated pairs from the database.
+
+    Returns pairs sorted by quality score with current signals.
+    """
+    try:
+        pairs = db.query(PairTradingPair).filter(
+            PairTradingPair.is_active == True,
+            PairTradingPair.quality_score >= min_quality_score
+        ).order_by(PairTradingPair.quality_score.desc()).limit(limit).all()
+
+        return {
+            "success": True,
+            "count": len(pairs),
+            "pairs": [
+                {
+                    "id": p.id,
+                    "stock_a": p.stock_a,
+                    "stock_b": p.stock_b,
+                    "quality_score": p.quality_score,
+                    "correlation": p.correlation,
+                    "cointegration_pvalue": p.cointegration_pvalue,
+                    "hedge_ratio": p.hedge_ratio,
+                    "hurst_exponent": p.hurst_exponent,
+                    "half_life_days": p.half_life_days,
+                    "current_zscore": p.current_zscore,
+                    "current_signal": p.current_signal,
+                    "total_trades": p.total_trades,
+                    "total_pnl": p.total_pnl,
+                    "last_tested": p.last_tested.isoformat() if p.last_tested else None,
+                    "thresholds": {
+                        "entry": p.entry_threshold,
+                        "exit": p.exit_threshold,
+                        "stop_loss": p.stop_loss_threshold
+                    }
+                }
+                for p in pairs
+            ]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pairs/{pair_id}")
+async def get_pair_details(pair_id: int, db=Depends(get_db)):
+    """Get detailed information about a specific pair"""
+    pair = db.query(PairTradingPair).filter(PairTradingPair.id == pair_id).first()
+
+    if not pair:
+        raise HTTPException(status_code=404, detail="Pair not found")
+
+    # Get positions for this pair
+    positions = db.query(PairTradingPosition).filter(
+        PairTradingPosition.pair_id == pair_id
+    ).order_by(PairTradingPosition.created_at.desc()).limit(20).all()
+
+    return {
+        "success": True,
+        "pair": {
+            "id": pair.id,
+            "stock_a": pair.stock_a,
+            "stock_b": pair.stock_b,
+            "quality_score": pair.quality_score,
+            "correlation": pair.correlation,
+            "cointegration_pvalue": pair.cointegration_pvalue,
+            "hedge_ratio": pair.hedge_ratio,
+            "hurst_exponent": pair.hurst_exponent,
+            "half_life_days": pair.half_life_days,
+            "adf_pvalue": pair.adf_pvalue,
+            "spread_mean": pair.spread_mean,
+            "spread_std": pair.spread_std,
+            "current_zscore": pair.current_zscore,
+            "current_signal": pair.current_signal,
+            "total_trades": pair.total_trades,
+            "winning_trades": pair.winning_trades,
+            "win_rate": (pair.winning_trades / pair.total_trades * 100) if pair.total_trades > 0 else 0,
+            "total_pnl": pair.total_pnl,
+            "thresholds": {
+                "entry": pair.entry_threshold,
+                "exit": pair.exit_threshold,
+                "stop_loss": pair.stop_loss_threshold
+            },
+            "created_at": pair.created_at.isoformat(),
+            "last_tested": pair.last_tested.isoformat() if pair.last_tested else None,
+            "is_active": pair.is_active
+        },
+        "recent_positions": [
+            {
+                "id": pos.id,
+                "position_type": pos.position_type,
+                "entry_date": pos.entry_date.isoformat(),
+                "exit_date": pos.exit_date.isoformat() if pos.exit_date else None,
+                "entry_zscore": pos.entry_zscore,
+                "exit_zscore": pos.exit_zscore,
+                "total_pnl": pos.total_pnl,
+                "return_pct": pos.return_pct,
+                "exit_reason": pos.exit_reason,
+                "is_open": pos.is_open
+            }
+            for pos in positions
+        ]
+    }
+
+
+@app.delete("/pairs/{pair_id}")
+async def deactivate_pair(pair_id: int, db=Depends(get_db)):
+    """Deactivate a pair (soft delete)"""
+    pair = db.query(PairTradingPair).filter(PairTradingPair.id == pair_id).first()
+
+    if not pair:
+        raise HTTPException(status_code=404, detail="Pair not found")
+
+    pair.is_active = False
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Pair {pair.stock_a}/{pair.stock_b} deactivated"
+    }
+
+
+@app.get("/pairs/scan/history")
+async def get_scan_history(limit: int = 10, db=Depends(get_db)):
+    """Get history of pair scans"""
+    scans = db.query(PairScanResult).order_by(
+        PairScanResult.created_at.desc()
+    ).limit(limit).all()
+
+    return {
+        "success": True,
+        "scans": [
+            {
+                "id": s.id,
+                "universe": s.universe_name,
+                "pairs_tested": s.pairs_tested,
+                "pairs_found": s.pairs_found,
+                "best_pair": s.best_pair,
+                "best_quality_score": s.best_quality_score,
+                "avg_quality_score": s.avg_quality_score,
+                "scan_duration_seconds": s.scan_duration_seconds,
+                "created_at": s.created_at.isoformat()
+            }
+            for s in scans
+        ]
     }
 
 
