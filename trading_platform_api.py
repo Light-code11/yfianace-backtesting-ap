@@ -1889,7 +1889,7 @@ async def analyze_pair(request: PairAnalyzeRequest, db=Depends(get_db)):
 
             db.commit()
 
-        return {
+        response = {
             "success": True,
             "pair": f"{request.stock_a}/{request.stock_b}",
             "analysis": {
@@ -1922,6 +1922,9 @@ async def analyze_pair(request: PairAnalyzeRequest, db=Depends(get_db)):
                 "stop_loss": request.stop_loss_threshold
             }
         }
+
+        # Convert numpy types to Python native types for JSON serialization
+        return convert_numpy_types(response)
 
     except Exception as e:
         import traceback
@@ -2158,12 +2161,15 @@ async def get_pair_signal(
             existing.last_signal_date = datetime.utcnow()
             db.commit()
 
-        return {
+        response = {
             "success": True,
             "pair": f"{stock_a}/{stock_b}",
             **signal,
             "action_required": signal['signal'] in ['LONG_SPREAD', 'SHORT_SPREAD', 'EXIT']
         }
+
+        # Convert numpy types for JSON serialization
+        return convert_numpy_types(response)
 
     except HTTPException:
         raise
