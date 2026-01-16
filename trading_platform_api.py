@@ -54,21 +54,40 @@ def convert_numpy_types(obj):
     import numpy as np
 
     # Handle None/NaN
-    if obj is None or (isinstance(obj, float) and np.isnan(obj)):
+    if obj is None:
+        return None
+    if isinstance(obj, float) and np.isnan(obj):
         return None
 
-    # Handle numpy types
-    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
-        return int(obj)
-    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
-        return float(obj)
-    elif isinstance(obj, np.bool_):
+    # Handle numpy boolean (check this FIRST before other numpy types)
+    # This catches both np.bool_ and deprecated numpy.bool
+    if type(obj).__module__ == 'numpy' and 'bool' in type(obj).__name__:
         return bool(obj)
-    elif isinstance(obj, np.ndarray):
-        return obj.tolist()
-    elif isinstance(obj, dict):
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+
+    # Handle numpy integers
+    if isinstance(obj, np.integer):
+        return int(obj)
+
+    # Handle numpy floats
+    if isinstance(obj, np.floating):
+        return float(obj)
+
+    # Handle numpy arrays
+    if isinstance(obj, np.ndarray):
+        return [convert_numpy_types(item) for item in obj.tolist()]
+
+    # Handle generic numpy scalars (catches any remaining numpy types)
+    if hasattr(obj, 'item') and type(obj).__module__ == 'numpy':
+        return obj.item()
+
+    # Handle dicts recursively
+    if isinstance(obj, dict):
         return {key: convert_numpy_types(value) for key, value in obj.items()}
-    elif isinstance(obj, (list, tuple)):
+
+    # Handle lists/tuples recursively
+    if isinstance(obj, (list, tuple)):
         return [convert_numpy_types(item) for item in obj]
 
     # Return as-is for Python native types
