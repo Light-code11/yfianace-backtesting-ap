@@ -78,6 +78,7 @@ setup(
     entry_points={
         'console_scripts': [
             'sample=sample:main',
+            'report=daily_report:generate_daily_report',
         ],
     },
 )

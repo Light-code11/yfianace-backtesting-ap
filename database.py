@@ -278,6 +278,34 @@ class TradeExecution(Base):
     decision_factors = Column(JSON)
 
 
+class RLAllocationLog(Base):
+    """Audit log of RL strategy allocation decisions"""
+    __tablename__ = "rl_allocation_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    strategy_name = Column(String, nullable=True)
+    regime = Column(String, nullable=True)
+    allocations = Column(JSON)  # {strategy_type: allocation}
+    state_snapshot = Column(JSON, nullable=True)
+    source = Column(String, default="autonomous_engine")  # autonomous_engine, retrain, etc.
+
+
+class RiskEventLog(Base):
+    """Risk management event log for operational visibility"""
+    __tablename__ = "risk_event_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    event_type = Column(String, index=True)  # can_trade_block, order_rejected, drawdown_halt, etc.
+    severity = Column(String, default="warning")  # info, warning, critical
+    message = Column(Text)
+    ticker = Column(String, nullable=True, index=True)
+    context = Column(JSON, nullable=True)
+
+
 class StrategyPerformance(Base):
     """Live strategy performance tracking (vs backtest)"""
     __tablename__ = "strategy_performance"
