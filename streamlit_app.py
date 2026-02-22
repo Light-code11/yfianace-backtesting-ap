@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
 import requests
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Optional, Dict, Any, List
 from enum import Enum
 from strategy_visualizer import StrategyVisualizer
+from portfolio_heatmap import PortfolioHeatmap
 
 # Page configuration
 st.set_page_config(
@@ -572,7 +574,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "📊 Pair Trading", "Paper Trading", "Portfolio Optimizer", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "📊 Pair Trading", "Paper Trading", "Portfolio Optimizer", "📈 Portfolio Correlation", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
 )
 
 st.sidebar.markdown("---")
@@ -3176,6 +3178,147 @@ elif page == "Portfolio Optimizer":
         - Go to the **Generate Strategies** page to create strategies manually
         - Or go to the **🤖 Autonomous Agent** page to let AI generate strategies automatically
         """)
+
+
+# =======================
+# PORTFOLIO CORRELATION PAGE
+# =======================
+
+elif page == "📈 Portfolio Correlation":
+    st.markdown('<div class="main-header">📈 Portfolio Correlation</div>', unsafe_allow_html=True)
+
+    st.write("""
+    Analyze portfolio diversification with an annotated correlation matrix.
+    Red means highly correlated pairs (higher concentration risk), green means low or negative correlation.
+    """)
+
+    heatmap_service = PortfolioHeatmap()
+
+    source_col, period_col = st.columns([2, 1])
+    with source_col:
+        ticker_source = st.radio(
+            "Ticker Source",
+            ["Custom Tickers", "Live Alpaca Positions"],
+            horizontal=True,
+            key="corr_ticker_source"
+        )
+    with period_col:
+        corr_period = st.selectbox(
+            "Period",
+            ["3mo", "6mo", "1y", "2y"],
+            index=1,
+            key="corr_period"
+        )
+
+    custom_tickers_input = ""
+    if ticker_source == "Custom Tickers":
+        custom_tickers_input = st.text_input(
+            "Tickers (comma-separated)",
+            value=st.session_state.get("tickers", "SPY,QQQ,AAPL"),
+            help="Example: SPY,QQQ,AAPL,MSFT",
+            key="corr_custom_tickers_input"
+        )
+    else:
+        st.caption("Loads currently open positions from Alpaca.")
+
+    run_heatmap = st.button("Generate Correlation Heatmap", use_container_width=True, key="corr_generate_btn")
+
+    if run_heatmap:
+        if ticker_source == "Custom Tickers":
+            selected_tickers = [t.strip().upper() for t in custom_tickers_input.split(",") if t.strip()]
+            st.session_state.tickers = custom_tickers_input
+        else:
+            with st.spinner("Loading live Alpaca positions..."):
+                selected_tickers = heatmap_service._get_position_tickers()
+
+        if not selected_tickers:
+            if ticker_source == "Live Alpaca Positions":
+                st.warning("No live Alpaca positions found. Add open positions or switch to custom tickers.")
+            else:
+                st.warning("Please enter at least two tickers.")
+        elif len(selected_tickers) < 2:
+            st.warning("Please provide at least two tickers to compute a correlation matrix.")
+        else:
+            with st.spinner("Computing correlation matrix..."):
+                corr_result = heatmap_service.generate_correlation_matrix(selected_tickers, period=corr_period)
+
+            matrix = corr_result.get("matrix", [])
+            tickers = corr_result.get("tickers", [])
+
+            if not matrix or len(tickers) < 2:
+                st.warning("Not enough price data available to build a portfolio correlation matrix.")
+            else:
+                diversification_score = heatmap_service.calculate_diversification_score(matrix)
+                risk_clusters = heatmap_service.get_risk_clusters(matrix, tickers, threshold=0.7)
+                correlation_warnings = heatmap_service.get_warnings(matrix, tickers)
+                stats = corr_result.get("stats", {})
+
+                metric_col1, metric_col2, metric_col3 = st.columns([2, 1, 1])
+                with metric_col1:
+                    st.metric("Diversification Score", f"{diversification_score:.2f} / 100")
+                with metric_col2:
+                    st.metric("Avg Correlation", f"{stats.get('avg_correlation', 0.0):.2f}")
+                with metric_col3:
+                    st.metric("Tickers", len(tickers))
+
+                annotation_text = [[f"{float(value):.2f}" for value in row] for row in matrix]
+                colors = get_theme_colors()
+                fig = ff.create_annotated_heatmap(
+                    z=matrix,
+                    x=tickers,
+                    y=tickers,
+                    annotation_text=annotation_text,
+                    colorscale=[
+                        [0.0, "#2ca02c"],
+                        [0.5, "#f7f7f7"],
+                        [1.0, "#d62728"]
+                    ],
+                    zmin=-1,
+                    zmax=1,
+                    showscale=True,
+                    colorbar=dict(title="Correlation")
+                )
+                fig.update_layout(
+                    title=f"Correlation Matrix ({corr_period})",
+                    template=get_plotly_template(),
+                    paper_bgcolor=colors["chart_bg"],
+                    plot_bgcolor=colors["chart_bg"],
+                    font=dict(color=colors["text_primary"]),
+                    xaxis=dict(side="bottom")
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
+                st.markdown("### Risk Clusters")
+                if risk_clusters:
+                    for idx, cluster in enumerate(risk_clusters, start=1):
+                        st.markdown(
+                            f"<div class='warning-box'><b>Cluster {idx}</b>: {', '.join(cluster)}</div>",
+                            unsafe_allow_html=True
+                        )
+                else:
+                    st.success("No high-correlation clusters detected above the 0.7 threshold.")
+
+                st.markdown("### Warnings")
+                if correlation_warnings:
+                    for warning_msg in correlation_warnings:
+                        st.warning(warning_msg)
+                else:
+                    st.info("No concentration warnings detected.")
+
+                max_pair = stats.get("max_pair")
+                min_pair = stats.get("min_pair")
+                if max_pair or min_pair:
+                    pair_col1, pair_col2 = st.columns(2)
+                    with pair_col1:
+                        if max_pair:
+                            st.caption(
+                                f"Most correlated pair: {', '.join(max_pair['tickers'])} ({max_pair['correlation']:.2f})"
+                            )
+                    with pair_col2:
+                        if min_pair:
+                            st.caption(
+                                f"Least correlated pair: {', '.join(min_pair['tickers'])} ({min_pair['correlation']:.2f})"
+                            )
 
 
 # =======================
