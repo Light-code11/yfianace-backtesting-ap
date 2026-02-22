@@ -105,7 +105,8 @@ class BacktestingEngine:
         strategy: Dict[str, Any],
         market_data: pd.DataFrame,
         commission: float = 0.001,  # 0.1% commission
-        trailing_stop_pct: Optional[float] = None
+        slippage_pct: float = 0.0005,  # 0.05% = 5 bps
+        spread_pct: float = 0.0002  # 0.02%
     ) -> Dict[str, Any]:
         """
         Backtest a trading strategy
@@ -114,7 +115,8 @@ class BacktestingEngine:
             strategy: Strategy dictionary with entry/exit rules
             market_data: Historical OHLCV data
             commission: Transaction commission as decimal
-            trailing_stop_pct: Trailing stop percentage (e.g. 5.0). None disables.
+            slippage_pct: Per-side slippage as decimal
+            spread_pct: Bid/ask spread as decimal
 
         Returns:
             Dictionary with backtest results
@@ -182,18 +184,23 @@ class BacktestingEngine:
                     exit_metadata = None
 
                     if pnl_pct <= -stop_loss_pct:
-                        exit_reason = "stop_loss"
+                        trade = self._close_position(
+                            ticker, position, current_price, current_date,
+                            commission, slippage_pct, spread_pct, "stop_loss"
+                        )
+                        trades.append(trade)
+                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+                        del positions[ticker]
+
+                    # Check take profit
                     elif pnl_pct >= take_profit_pct:
-                        exit_reason = "take_profit"
-                    elif trailing_stop_pct is not None and trailing_stop_pct > 0:
-                        trailing_stop_price = position['highest_price'] * (1 - trailing_stop_pct / 100)
-                        if current_price <= trailing_stop_price:
-                            exit_reason = "trailing_stop"
-                            exit_metadata = {
-                                'trailing_high_price': position['highest_price'],
-                                'trailing_stop_pct': trailing_stop_pct,
-                                'trailing_stop_price': trailing_stop_price
-                            }
+                        trade = self._close_position(
+                            ticker, position, current_price, current_date,
+                            commission, slippage_pct, spread_pct, "take_profit"
+                        )
+                        trades.append(trade)
+                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+                        del positions[ticker]
 
                     if exit_reason is None and self._check_exit_signal(indicators_data, i, strategy):
                         exit_reason = "signal"
@@ -201,7 +208,7 @@ class BacktestingEngine:
                     if exit_reason:
                         trade = self._close_position(
                             ticker, position, current_price, current_date,
-                            commission, exit_reason, exit_metadata=exit_metadata
+                            commission, slippage_pct, spread_pct, "signal"
                         )
                         trades.append(trade)
                         capital += trade['exit_value']
@@ -642,8 +649,9 @@ class BacktestingEngine:
         exit_price: float,
         exit_date: datetime,
         commission: float,
-        exit_reason: str,
-        exit_metadata: Optional[Dict[str, Any]] = None
+        slippage_pct: float,
+        spread_pct: float,
+        exit_reason: str
     ) -> Dict:
         """Close a position and record trade"""
         entry_price = position['entry_price']
@@ -669,10 +677,118 @@ class BacktestingEngine:
             'exit_value': exit_value  # Add exit value for correct capital management
         }
 
-        if exit_metadata:
-            trade.update(exit_metadata)
+    def _optimize_strategy_on_insample(
+        self,
+        strategy: Dict[str, Any],
+        in_sample_data: pd.DataFrame,
+        commission: float,
+        slippage_pct: float,
+        spread_pct: float
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Simple in-sample optimization over risk management parameters."""
+        risk_cfg = strategy.get("risk_management", {})
 
-        return trade
+        base_stop = float(risk_cfg.get("stop_loss_pct", 5.0))
+        base_take = float(risk_cfg.get("take_profit_pct", 10.0))
+        base_size = float(risk_cfg.get("position_size_pct", 10.0))
+
+        optimization_grid = strategy.get("optimization_grid", {})
+        stop_candidates = optimization_grid.get("stop_loss_pct", [base_stop * 0.8, base_stop, base_stop * 1.2])
+        take_candidates = optimization_grid.get("take_profit_pct", [base_take * 0.8, base_take, base_take * 1.2])
+        size_candidates = optimization_grid.get("position_size_pct", [base_size * 0.75, base_size, base_size * 1.25])
+
+        # Prevent invalid sizing/thresholds while keeping optimization local.
+        stop_candidates = sorted(set(max(0.1, float(v)) for v in stop_candidates))
+        take_candidates = sorted(set(max(0.1, float(v)) for v in take_candidates))
+        size_candidates = sorted(set(min(100.0, max(0.1, float(v))) for v in size_candidates))
+
+        best_strategy = strategy
+        best_metrics = None
+        best_score = (float("-inf"), float("-inf"), float("-inf"))
+
+        for stop_loss in stop_candidates:
+            for take_profit in take_candidates:
+                for position_size in size_candidates:
+                    candidate_strategy = dict(strategy)
+                    candidate_risk = dict(risk_cfg)
+                    candidate_risk.update({
+                        "stop_loss_pct": stop_loss,
+                        "take_profit_pct": take_profit,
+                        "position_size_pct": position_size
+                    })
+                    candidate_strategy["risk_management"] = candidate_risk
+
+                    result = self.backtest_strategy(
+                        strategy=candidate_strategy,
+                        market_data=in_sample_data,
+                        commission=commission,
+                        slippage_pct=slippage_pct,
+                        spread_pct=spread_pct
+                    )
+                    metrics = result.get("metrics", {})
+                    score = (
+                        float(metrics.get("quality_score", 0.0)),
+                        float(metrics.get("sharpe_ratio", 0.0)),
+                        float(metrics.get("total_return_pct", 0.0))
+                    )
+
+                    if score > best_score:
+                        best_score = score
+                        best_strategy = candidate_strategy
+                        best_metrics = metrics
+
+        return best_strategy, (best_metrics or {})
+
+    @staticmethod
+    def _calculate_metric_degradation(in_sample_value: float, out_sample_value: float) -> float:
+        """Return degradation percentage where larger values indicate worse OOS performance."""
+        baseline = abs(float(in_sample_value))
+        if baseline < 1e-9:
+            return 0.0 if out_sample_value >= in_sample_value else 100.0
+        return max(0.0, ((in_sample_value - out_sample_value) / baseline) * 100)
+
+    @staticmethod
+    def _calculate_max_drawdown_pct(equity_values: List[float]) -> float:
+        """Calculate max drawdown percentage from equity values."""
+        if not equity_values:
+            return 0.0
+        peak = equity_values[0]
+        max_dd = 0.0
+        for value in equity_values:
+            if value > peak:
+                peak = value
+            if peak > 0:
+                max_dd = max(max_dd, ((peak - value) / peak) * 100)
+        return max_dd
+
+    @staticmethod
+    def _summarize_distribution(values: List[float]) -> Dict[str, float]:
+        """Summarize distribution with requested percentile bands and core stats."""
+        if not values:
+            return {
+                "p5": 0.0,
+                "p25": 0.0,
+                "p50": 0.0,
+                "p75": 0.0,
+                "p95": 0.0,
+                "mean": 0.0,
+                "std": 0.0,
+                "min": 0.0,
+                "max": 0.0
+            }
+
+        arr = np.array(values, dtype=float)
+        return {
+            "p5": round(float(np.percentile(arr, 5)), 2),
+            "p25": round(float(np.percentile(arr, 25)), 2),
+            "p50": round(float(np.percentile(arr, 50)), 2),
+            "p75": round(float(np.percentile(arr, 75)), 2),
+            "p95": round(float(np.percentile(arr, 95)), 2),
+            "mean": round(float(np.mean(arr)), 2),
+            "std": round(float(np.std(arr)), 2),
+            "min": round(float(np.min(arr)), 2),
+            "max": round(float(np.max(arr)), 2)
+        }
 
     def _calculate_metrics(
         self,
