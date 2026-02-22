@@ -45,3 +45,4 @@ api_server.log
 
 # Environment
 .env
+.env.save

@@ -2,8 +2,9 @@
 Trading Platform API - Extended FastAPI server with AI strategy generation,
 backtesting, paper trading, and portfolio optimization
 """
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
@@ -24,6 +25,9 @@ if raw_api_key:
     print(f"DEBUG: OPENAI_API_KEY loaded and cleaned: {clean_api_key[:20]}...")
 else:
     print("DEBUG: OPENAI_API_KEY NOT FOUND")
+
+# API auth key for endpoint protection (default is for local development only)
+API_AUTH_KEY = os.getenv("API_AUTH_KEY", "local-dev-api-key")
 
 from database import (
     init_db, get_db, Strategy, BacktestResult, PaperTrade,
@@ -97,7 +101,7 @@ def convert_numpy_types(obj):
 app = FastAPI(
     title="AI Trading Platform API",
     description="AI-powered trading strategy generator with backtesting and portfolio optimization",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # CORS middleware
@@ -108,6 +112,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+AUTH_EXEMPT_PATHS = {"/health"}
+AUTH_EXEMPT_PREFIXES = ("/docs",)
+
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    path = request.url.path
+    if path in AUTH_EXEMPT_PATHS or any(path.startswith(prefix) for prefix in AUTH_EXEMPT_PREFIXES):
+        return await call_next(request)
+
+    api_key = request.headers.get("X-API-Key")
+    if not api_key or api_key != API_AUTH_KEY:
+        return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+
+    return await call_next(request)
 
 # Initialize database
 print("Initializing database...")
@@ -220,7 +240,11 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "version": "2.1.0"
+    }
 
 
 @app.get("/debug/network")
