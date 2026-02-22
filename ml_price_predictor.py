@@ -1,28 +1,40 @@
 """
-Machine Learning Price Predictor using XGBoost
-Predicts next-day price movements based on technical indicators
+Machine Learning Price Predictor using an ensemble of XGBoost, RandomForest, and MLP.
 """
+
+from __future__ import annotations
+
+import pickle
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timedelta
-import json
-import pickle
-import os
-from pathlib import Path
+
+try:
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.neural_network import MLPClassifier
+
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("Warning: scikit-learn not available. ML predictions disabled.")
 
 try:
     import xgboost as xgb
-    from sklearn.model_selection import train_test_split, TimeSeriesSplit
-    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
-    print("Warning: XGBoost not available. ML predictions disabled.")
+    print("Warning: XGBoost not available. XGBoost component disabled.")
 
 try:
     from advanced_indicators import AdvancedIndicators
+
     INDICATORS_AVAILABLE = True
 except ImportError:
     INDICATORS_AVAILABLE = False
@@ -30,489 +42,471 @@ except ImportError:
 
 
 class MLPricePredictor:
-    """
-    XGBoost-based price movement predictor
-
-    Features:
-    - Binary classification: Predict UP (1) or DOWN (0) next day
-    - Uses 50+ technical indicators as features
-    - Time series cross-validation
-    - Model persistence (save/load)
-    - Feature importance analysis
-    - Prediction confidence scores
-    """
+    DEFAULT_WEIGHTS = {"xgboost": 0.4, "random_forest": 0.3, "mlp": 0.3}
 
     def __init__(self, model_dir: str = "./ml_models"):
-        """
-        Args:
-            model_dir: Directory to save/load trained models
-        """
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(exist_ok=True)
-        self.model = None
-        self.feature_columns = []
-        self.scaler_params = {}  # For feature normalization
+        self.models: Dict[str, Any] = {"xgboost": None, "random_forest": None, "mlp": None}
+        self.model = None  # compatibility alias
+        self.feature_columns: List[str] = []
+        self.baseline_feature_importances: Dict[str, float] = {}
+        self.model_weights: Dict[str, float] = self.DEFAULT_WEIGHTS.copy()
 
     def prepare_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Prepare features from price data using technical indicators
-
-        Args:
-            df: DataFrame with OHLCV data
-
-        Returns:
-            DataFrame with technical indicator features
-        """
         if not INDICATORS_AVAILABLE:
-            # Fallback: basic features
-            df['returns'] = df['Close'].pct_change()
-            df['high_low_ratio'] = df['High'] / df['Low']
-            df['close_open_ratio'] = df['Close'] / df['Open']
-            return df
+            features = df.copy()
+            features["returns"] = df["Close"].pct_change()
+            features["high_low_ratio"] = df["High"] / df["Low"]
+            features["close_open_ratio"] = df["Close"] / df["Open"]
+            features["volume_change"] = df["Volume"].pct_change()
+            return features
 
+        features = df.copy()
         try:
-            # Calculate all technical indicators
-            features = df.copy()
-
-            # Momentum indicators
-            features['RSI'] = AdvancedIndicators.rsi(df, period=14)
-            features['RSI_fast'] = AdvancedIndicators.rsi(df, period=7)
-            features['Stoch_K'], features['Stoch_D'] = AdvancedIndicators.stochastic(df)
-            features['CCI'] = AdvancedIndicators.cci(df, period=20)
-            features['Williams_R'] = AdvancedIndicators.williams_r(df, period=14)
-            features['ROC'] = AdvancedIndicators.roc(df, period=12)
-            features['MFI'] = AdvancedIndicators.mfi(df, period=14)
-
-            # Trend indicators
-            features['SMA_20'] = AdvancedIndicators.sma(df, period=20)
-            features['SMA_50'] = AdvancedIndicators.sma(df, period=50)
-            features['EMA_12'] = AdvancedIndicators.ema(df, period=12)
-            features['EMA_26'] = AdvancedIndicators.ema(df, period=26)
-
-            macd_result = AdvancedIndicators.macd(df)
-            features['MACD'] = macd_result['MACD']
-            features['MACD_signal'] = macd_result['MACD_Signal']
-            features['MACD_hist'] = macd_result['MACD_Hist']
-
-            features['ADX'] = AdvancedIndicators.adx(df, period=14)
-
+            features["RSI"] = AdvancedIndicators.rsi(df, period=14)
+            features["RSI_fast"] = AdvancedIndicators.rsi(df, period=7)
+            features["Stoch_K"], features["Stoch_D"] = AdvancedIndicators.stochastic(df)
+            features["CCI"] = AdvancedIndicators.cci(df, period=20)
+            features["Williams_R"] = AdvancedIndicators.williams_r(df, period=14)
+            features["ROC"] = AdvancedIndicators.roc(df, period=12)
+            features["MFI"] = AdvancedIndicators.mfi(df, period=14)
+            features["SMA_20"] = AdvancedIndicators.sma(df, period=20)
+            features["SMA_50"] = AdvancedIndicators.sma(df, period=50)
+            features["EMA_12"] = AdvancedIndicators.ema(df, period=12)
+            features["EMA_26"] = AdvancedIndicators.ema(df, period=26)
+            macd = AdvancedIndicators.macd(df)
+            features["MACD"] = macd["MACD"]
+            features["MACD_signal"] = macd["MACD_Signal"]
+            features["MACD_hist"] = macd["MACD_Hist"]
+            features["ADX"] = AdvancedIndicators.adx(df, period=14)
             aroon = AdvancedIndicators.aroon(df, period=25)
-            features['Aroon_Up'] = aroon['Aroon_Up']
-            features['Aroon_Down'] = aroon['Aroon_Down']
-
-            # Volatility indicators
-            features['ATR'] = AdvancedIndicators.atr(df, period=14)
-
+            features["Aroon_Up"] = aroon["Aroon_Up"]
+            features["Aroon_Down"] = aroon["Aroon_Down"]
+            features["ATR"] = AdvancedIndicators.atr(df, period=14)
             bb = AdvancedIndicators.bollinger_bands(df, period=20)
-            features['BB_upper'] = bb['BB_Upper']
-            features['BB_middle'] = bb['BB_Middle']
-            features['BB_lower'] = bb['BB_Lower']
-            features['BB_width'] = (bb['BB_Upper'] - bb['BB_Lower']) / bb['BB_Middle']
-
-            # Volume indicators
-            features['OBV'] = AdvancedIndicators.obv(df)
-            features['CMF'] = AdvancedIndicators.cmf(df, period=20)
-            features['VWAP'] = AdvancedIndicators.vwap(df)
-
-            # Price-based features
-            features['returns'] = df['Close'].pct_change()
-            features['log_returns'] = np.log(df['Close'] / df['Close'].shift(1))
-            features['high_low_ratio'] = df['High'] / df['Low']
-            features['close_open_ratio'] = df['Close'] / df['Open']
-            features['volume_change'] = df['Volume'].pct_change()
-
-            # Lagged features (past N days)
-            for lag in [1, 2, 3, 5, 10]:
-                features[f'returns_lag_{lag}'] = features['returns'].shift(lag)
-                features[f'volume_lag_{lag}'] = features['volume_change'].shift(lag)
-
-            # Rolling statistics
-            for window in [5, 10, 20]:
-                features[f'returns_mean_{window}'] = features['returns'].rolling(window).mean()
-                features[f'returns_std_{window}'] = features['returns'].rolling(window).std()
-                features[f'volume_mean_{window}'] = features['Volume'].rolling(window).mean()
-
-            return features
-
+            features["BB_upper"] = bb["BB_Upper"]
+            features["BB_middle"] = bb["BB_Middle"]
+            features["BB_lower"] = bb["BB_Lower"]
+            features["BB_width"] = (bb["BB_Upper"] - bb["BB_Lower"]) / bb["BB_Middle"]
+            features["OBV"] = AdvancedIndicators.obv(df)
+            features["CMF"] = AdvancedIndicators.cmf(df, period=20)
+            features["VWAP"] = AdvancedIndicators.vwap(df)
         except Exception as e:
-            print(f"Error calculating indicators: {str(e)}")
-            # Return basic features on error
-            features = df.copy()
-            features['returns'] = df['Close'].pct_change()
-            features['high_low_ratio'] = df['High'] / df['Low']
-            features['close_open_ratio'] = df['Close'] / df['Open']
-            features['volume_change'] = df['Volume'].pct_change()
-            return features
+            print(f"Indicator calculation error: {e}")
+
+        features["returns"] = df["Close"].pct_change()
+        features["log_returns"] = np.log(df["Close"] / df["Close"].shift(1))
+        features["high_low_ratio"] = df["High"] / df["Low"]
+        features["close_open_ratio"] = df["Close"] / df["Open"]
+        features["volume_change"] = df["Volume"].pct_change()
+        for lag in [1, 2, 3, 5, 10]:
+            features[f"returns_lag_{lag}"] = features["returns"].shift(lag)
+            features[f"volume_lag_{lag}"] = features["volume_change"].shift(lag)
+        for window in [5, 10, 20]:
+            features[f"returns_mean_{window}"] = features["returns"].rolling(window).mean()
+            features[f"returns_std_{window}"] = features["returns"].rolling(window).std()
+            features[f"volume_mean_{window}"] = features["Volume"].rolling(window).mean()
+        return features
 
     def prepare_target(self, df: pd.DataFrame, horizon: int = 1) -> pd.Series:
-        """
-        Prepare target variable: 1 if price goes up, 0 if down
+        return (df["Close"].shift(-horizon) / df["Close"] - 1 > 0).astype(int)
 
-        Args:
-            df: DataFrame with price data
-            horizon: Number of days ahead to predict (default 1)
+    def _download_data(self, ticker: str, period: str) -> pd.DataFrame:
+        df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        return df
 
-        Returns:
-            Series with binary target (1=up, 0=down)
-        """
-        # Calculate future return
-        future_return = df['Close'].shift(-horizon) / df['Close'] - 1
-
-        # Binary classification: 1 if up, 0 if down
-        target = (future_return > 0).astype(int)
-
-        return target
-
-    def train_model(
-        self,
-        ticker: str,
-        period: str = "2y",
-        test_size: float = 0.2,
-        horizon: int = 1,
-        **xgb_params
+    def _prepare_training_arrays(
+        self, ticker: str, period: str, test_size: float, horizon: int, data: Optional[pd.DataFrame] = None
     ) -> Dict[str, Any]:
-        """
-        Train XGBoost model to predict price movements
+        df = self._download_data(ticker, period) if data is None else data.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        if df.empty or len(df) < 100:
+            return {"success": False, "error": f"Insufficient data for {ticker}. Need at least 100 days."}
 
-        Args:
-            ticker: Stock ticker symbol
-            period: Historical data period (default 2 years)
-            test_size: Fraction of data for testing (default 0.2)
-            horizon: Days ahead to predict (default 1)
-            **xgb_params: Additional XGBoost parameters
+        required = ["Open", "High", "Low", "Close", "Volume"]
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            return {"success": False, "error": f"Missing required columns: {missing}"}
 
-        Returns:
-            Dict with training results and metrics
-        """
-        if not XGBOOST_AVAILABLE:
-            return {
-                "success": False,
-                "error": "XGBoost not available. Install with: pip install xgboost scikit-learn"
-            }
+        feat = self.prepare_features(df)
+        target = self.prepare_target(df, horizon=horizon)
+        valid = ~(feat.isna().any(axis=1) | target.isna())
+        feat, target = feat[valid], target[valid]
 
+        exclude = ["Open", "High", "Low", "Close", "Volume", "Adj Close"]
+        self.feature_columns = [c for c in feat.columns if c not in exclude]
+        X, y = feat[self.feature_columns].values, target.values
+        if len(X) < 50:
+            return {"success": False, "error": "Not enough valid samples after feature preparation"}
+
+        split_idx = int(len(X) * (1 - test_size))
+        if split_idx <= 0 or split_idx >= len(X):
+            return {"success": False, "error": "Invalid test_size produced empty train/test split"}
+
+        return {
+            "success": True,
+            "X": X,
+            "y": y,
+            "X_train": X[:split_idx],
+            "X_test": X[split_idx:],
+            "y_train": y[:split_idx],
+            "y_test": y[split_idx:],
+        }
+
+    def _calculate_metrics(self, y_true, y_pred, y_proba) -> Dict[str, float]:
+        metrics = {
+            "accuracy": float(round(accuracy_score(y_true, y_pred), 4)),
+            "precision": float(round(precision_score(y_true, y_pred, zero_division=0), 4)),
+            "recall": float(round(recall_score(y_true, y_pred, zero_division=0), 4)),
+            "f1_score": float(round(f1_score(y_true, y_pred, zero_division=0), 4)),
+        }
+        metrics["roc_auc"] = (
+            float(round(roc_auc_score(y_true, y_proba), 4)) if len(np.unique(y_true)) > 1 else 0.0
+        )
+        return metrics
+
+    def _extract_feature_importances(self, models: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
+        models = models or self.models
+        vectors = []
+        for name in ["xgboost", "random_forest"]:
+            model = models.get(name)
+            if model is None or not hasattr(model, "feature_importances_"):
+                continue
+            vec = np.array(model.feature_importances_, dtype=float)
+            vec = vec / vec.sum() if vec.sum() > 0 else vec
+            vectors.append(vec)
+        if not vectors:
+            return {}
+        avg = np.mean(np.vstack(vectors), axis=0)
+        return {f: float(avg[i]) for i, f in enumerate(self.feature_columns)}
+
+    def _active_weights(self) -> Dict[str, float]:
+        active = {n: float(w) for n, w in self.model_weights.items() if self.models.get(n) is not None}
+        total = sum(active.values())
+        if total <= 0:
+            return {}
+        return {n: w / total for n, w in active.items()}
+
+    def train_model(self, ticker: str, period: str = "2y", test_size: float = 0.2, horizon: int = 1, **xgb_params):
+        if not SKLEARN_AVAILABLE:
+            return {"success": False, "error": "scikit-learn not available"}
         try:
-            # Download data
-            df = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+            prep = self._prepare_training_arrays(ticker, period, test_size, horizon)
+            if not prep["success"]:
+                return prep
 
-            if df.empty or len(df) < 100:
-                return {
-                    "success": False,
-                    "error": f"Insufficient data for {ticker}. Need at least 100 days."
+            X, X_train, X_test = prep["X"], prep["X_train"], prep["X_test"]
+            y, y_train, y_test = prep["y"], prep["y_train"], prep["y_test"]
+            self.models = {"xgboost": None, "random_forest": None, "mlp": None}
+            per_model_metrics: Dict[str, Dict[str, float]] = {}
+            test_probs: Dict[str, np.ndarray] = {}
+            train_probs: Dict[str, np.ndarray] = {}
+
+            if XGBOOST_AVAILABLE:
+                params = {
+                    "objective": "binary:logistic",
+                    "max_depth": 6,
+                    "learning_rate": 0.1,
+                    "n_estimators": 120,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "random_state": 42,
+                    "eval_metric": "logloss",
                 }
+                params.update(xgb_params)
+                model = xgb.XGBClassifier(**params)
+                model.fit(X_train, y_train, eval_set=[(X_test, y_test)], verbose=False)
+                self.models["xgboost"] = model
+                y_pred, y_proba = model.predict(X_test), model.predict_proba(X_test)[:, 1]
+                per_model_metrics["xgboost"] = self._calculate_metrics(y_test, y_pred, y_proba)
+                test_probs["xgboost"] = y_proba
+                train_probs["xgboost"] = model.predict_proba(X_train)[:, 1]
 
-            # Flatten multi-index columns if present (yfinance sometimes returns MultiIndex)
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-
-            # Ensure we have the required columns
-            required_cols = ['Open', 'High', 'Low', 'Close', 'Volume']
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            if missing_cols:
-                return {
-                    "success": False,
-                    "error": f"Missing required columns: {missing_cols}"
-                }
-
-            # Prepare features
-            features_df = self.prepare_features(df)
-
-            # Prepare target
-            target = self.prepare_target(df, horizon=horizon)
-
-            # Align features and target (remove NaN rows)
-            valid_idx = ~(features_df.isna().any(axis=1) | target.isna())
-            features_df = features_df[valid_idx]
-            target = target[valid_idx]
-
-            # Select feature columns (exclude price/volume columns)
-            exclude_cols = ['Open', 'High', 'Low', 'Close', 'Volume', 'Adj Close']
-            self.feature_columns = [col for col in features_df.columns if col not in exclude_cols]
-
-            X = features_df[self.feature_columns].values
-            y = target.values
-
-            if len(X) < 50:
-                return {
-                    "success": False,
-                    "error": "Not enough valid samples after feature preparation"
-                }
-
-            # Time series split (preserve temporal order)
-            split_idx = int(len(X) * (1 - test_size))
-            X_train, X_test = X[:split_idx], X[split_idx:]
-            y_train, y_test = y[:split_idx], y[split_idx:]
-
-            # Check class balance
-            train_positive_pct = (y_train.sum() / len(y_train)) * 100
-            test_positive_pct = (y_test.sum() / len(y_test)) * 100
-
-            # Default XGBoost parameters
-            default_params = {
-                'objective': 'binary:logistic',
-                'max_depth': 6,
-                'learning_rate': 0.1,
-                'n_estimators': 100,
-                'subsample': 0.8,
-                'colsample_bytree': 0.8,
-                'random_state': 42,
-                'eval_metric': 'logloss'
-            }
-            default_params.update(xgb_params)
-
-            # Train model
-            self.model = xgb.XGBClassifier(**default_params)
-            self.model.fit(
-                X_train, y_train,
-                eval_set=[(X_test, y_test)],
-                verbose=False
+            rf = RandomForestClassifier(
+                n_estimators=300, max_depth=8, min_samples_leaf=2, random_state=42, n_jobs=-1
             )
+            rf.fit(X_train, y_train)
+            self.models["random_forest"] = rf
+            y_pred, y_proba = rf.predict(X_test), rf.predict_proba(X_test)[:, 1]
+            per_model_metrics["random_forest"] = self._calculate_metrics(y_test, y_pred, y_proba)
+            test_probs["random_forest"] = y_proba
+            train_probs["random_forest"] = rf.predict_proba(X_train)[:, 1]
 
-            # Predictions
-            y_train_pred = self.model.predict(X_train)
-            y_test_pred = self.model.predict(X_test)
+            mlp = MLPClassifier(
+                hidden_layer_sizes=(64, 32), activation="relu", solver="adam", max_iter=400, random_state=42
+            )
+            mlp.fit(X_train, y_train)
+            self.models["mlp"] = mlp
+            y_pred, y_proba = mlp.predict(X_test), mlp.predict_proba(X_test)[:, 1]
+            per_model_metrics["mlp"] = self._calculate_metrics(y_test, y_pred, y_proba)
+            test_probs["mlp"] = y_proba
+            train_probs["mlp"] = mlp.predict_proba(X_train)[:, 1]
 
-            # Prediction probabilities
-            y_train_proba = self.model.predict_proba(X_train)[:, 1]
-            y_test_proba = self.model.predict_proba(X_test)[:, 1]
+            self.model = self.models.get("xgboost") or self.models.get("random_forest")
+            weights = self._active_weights()
+            weighted_test = sum(test_probs[m] * w for m, w in weights.items())
+            weighted_train = sum(train_probs[m] * w for m, w in weights.items())
+            y_test_pred = (weighted_test >= 0.5).astype(int)
+            y_train_pred = (weighted_train >= 0.5).astype(int)
+            train_metrics = self._calculate_metrics(y_train, y_train_pred, weighted_train)
+            test_metrics = self._calculate_metrics(y_test, y_test_pred, weighted_test)
 
-            # Calculate metrics
-            train_metrics = self._calculate_metrics(y_train, y_train_pred, y_train_proba)
-            test_metrics = self._calculate_metrics(y_test, y_test_pred, y_test_proba)
+            feature_importance = self._extract_feature_importances()
+            self.baseline_feature_importances = feature_importance.copy()
+            top = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)[:10]
 
-            # Feature importance (convert numpy types to Python float)
-            feature_importance = dict(zip(
-                self.feature_columns,
-                [float(x) for x in self.model.feature_importances_]
-            ))
-            top_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)[:10]
-
-            # Save model
             model_path = self.model_dir / f"{ticker}_model.pkl"
             self._save_model(model_path, ticker, horizon)
-
             return {
                 "success": True,
                 "ticker": ticker,
                 "period": period,
                 "horizon": horizon,
-                "samples": {
-                    "total": int(len(X)),
-                    "train": int(len(X_train)),
-                    "test": int(len(X_test))
-                },
+                "samples": {"total": int(len(X)), "train": int(len(X_train)), "test": int(len(X_test))},
                 "class_balance": {
-                    "train_positive_pct": float(round(train_positive_pct, 2)),
-                    "test_positive_pct": float(round(test_positive_pct, 2))
+                    "train_positive_pct": float(round((y_train.sum() / len(y_train)) * 100, 2)),
+                    "test_positive_pct": float(round((y_test.sum() / len(y_test)) * 100, 2)),
                 },
                 "train_metrics": train_metrics,
                 "test_metrics": test_metrics,
-                "top_features": [{"feature": f, "importance": float(round(imp, 4))} for f, imp in top_features],
+                "per_model_metrics": per_model_metrics,
+                "ensemble_weights": weights,
+                "top_features": [{"feature": f, "importance": float(round(v, 4))} for f, v in top],
                 "model_path": str(model_path),
-                "features_count": int(len(self.feature_columns))
+                "features_count": int(len(self.feature_columns)),
+                "validation_accuracy": test_metrics.get("accuracy", 0.0),
             }
-
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Training failed: {str(e)}"
-            }
+            return {"success": False, "error": f"Training failed: {str(e)}"}
 
-    def _calculate_metrics(self, y_true, y_pred, y_proba) -> Dict[str, float]:
-        """Calculate classification metrics (convert to Python native types for JSON)"""
-        metrics = {
-            "accuracy": float(round(accuracy_score(y_true, y_pred), 4)),
-            "precision": float(round(precision_score(y_true, y_pred, zero_division=0), 4)),
-            "recall": float(round(recall_score(y_true, y_pred, zero_division=0), 4)),
-            "f1_score": float(round(f1_score(y_true, y_pred, zero_division=0), 4))
-        }
+    def train(self, ticker: str, period: str = "2y", test_size: float = 0.2, horizon: int = 1, **xgb_params):
+        return self.train_model(ticker=ticker, period=period, test_size=test_size, horizon=horizon, **xgb_params)
 
-        # ROC AUC only if we have both classes
-        if len(np.unique(y_true)) > 1:
-            metrics["roc_auc"] = float(round(roc_auc_score(y_true, y_proba), 4))
-        else:
-            metrics["roc_auc"] = 0.0
-
-        return metrics
-
-    def predict(
-        self,
-        ticker: str,
-        data: Optional[pd.DataFrame] = None,
-        return_proba: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Predict next-day price movement
-
-        Args:
-            ticker: Stock ticker
-            data: Optional DataFrame with current data. If None, fetches latest.
-            return_proba: Return probability scores
-
-        Returns:
-            Dict with prediction and confidence
-        """
-        if not XGBOOST_AVAILABLE:
-            return {
-                "success": False,
-                "error": "XGBoost not available"
-            }
-
+    def ensemble_predict(self, ticker: str, data: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+        if not SKLEARN_AVAILABLE:
+            return {"success": False, "error": "scikit-learn not available"}
         try:
-            # Load model if not in memory
-            if self.model is None:
-                model_path = self.model_dir / f"{ticker}_model.pkl"
-                if not model_path.exists():
-                    return {
-                        "success": False,
-                        "error": f"No trained model found for {ticker}. Train first."
-                    }
-                self._load_model(model_path)
+            if not any(self.models.values()):
+                path = self.model_dir / f"{ticker}_model.pkl"
+                if not path.exists():
+                    return {"success": False, "error": f"No trained model found for {ticker}. Train first."}
+                self._load_model(path)
 
-            # Get data
             if data is None:
-                data = yf.download(ticker, period="6mo", progress=False, auto_adjust=True)
-
-                # Flatten multi-index columns if present
-                if isinstance(data.columns, pd.MultiIndex):
-                    data.columns = data.columns.get_level_values(0)
-
+                data = self._download_data(ticker, period="6mo")
+            elif isinstance(data.columns, pd.MultiIndex):
+                data = data.copy()
+                data.columns = data.columns.get_level_values(0)
             if data.empty:
-                return {
-                    "success": False,
-                    "error": f"No data available for {ticker}"
-                }
+                return {"success": False, "error": f"No data available for {ticker}"}
 
-            # Prepare features
-            features_df = self.prepare_features(data)
-
-            # Get latest row (most recent data)
-            latest = features_df.iloc[-1]
-            X = latest[self.feature_columns].values.reshape(1, -1)
-
-            # Check for NaN
+            feat = self.prepare_features(data)
+            X = feat.iloc[-1][self.feature_columns].values.reshape(1, -1)
             if np.isnan(X).any():
-                return {
-                    "success": False,
-                    "error": "Insufficient data for prediction (missing indicators)"
+                return {"success": False, "error": "Insufficient data for prediction (missing indicators)"}
+
+            breakdown: Dict[str, Any] = {}
+            weights = self._active_weights()
+            if not weights:
+                return {"success": False, "error": "No active models available for prediction"}
+
+            weighted_up = 0.0
+            for name in ["xgboost", "random_forest", "mlp"]:
+                model = self.models.get(name)
+                if model is None:
+                    continue
+                proba = model.predict_proba(X)[0] if hasattr(model, "predict_proba") else [1.0, 0.0]
+                down_prob, up_prob = float(proba[0]), float(proba[1])
+                conf = max(up_prob, down_prob)
+                weighted_up += up_prob * weights.get(name, 0.0)
+                breakdown[name] = {
+                    "prediction": "UP" if up_prob >= down_prob else "DOWN",
+                    "up_probability": round(up_prob, 4),
+                    "down_probability": round(down_prob, 4),
+                    "confidence": round(conf, 4),
+                    "weight": round(weights.get(name, 0.0), 4),
                 }
 
-            # Predict
-            prediction = self.model.predict(X)[0]
-
-            result = {
+            weighted_down = 1.0 - weighted_up
+            direction = "UP" if weighted_up >= 0.5 else "DOWN"
+            confidence = max(weighted_up, weighted_down)
+            return {
                 "success": True,
                 "ticker": ticker,
                 "timestamp": datetime.now().isoformat(),
-                "prediction": "UP" if prediction == 1 else "DOWN",
-                "prediction_binary": int(prediction),
-                "current_price": float(data['Close'].iloc[-1])
+                "direction": direction,
+                "prediction": direction,
+                "prediction_binary": int(1 if direction == "UP" else 0),
+                "confidence": float(round(confidence, 4)),
+                "up_probability": float(round(weighted_up, 4)),
+                "down_probability": float(round(weighted_down, 4)),
+                "per_model_breakdown": breakdown,
+                "weights": {k: round(v, 4) for k, v in weights.items()},
+                "current_price": float(data["Close"].iloc[-1]),
             }
-
-            if return_proba:
-                proba = self.model.predict_proba(X)[0]
-                result["confidence"] = {
-                    "down_probability": round(float(proba[0]), 4),
-                    "up_probability": round(float(proba[1]), 4),
-                    "confidence_score": round(float(max(proba)), 4)
-                }
-
-            return result
-
         except Exception as e:
-            return {
-                "success": False,
-                "error": f"Prediction failed: {str(e)}"
+            return {"success": False, "error": f"Ensemble prediction failed: {str(e)}"}
+
+    def predict(self, ticker: str, data: Optional[pd.DataFrame] = None, return_proba: bool = True):
+        result = self.ensemble_predict(ticker=ticker, data=data)
+        if result.get("success") and return_proba:
+            result["confidence_scores"] = {
+                "down_probability": result["down_probability"],
+                "up_probability": result["up_probability"],
+                "confidence_score": result["confidence"],
             }
+        return result
+
+    def detect_feature_drift(self, ticker: str, lookback_days: int = 60) -> Dict[str, Any]:
+        path = self.model_dir / f"{ticker}_model.pkl"
+        if not path.exists():
+            return {"success": False, "error": f"No trained model found for {ticker}. Train first."}
+        try:
+            self._load_model(path)
+            baseline = self.baseline_feature_importances or {}
+            if not baseline:
+                return {"success": False, "error": "No baseline feature importances saved for this model"}
+
+            recent_df = self._download_data(ticker, period="6mo").tail(max(lookback_days + 60, 120))
+            prep = self._prepare_training_arrays(
+                ticker=ticker, period="6mo", test_size=0.2, horizon=1, data=recent_df
+            )
+            if not prep.get("success"):
+                return prep
+
+            X_train, y_train = prep["X_train"], prep["y_train"]
+            temp_models: Dict[str, Any] = {"xgboost": None, "random_forest": None, "mlp": None}
+            if XGBOOST_AVAILABLE:
+                tx = xgb.XGBClassifier(
+                    objective="binary:logistic",
+                    max_depth=5,
+                    learning_rate=0.1,
+                    n_estimators=80,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    random_state=42,
+                    eval_metric="logloss",
+                )
+                tx.fit(X_train, y_train, verbose=False)
+                temp_models["xgboost"] = tx
+            trf = RandomForestClassifier(
+                n_estimators=200, max_depth=7, min_samples_leaf=2, random_state=42, n_jobs=-1
+            )
+            trf.fit(X_train, y_train)
+            temp_models["random_forest"] = trf
+
+            current = self._extract_feature_importances(models=temp_models)
+            if not current:
+                return {"success": False, "error": "Unable to derive current feature importances"}
+
+            baseline_top10 = sorted(baseline.items(), key=lambda x: x[1], reverse=True)[:10]
+            current_top10 = sorted(current.items(), key=lambda x: x[1], reverse=True)[:10]
+            union_features = sorted({f for f, _ in baseline_top10} | {f for f, _ in current_top10})
+            b_vec = np.array([baseline.get(f, 0.0) for f in union_features], dtype=float)
+            c_vec = np.array([current.get(f, 0.0) for f in union_features], dtype=float)
+            similarity = (
+                float(cosine_similarity([b_vec], [c_vec])[0][0])
+                if np.linalg.norm(b_vec) > 0 and np.linalg.norm(c_vec) > 0
+                else 0.0
+            )
+            drift_score = float(max(0.0, min(1.0, 1.0 - similarity)))
+            needs_retraining = drift_score > 0.3
+
+            drifted_features = []
+            for f in union_features:
+                diff = abs(float(current.get(f, 0.0)) - float(baseline.get(f, 0.0)))
+                if diff >= 0.03:
+                    drifted_features.append(
+                        {
+                            "feature": f,
+                            "baseline_importance": round(float(baseline.get(f, 0.0)), 4),
+                            "current_importance": round(float(current.get(f, 0.0)), 4),
+                            "absolute_change": round(diff, 4),
+                        }
+                    )
+            drifted_features = sorted(drifted_features, key=lambda x: x["absolute_change"], reverse=True)
+            print(
+                f"[Feature Drift] {ticker} | drift_score={drift_score:.4f} "
+                f"| needs_retraining={'YES' if needs_retraining else 'NO'}"
+            )
+            return {
+                "success": True,
+                "ticker": ticker,
+                "lookback_days": lookback_days,
+                "drift_score": round(drift_score, 4),
+                "drifted_features": drifted_features,
+                "needs_retraining": needs_retraining,
+                "baseline_top10": [{"feature": f, "importance": round(float(v), 4)} for f, v in baseline_top10],
+                "current_top10": [{"feature": f, "importance": round(float(v), 4)} for f, v in current_top10],
+            }
+        except Exception as e:
+            return {"success": False, "error": f"Drift detection failed: {str(e)}"}
 
     def _save_model(self, path: Path, ticker: str, horizon: int):
-        """Save trained model to disk"""
         model_data = {
-            "model": self.model,
+            "models": self.models,
+            "model": self.models.get("xgboost") or self.models.get("random_forest"),
             "feature_columns": self.feature_columns,
             "ticker": ticker,
             "horizon": horizon,
-            "trained_at": datetime.now().isoformat()
+            "trained_at": datetime.now().isoformat(),
+            "baseline_feature_importances": self.baseline_feature_importances,
+            "model_weights": self.model_weights,
         }
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             pickle.dump(model_data, f)
 
     def _load_model(self, path: Path):
-        """Load trained model from disk"""
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             model_data = pickle.load(f)
-
-        self.model = model_data['model']
-        self.feature_columns = model_data['feature_columns']
+        if "models" in model_data:
+            self.models = model_data["models"]
+            self.model = self.models.get("xgboost") or self.models.get("random_forest")
+        else:
+            legacy = model_data.get("model")
+            self.models = {"xgboost": legacy if XGBOOST_AVAILABLE else None, "random_forest": None, "mlp": None}
+            self.model = legacy
+        self.feature_columns = model_data.get("feature_columns", [])
+        self.baseline_feature_importances = model_data.get("baseline_feature_importances", {})
+        saved_weights = model_data.get("model_weights", {})
+        self.model_weights = {
+            "xgboost": float(saved_weights.get("xgboost", self.DEFAULT_WEIGHTS["xgboost"])),
+            "random_forest": float(saved_weights.get("random_forest", self.DEFAULT_WEIGHTS["random_forest"])),
+            "mlp": float(saved_weights.get("mlp", self.DEFAULT_WEIGHTS["mlp"])),
+        }
 
     def list_models(self) -> List[Dict[str, Any]]:
-        """List all trained models"""
         models = []
         for model_file in self.model_dir.glob("*_model.pkl"):
             try:
-                with open(model_file, 'rb') as f:
-                    model_data = pickle.load(f)
-
-                models.append({
-                    "ticker": model_data['ticker'],
-                    "horizon": model_data['horizon'],
-                    "trained_at": model_data['trained_at'],
-                    "features_count": len(model_data['feature_columns']),
-                    "model_file": model_file.name
-                })
-            except:
+                with open(model_file, "rb") as f:
+                    data = pickle.load(f)
+                model_map = data.get("models")
+                components = (
+                    [name for name, obj in model_map.items() if obj is not None]
+                    if isinstance(model_map, dict)
+                    else ["legacy_single_model"]
+                )
+                models.append(
+                    {
+                        "ticker": data.get("ticker"),
+                        "horizon": data.get("horizon"),
+                        "trained_at": data.get("trained_at"),
+                        "features_count": len(data.get("feature_columns", [])),
+                        "model_components": components,
+                        "model_file": model_file.name,
+                    }
+                )
+            except Exception:
                 continue
-
-        return sorted(models, key=lambda x: x['trained_at'], reverse=True)
+        return sorted(models, key=lambda x: x.get("trained_at", ""), reverse=True)
 
 
 if __name__ == "__main__":
-    # Test the predictor
-    print("=" * 70)
-    print("TESTING ML PRICE PREDICTOR")
-    print("=" * 70)
-    print(f"XGBoost available: {XGBOOST_AVAILABLE}")
-    print(f"Advanced Indicators available: {INDICATORS_AVAILABLE}")
-
-    if XGBOOST_AVAILABLE:
-        predictor = MLPricePredictor()
-
-        # Train model on NVDA
-        print("\n1. Training model on NVDA...")
-        result = predictor.train_model("NVDA", period="1y")
-
-        if result['success']:
-            print("✅ Training successful!")
-            print(f"\nDataset: {result['samples']['total']} samples")
-            print(f"Train: {result['samples']['train']}, Test: {result['samples']['test']}")
-            print(f"\nClass Balance:")
-            print(f"  Train positive: {result['class_balance']['train_positive_pct']}%")
-            print(f"  Test positive: {result['class_balance']['test_positive_pct']}%")
-            print(f"\nTrain Metrics:")
-            for metric, value in result['train_metrics'].items():
-                print(f"  {metric}: {value}")
-            print(f"\nTest Metrics:")
-            for metric, value in result['test_metrics'].items():
-                print(f"  {metric}: {value}")
-            print(f"\nTop 5 Features:")
-            for feat in result['top_features'][:5]:
-                print(f"  {feat['feature']}: {feat['importance']}")
-
-            # Test prediction
-            print("\n2. Testing prediction...")
-            pred = predictor.predict("NVDA")
-
-            if pred['success']:
-                print("✅ Prediction successful!")
-                print(f"Ticker: {pred['ticker']}")
-                print(f"Current Price: ${pred['current_price']:.2f}")
-                print(f"Prediction: {pred['prediction']}")
-                print(f"Confidence: {pred['confidence']['confidence_score'] * 100:.1f}%")
-                print(f"Up Probability: {pred['confidence']['up_probability'] * 100:.1f}%")
-                print(f"Down Probability: {pred['confidence']['down_probability'] * 100:.1f}%")
-            else:
-                print(f"❌ Prediction failed: {pred['error']}")
-        else:
-            print(f"❌ Training failed: {result['error']}")
-    else:
-        print("\n⚠️  XGBoost not installed. Install with:")
-        print("   pip install xgboost scikit-learn")
+    predictor = MLPricePredictor()
+    result = predictor.train_model("NVDA", period="1y")
+    print(result)

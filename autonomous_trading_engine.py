@@ -43,6 +43,13 @@ except ImportError:
     HMM_AVAILABLE = False
     print("Warning: HMM Regime Detector not available")
 
+try:
+    from auto_retrain import run_weekly_auto_retraining
+    AUTO_RETRAIN_AVAILABLE = True
+except ImportError:
+    AUTO_RETRAIN_AVAILABLE = False
+    run_weekly_auto_retraining = None
+
 load_dotenv()
 
 
@@ -83,7 +90,7 @@ class AutonomousTradingEngine:
 
         if ML_AVAILABLE and self.use_ml_validation:
             self.ml_predictor = MLPricePredictor()
-            print("   ✅ XGBoost ML Predictor loaded")
+            print("   ✅ Ensemble ML Predictor loaded (XGBoost + RF + MLP)")
 
         if HMM_AVAILABLE and self.use_regime_detection:
             self.regime_detector = HMMRegimeDetector()
@@ -248,7 +255,7 @@ class AutonomousTradingEngine:
 
             # Step 4.5: Validate signals with ML (NEW - XGBoost Integration)
             if self.ml_predictor and self.use_ml_validation:
-                print("\n🤖 Validating signals with XGBoost ML...")
+                print("\n🤖 Validating signals with Ensemble ML...")
                 signals = self._validate_signals_with_ml(signals)
                 results['ml_validated_signals'] = len(signals)
                 print(f"   {len(signals)} signals passed ML validation")
@@ -410,7 +417,7 @@ class AutonomousTradingEngine:
 
     def _validate_signals_with_ml(self, signals: List[Dict]) -> List[Dict]:
         """
-        Validate trading signals using XGBoost ML predictions
+        Validate trading signals using ensemble ML predictions
 
         Only keeps signals where:
         - BUY signal AND ML predicts UP with sufficient confidence
@@ -442,8 +449,8 @@ class AutonomousTradingEngine:
                         validated_signals.append(signal)
                         continue
 
-                # Get prediction
-                prediction = self.ml_predictor.predict(ticker)
+                # Get ensemble prediction
+                prediction = self.ml_predictor.ensemble_predict(ticker)
 
                 if not prediction.get('success'):
                     # Prediction failed, include signal anyway
@@ -451,7 +458,11 @@ class AutonomousTradingEngine:
                     continue
 
                 ml_direction = prediction.get('prediction')  # 'UP' or 'DOWN'
-                ml_confidence = prediction.get('confidence', 0)
+                ml_confidence_raw = prediction.get('confidence', 0)
+                if isinstance(ml_confidence_raw, dict):
+                    ml_confidence = float(ml_confidence_raw.get('confidence_score', 0))
+                else:
+                    ml_confidence = float(ml_confidence_raw or 0)
 
                 # Validate signal against ML prediction
                 signal_agrees = False
@@ -867,6 +878,28 @@ class AutonomousTradingEngine:
 
         self.db.commit()
 
+    def run_weekly_ml_retraining(self, tickers: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Run weekly ML retraining cycle from the engine context.
+        """
+        if not AUTO_RETRAIN_AVAILABLE:
+            return {
+                "success": False,
+                "error": "auto_retrain module is not available"
+            }
+
+        try:
+            summary = run_weekly_auto_retraining(tickers=tickers)
+            return {
+                "success": True,
+                "summary": summary
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
 
 if __name__ == "__main__":
     # Test the engine
@@ -882,3 +915,4 @@ if __name__ == "__main__":
     if results.get('error'):
         print(f"Error: {results['error']}")
     print("=" * 70)
+
