@@ -45,6 +45,7 @@ from ml_price_predictor import MLPricePredictor
 from hmm_regime_detector import HMMRegimeDetector
 from live_signal_generator import LiveSignalGenerator
 from market_scanner import MarketScanner
+from portfolio_heatmap import PortfolioHeatmap
 from pair_trading_strategy import (
     PairTradingStatistics, PairTradingStrategy, PairBacktester, PairScanner,
     PairAnalysis, CointegrationResult
@@ -1201,6 +1202,65 @@ async def optimize_portfolio(request: PortfolioOptimizationRequest, db=Depends(g
         # Convert numpy types to Python types for JSON serialization
         return convert_numpy_types(response)
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/portfolio/correlation")
+async def get_portfolio_correlation(
+    tickers: Optional[str] = None,
+    period: str = "6mo",
+    interval: str = "1d"
+):
+    """Return correlation heatmap data for provided comma-separated tickers."""
+    try:
+        heatmap = PortfolioHeatmap()
+        ticker_list = [t.strip().upper() for t in tickers.split(",")] if tickers else None
+        payload = heatmap.generate_heatmap_data(ticker_list)
+
+        # Recompute with requested period/interval when explicit tickers are provided.
+        if ticker_list:
+            corr = heatmap.generate_correlation_matrix(ticker_list, period=period, interval=interval)
+            payload["correlation_matrix"] = corr["matrix"]
+            payload["tickers"] = corr["tickers"]
+            payload["stats"] = corr["stats"]
+            payload["risk_clusters"] = heatmap.get_risk_clusters(corr["matrix"], corr["tickers"], threshold=0.7)
+            payload["diversification_score"] = heatmap.calculate_diversification_score(corr["matrix"])
+            payload["warnings"] = heatmap.get_warnings(corr["matrix"], corr["tickers"])
+            payload["metadata"]["source"] = "request"
+
+        payload["metadata"]["period"] = period
+        payload["metadata"]["interval"] = interval
+        return convert_numpy_types(payload)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/portfolio/correlation/live")
+async def get_live_portfolio_correlation(
+    period: str = "6mo",
+    interval: str = "1d"
+):
+    """
+    Return live correlation heatmap using Alpaca positions.
+    Falls back to default watchlist when no open positions are available.
+    """
+    try:
+        heatmap = PortfolioHeatmap()
+        payload = heatmap.generate_heatmap_data()
+
+        current_tickers = payload.get("tickers", [])
+        corr = heatmap.generate_correlation_matrix(current_tickers, period=period, interval=interval)
+        payload["correlation_matrix"] = corr["matrix"]
+        payload["tickers"] = corr["tickers"]
+        payload["stats"] = corr["stats"]
+        payload["risk_clusters"] = heatmap.get_risk_clusters(corr["matrix"], corr["tickers"], threshold=0.7)
+        payload["diversification_score"] = heatmap.calculate_diversification_score(corr["matrix"])
+        payload["warnings"] = heatmap.get_warnings(corr["matrix"], corr["tickers"])
+        payload["metadata"]["period"] = period
+        payload["metadata"]["interval"] = interval
+
+        return convert_numpy_types(payload)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
