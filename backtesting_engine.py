@@ -3,7 +3,7 @@ Advanced backtesting engine with technical indicators and advanced risk metrics
 """
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
 from datetime import datetime, timedelta
 from kelly_criterion import KellyCriterion
 from advanced_indicators import AdvancedIndicators
@@ -104,7 +104,8 @@ class BacktestingEngine:
         self,
         strategy: Dict[str, Any],
         market_data: pd.DataFrame,
-        commission: float = 0.001  # 0.1% commission
+        commission: float = 0.001,  # 0.1% commission
+        trailing_stop_pct: Optional[float] = None
     ) -> Dict[str, Any]:
         """
         Backtest a trading strategy
@@ -113,6 +114,7 @@ class BacktestingEngine:
             strategy: Strategy dictionary with entry/exit rules
             market_data: Historical OHLCV data
             commission: Transaction commission as decimal
+            trailing_stop_pct: Trailing stop percentage (e.g. 5.0). None disables.
 
         Returns:
             Dictionary with backtest results
@@ -138,62 +140,76 @@ class BacktestingEngine:
         positions = {}  # {ticker: {qty, entry_price, entry_date}}
         trades = []
 
-        # Process each ticker
+        # Pre-calculate ticker data/indicators so simulation can run date-by-date
+        ticker_state = {}
         for ticker in tickers:
             if ticker not in market_data.columns.levels[1]:
                 continue
 
-            # Get ticker data
             ticker_data = market_data.xs(ticker, level=1, axis=1)
+            if 'Close' not in ticker_data.columns:
+                continue
 
-            # Calculate indicators
             indicators_data = self._calculate_indicators(ticker_data, indicators_config)
+            ticker_state[ticker] = {
+                'data': ticker_data,
+                'indicators': indicators_data,
+                'date_to_index': {dt: i for i, dt in enumerate(ticker_data.index)},
+                'close_series': ticker_data['Close'].reindex(market_data.index).ffill()
+            }
 
-            # Simulate trading
-            for i in range(len(ticker_data)):
-                current_date = ticker_data.index[i]
+        # Simulate trading date-by-date across all tickers and track full portfolio equity
+        for current_date in market_data.index:
+            for ticker, state in ticker_state.items():
+                i = state['date_to_index'].get(current_date)
+                if i is None:
+                    continue
+
+                ticker_data = state['data']
+                indicators_data = state['indicators']
                 current_price = ticker_data['Close'].iloc[i]
 
                 # Check exit conditions for existing positions
                 if ticker in positions:
                     position = positions[ticker]
+                    position['highest_price'] = max(
+                        position.get('highest_price', position['entry_price']),
+                        current_price
+                    )
                     entry_price = position['entry_price']
                     pnl_pct = ((current_price - entry_price) / entry_price) * 100
+                    exit_reason = None
+                    exit_metadata = None
 
-                    # Check stop loss
                     if pnl_pct <= -stop_loss_pct:
-                        trade = self._close_position(
-                            ticker, position, current_price, current_date,
-                            commission, "stop_loss"
-                        )
-                        trades.append(trade)
-                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
-                        del positions[ticker]
-
-                    # Check take profit
+                        exit_reason = "stop_loss"
                     elif pnl_pct >= take_profit_pct:
-                        trade = self._close_position(
-                            ticker, position, current_price, current_date,
-                            commission, "take_profit"
-                        )
-                        trades.append(trade)
-                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
-                        del positions[ticker]
+                        exit_reason = "take_profit"
+                    elif trailing_stop_pct is not None and trailing_stop_pct > 0:
+                        trailing_stop_price = position['highest_price'] * (1 - trailing_stop_pct / 100)
+                        if current_price <= trailing_stop_price:
+                            exit_reason = "trailing_stop"
+                            exit_metadata = {
+                                'trailing_high_price': position['highest_price'],
+                                'trailing_stop_pct': trailing_stop_pct,
+                                'trailing_stop_price': trailing_stop_price
+                            }
 
-                    # Check strategy exit conditions
-                    elif self._check_exit_signal(indicators_data, i, strategy):
+                    if exit_reason is None and self._check_exit_signal(indicators_data, i, strategy):
+                        exit_reason = "signal"
+
+                    if exit_reason:
                         trade = self._close_position(
                             ticker, position, current_price, current_date,
-                            commission, "signal"
+                            commission, exit_reason, exit_metadata=exit_metadata
                         )
                         trades.append(trade)
-                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+                        capital += trade['exit_value']
                         del positions[ticker]
 
                 # Check entry conditions
                 if ticker not in positions and len(positions) < max_positions:
                     if self._check_entry_signal(indicators_data, i, strategy):
-                        # Calculate position size
                         position_value = capital * (position_size_pct / 100)
                         qty = position_value / current_price
                         cost = qty * current_price * (1 + commission)
@@ -203,23 +219,32 @@ class BacktestingEngine:
                                 'qty': qty,
                                 'entry_price': current_price,
                                 'entry_date': current_date,
-                                'cost': cost
+                                'cost': cost,
+                                'highest_price': current_price
                             }
                             capital -= cost
 
-                # Track equity
-                portfolio_value = capital + sum(
-                    pos['qty'] * ticker_data['Close'].iloc[i]
-                    for tick, pos in positions.items() if tick == ticker
-                )
-                results['equity_curve'].append({
-                    'date': current_date.strftime('%Y-%m-%d'),
-                    'equity': portfolio_value
-                })
+            # Track total portfolio equity across all open positions at this date
+            portfolio_value = capital
+            for pos_ticker, pos in positions.items():
+                close_series = ticker_state[pos_ticker]['close_series']
+                mark_price = close_series.loc[current_date]
+                if pd.isna(mark_price):
+                    mark_price = pos['entry_price']
+                portfolio_value += pos['qty'] * mark_price
+
+            results['equity_curve'].append({
+                'date': current_date.strftime('%Y-%m-%d'),
+                'equity': portfolio_value
+            })
 
         # Close any remaining positions
         for ticker, position in list(positions.items()):
-            final_price = market_data['Close'][ticker].iloc[-1]
+            close_series = ticker_state[ticker]['close_series']
+            final_price = close_series.iloc[-1]
+            if pd.isna(final_price):
+                valid_closes = close_series.dropna()
+                final_price = valid_closes.iloc[-1] if not valid_closes.empty else position['entry_price']
             final_date = market_data.index[-1]
             trade = self._close_position(
                 ticker, position, final_price, final_date,
@@ -227,6 +252,13 @@ class BacktestingEngine:
             )
             trades.append(trade)
             capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+
+        if results['equity_curve']:
+            # Ensure final equity reflects net liquidation value after commissions.
+            results['equity_curve'][-1] = {
+                'date': market_data.index[-1].strftime('%Y-%m-%d'),
+                'equity': capital
+            }
 
         # Calculate metrics
         results['trades'] = trades
@@ -430,7 +462,8 @@ class BacktestingEngine:
         exit_price: float,
         exit_date: datetime,
         commission: float,
-        exit_reason: str
+        exit_reason: str,
+        exit_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict:
         """Close a position and record trade"""
         entry_price = position['entry_price']
@@ -440,7 +473,7 @@ class BacktestingEngine:
         profit_loss = exit_value - position['cost']
         profit_loss_pct = (profit_loss / position['cost']) * 100
 
-        return {
+        trade = {
             'ticker': ticker,
             'action': 'BUY/SELL',
             'quantity': qty,
@@ -453,6 +486,11 @@ class BacktestingEngine:
             'exit_reason': exit_reason,
             'exit_value': exit_value  # Add exit value for correct capital management
         }
+
+        if exit_metadata:
+            trade.update(exit_metadata)
+
+        return trade
 
     def _calculate_metrics(
         self,

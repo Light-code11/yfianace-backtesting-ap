@@ -14,6 +14,9 @@ This is the brain of the autonomous system that:
 import os
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+import yfinance as yf
 from dotenv import load_dotenv
 
 from alpaca_client import AlpacaClient
@@ -54,7 +57,7 @@ class AutonomousTradingEngine:
     - Position correlations
     """
 
-    def __init__(self):
+    def __init__(self, max_correlation: float = 0.7):
         self.alpaca = AlpacaClient()
         self.db = SessionLocal()
 
@@ -64,6 +67,8 @@ class AutonomousTradingEngine:
         self.max_daily_loss_pct = float(os.getenv('MAX_DAILY_LOSS_PCT', 5))
         self.max_portfolio_positions = int(os.getenv('MAX_PORTFOLIO_POSITIONS', 10))
         self.min_signal_confidence = os.getenv('MIN_SIGNAL_CONFIDENCE', 'HIGH')
+        self.max_correlation = float(os.getenv('MAX_CORRELATION', max_correlation))
+        self._returns_cache: Dict[str, pd.Series] = {}
 
         # ML Configuration
         self.use_ml_validation = os.getenv('USE_ML_VALIDATION', 'true').lower() == 'true'
@@ -86,9 +91,88 @@ class AutonomousTradingEngine:
         print(f"🤖 Autonomous Trading Engine initialized")
         print(f"   Auto-trading: {'ENABLED' if self.auto_trading_enabled else 'DISABLED'}")
         print(f"   Max position size: {self.max_position_size_pct}%")
+        print(f"   Max correlation: {self.max_correlation}")
         print(f"   Max daily loss: {self.max_daily_loss_pct}%")
         print(f"   ML Validation: {'ENABLED' if self.use_ml_validation and ML_AVAILABLE else 'DISABLED'}")
         print(f"   Regime Detection: {'ENABLED' if self.use_regime_detection and HMM_AVAILABLE else 'DISABLED'}")
+
+    def _get_recent_returns(self, ticker: str, lookback_days: int = 60) -> Optional[pd.Series]:
+        """Fetch recent daily returns for correlation checks (cached per run)."""
+        if ticker in self._returns_cache:
+            return self._returns_cache[ticker]
+
+        try:
+            history = yf.download(
+                ticker,
+                period="6mo",
+                interval="1d",
+                auto_adjust=True,
+                progress=False
+            )
+            if history is None or history.empty or 'Close' not in history.columns:
+                return None
+
+            returns = history['Close'].pct_change().dropna().tail(lookback_days)
+            if returns.empty:
+                return None
+
+            self._returns_cache[ticker] = returns
+            return returns
+        except Exception:
+            return None
+
+    def _evaluate_correlation_risk(self, candidate_ticker: str, lookback_days: int = 60) -> Dict[str, Any]:
+        """Evaluate return correlation between candidate and current open positions."""
+        open_positions = self.db.query(LivePosition).filter(
+            LivePosition.is_open == True
+        ).all()
+
+        open_tickers = [p.ticker for p in open_positions if p.ticker != candidate_ticker]
+        if not open_tickers:
+            return {'can_trade': True, 'size_multiplier': 1.0}
+
+        candidate_returns = self._get_recent_returns(candidate_ticker, lookback_days=lookback_days)
+        if candidate_returns is None:
+            return {'can_trade': True, 'size_multiplier': 1.0}
+
+        max_corr = -1.0
+        max_corr_ticker = None
+
+        for open_ticker in open_tickers:
+            open_returns = self._get_recent_returns(open_ticker, lookback_days=lookback_days)
+            if open_returns is None:
+                continue
+
+            aligned = pd.concat([candidate_returns, open_returns], axis=1, join='inner').dropna()
+            if len(aligned) < 20:
+                continue
+
+            corr = aligned.iloc[:, 0].corr(aligned.iloc[:, 1])
+            if corr is None or np.isnan(corr):
+                continue
+
+            if corr > max_corr:
+                max_corr = corr
+                max_corr_ticker = open_ticker
+
+        if max_corr <= self.max_correlation:
+            return {'can_trade': True, 'size_multiplier': 1.0}
+
+        # Risk response: skip for very high correlation, reduce size for moderate excess.
+        if max_corr >= 0.9:
+            return {
+                'can_trade': False,
+                'size_multiplier': 0.0,
+                'max_correlation': max_corr,
+                'against_ticker': max_corr_ticker
+            }
+
+        return {
+            'can_trade': True,
+            'size_multiplier': 0.5,
+            'max_correlation': max_corr,
+            'against_ticker': max_corr_ticker
+        }
 
     def run_daily_cycle(self) -> Dict[str, Any]:
         """
@@ -546,6 +630,28 @@ class AutonomousTradingEngine:
                 signal['adjusted_position_size_pct'],
                 self.max_position_size_pct
             )
+
+            # Correlation risk check against existing open positions (60-day returns)
+            corr_check = self._evaluate_correlation_risk(signal['ticker'], lookback_days=60)
+            if not corr_check.get('can_trade', True):
+                print(
+                    f"      ⚠️  {signal['ticker']}: skipped due to high correlation "
+                    f"({corr_check.get('max_correlation', 0):.2f}) with "
+                    f"{corr_check.get('against_ticker', 'existing position')}"
+                )
+                continue
+
+            corr_multiplier = corr_check.get('size_multiplier', 1.0)
+            if corr_multiplier < 1.0:
+                signal['adjusted_position_size_pct'] *= corr_multiplier
+                signal['correlation_multiplier'] = corr_multiplier
+                signal['max_observed_correlation'] = corr_check.get('max_correlation')
+                signal['correlated_with'] = corr_check.get('against_ticker')
+                print(
+                    f"      📉 {signal['ticker']}: reducing size {corr_multiplier:.2f}x "
+                    f"due to correlation {corr_check.get('max_correlation', 0):.2f} with "
+                    f"{corr_check.get('against_ticker', 'existing position')}"
+                )
 
             actionable.append(signal)
 
