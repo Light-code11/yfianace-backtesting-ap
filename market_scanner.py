@@ -138,6 +138,87 @@ class MarketScanner:
         }
 
     @staticmethod
+    def multi_timeframe_scan(
+        strategies: List[Dict[str, Any]],
+        universe: Optional[List[str]] = None,
+        max_workers: int = 10,
+        min_confidence: str = "LOW",
+        require_alignment: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Scan market and enforce/flag daily+weekly signal agreement.
+
+        Args:
+            strategies: List of strategy configs to test
+            universe: List of tickers to scan
+            max_workers: Number of parallel scan workers
+            min_confidence: Confidence filter
+            require_alignment: If True, only surface ALIGNED signals in top lists
+
+        Returns:
+            Scan payload with aligned and disagreement buckets.
+        """
+        base_results = MarketScanner.scan_market(
+            strategies=strategies,
+            universe=universe,
+            max_workers=max_workers,
+            min_confidence=min_confidence
+        )
+
+        all_signals = base_results.get("all_signals", [])
+        aligned_signals = []
+        neutral_signals = []
+        conflicting_signals = []
+
+        for sig in all_signals:
+            alignment = sig.get("higher_timeframe_alignment", "NEUTRAL")
+            multiplier = sig.get("higher_timeframe_multiplier")
+
+            # Backward compatibility for signals generated before HTF metadata was added.
+            if multiplier is None:
+                multiplier = LiveSignalGenerator.confirm_with_higher_timeframe(
+                    sig.get("ticker", ""),
+                    sig.get("signal", "HOLD")
+                )
+                sig["higher_timeframe_multiplier"] = multiplier
+
+            if alignment not in {"ALIGNED", "NEUTRAL", "CONFLICT"}:
+                if multiplier >= 1.0:
+                    alignment = "ALIGNED"
+                elif multiplier <= 0.0:
+                    alignment = "CONFLICT"
+                else:
+                    alignment = "NEUTRAL"
+                sig["higher_timeframe_alignment"] = alignment
+
+            if alignment == "ALIGNED":
+                aligned_signals.append(sig)
+            elif alignment == "CONFLICT":
+                conflicting_signals.append(sig)
+            else:
+                neutral_signals.append(sig)
+
+        surfaced_signals = aligned_signals if require_alignment else aligned_signals + neutral_signals
+        surfaced_signals = MarketScanner._rank_signals(surfaced_signals)
+        conflicting_signals = MarketScanner._rank_signals(conflicting_signals)
+
+        surfaced_buys = [s for s in surfaced_signals if s.get("signal") == "BUY"]
+        surfaced_sells = [s for s in surfaced_signals if s.get("signal") == "SELL"]
+
+        return {
+            **base_results,
+            "scan_mode": "multi_timeframe",
+            "require_alignment": require_alignment,
+            "aligned_signals": len(aligned_signals),
+            "neutral_signals": len(neutral_signals),
+            "conflicting_signals": len(conflicting_signals),
+            "disagreement_signals": conflicting_signals,
+            "top_buys": surfaced_buys[:20],
+            "top_sells": surfaced_sells[:20],
+            "all_signals": surfaced_signals
+        }
+
+    @staticmethod
     def _scan_ticker(ticker: str, strategies: List[Dict]) -> List[Dict]:
         """Scan a single ticker with all strategies"""
         signals = []

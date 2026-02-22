@@ -106,7 +106,8 @@ class BacktestingEngine:
         market_data: pd.DataFrame,
         commission: float = 0.001,  # 0.1% commission
         slippage_pct: float = 0.0005,  # 0.05% = 5 bps
-        spread_pct: float = 0.0002  # 0.02%
+        spread_pct: float = 0.0002,  # 0.02%
+        use_dynamic_stops: bool = True
     ) -> Dict[str, Any]:
         """
         Backtest a trading strategy
@@ -136,6 +137,7 @@ class BacktestingEngine:
         take_profit_pct = strategy.get("risk_management", {}).get("take_profit_pct", 10.0)
         position_size_pct = strategy.get("risk_management", {}).get("position_size_pct", 10.0)
         max_positions = strategy.get("risk_management", {}).get("max_positions", 3)
+        atr_stop_multiplier = float(strategy.get("risk_management", {}).get("atr_stop_multiplier", 2.0))
 
         # Initialize portfolio
         capital = self.initial_capital
@@ -181,28 +183,56 @@ class BacktestingEngine:
                     entry_price = position['entry_price']
                     pnl_pct = ((current_price - entry_price) / entry_price) * 100
                     exit_reason = None
-                    exit_metadata = None
+                    exit_triggered = False
 
-                    if pnl_pct <= -stop_loss_pct:
-                        trade = self._close_position(
-                            ticker, position, current_price, current_date,
-                            commission, slippage_pct, spread_pct, "stop_loss"
-                        )
-                        trades.append(trade)
-                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
-                        del positions[ticker]
+                    if use_dynamic_stops:
+                        dynamic_stop_loss = position.get("dynamic_stop_loss")
+                        dynamic_take_profit = position.get("dynamic_take_profit")
 
-                    # Check take profit
-                    elif pnl_pct >= take_profit_pct:
-                        trade = self._close_position(
-                            ticker, position, current_price, current_date,
-                            commission, slippage_pct, spread_pct, "take_profit"
-                        )
-                        trades.append(trade)
-                        capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
-                        del positions[ticker]
+                        if dynamic_stop_loss is not None and current_price <= dynamic_stop_loss:
+                            trade = self._close_position(
+                                ticker, position, current_price, current_date,
+                                commission, slippage_pct, spread_pct, "dynamic_stop_loss"
+                            )
+                            trades.append(trade)
+                            capital += trade['exit_value']
+                            del positions[ticker]
+                            exit_triggered = True
+                        elif dynamic_take_profit is not None and current_price >= dynamic_take_profit:
+                            trade = self._close_position(
+                                ticker, position, current_price, current_date,
+                                commission, slippage_pct, spread_pct, "dynamic_take_profit"
+                            )
+                            trades.append(trade)
+                            capital += trade['exit_value']
+                            del positions[ticker]
+                            exit_triggered = True
+                    else:
+                        if pnl_pct <= -stop_loss_pct:
+                            trade = self._close_position(
+                                ticker, position, current_price, current_date,
+                                commission, slippage_pct, spread_pct, "stop_loss"
+                            )
+                            trades.append(trade)
+                            capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+                            del positions[ticker]
+                            exit_triggered = True
 
-                    if exit_reason is None and self._check_exit_signal(indicators_data, i, strategy):
+                        # Check take profit
+                        elif pnl_pct >= take_profit_pct:
+                            trade = self._close_position(
+                                ticker, position, current_price, current_date,
+                                commission, slippage_pct, spread_pct, "take_profit"
+                            )
+                            trades.append(trade)
+                            capital += trade['exit_value']  # Fixed: add exit proceeds, not profit
+                            del positions[ticker]
+                            exit_triggered = True
+
+                    if exit_triggered:
+                        continue
+
+                    if self._check_exit_signal(indicators_data, i, strategy):
                         exit_reason = "signal"
 
                     if exit_reason:
@@ -223,13 +253,35 @@ class BacktestingEngine:
                         cost = qty * entry_fill_price * (1 + commission)
 
                         if cost <= capital:
+                            dynamic_stop_loss = None
+                            dynamic_take_profit = None
+                            entry_atr = None
+
+                            if use_dynamic_stops:
+                                dynamic_levels = self.calculate_dynamic_stop(
+                                    ticker_data=ticker_data,
+                                    index=i,
+                                    multiplier=atr_stop_multiplier
+                                )
+                                entry_atr = dynamic_levels.get("atr")
+                                dynamic_stop_loss = dynamic_levels.get("stop_loss")
+                                dynamic_take_profit = dynamic_levels.get("take_profit")
+
+                            if dynamic_stop_loss is None or dynamic_take_profit is None:
+                                dynamic_stop_loss = entry_fill_price * (1 - stop_loss_pct / 100)
+                                dynamic_take_profit = entry_fill_price * (1 + take_profit_pct / 100)
+
                             positions[ticker] = {
                                 'qty': qty,
                                 'entry_price': entry_fill_price,
                                 'entry_market_price': current_price,
                                 'entry_date': current_date,
                                 'cost': cost,
-                                'highest_price': current_price
+                                'highest_price': current_price,
+                                'entry_atr': entry_atr,
+                                'dynamic_stop_loss': float(dynamic_stop_loss),
+                                'dynamic_take_profit': float(dynamic_take_profit),
+                                'use_dynamic_stops': use_dynamic_stops
                             }
                             capital -= cost
 
@@ -274,6 +326,48 @@ class BacktestingEngine:
         results['metrics'] = self._calculate_metrics(trades, capital, results['equity_curve'])
 
         return results
+
+    def calculate_dynamic_stop(
+        self,
+        ticker_data: pd.DataFrame,
+        index: int,
+        multiplier: float = 2.0
+    ) -> Dict[str, Optional[float]]:
+        """
+        Calculate ATR-based stop/take-profit for long positions.
+
+        Stop = entry_price - ATR_14 * multiplier
+        Take profit = entry_price + ATR_14 * multiplier * 2 (2:1 reward/risk)
+        """
+        if ticker_data is None or ticker_data.empty or index < 0 or index >= len(ticker_data):
+            return {"atr": None, "stop_loss": None, "take_profit": None}
+
+        required_cols = {"High", "Low", "Close"}
+        if not required_cols.issubset(set(ticker_data.columns)):
+            return {"atr": None, "stop_loss": None, "take_profit": None}
+
+        atr_series = TechnicalIndicators.atr(
+            ticker_data["High"],
+            ticker_data["Low"],
+            ticker_data["Close"],
+            period=14
+        )
+        atr_value = atr_series.iloc[index]
+        entry_price = float(ticker_data["Close"].iloc[index])
+
+        if pd.isna(atr_value) or atr_value <= 0:
+            return {"atr": None, "stop_loss": None, "take_profit": None}
+
+        atr_value = float(atr_value)
+        risk_distance = atr_value * float(multiplier)
+        stop_loss = entry_price - risk_distance
+        take_profit = entry_price + (risk_distance * 2.0)
+
+        return {
+            "atr": atr_value,
+            "stop_loss": float(stop_loss),
+            "take_profit": float(take_profit)
+        }
 
     def walk_forward_test(
         self,
@@ -674,8 +768,14 @@ class BacktestingEngine:
             'profit_loss_usd': profit_loss,
             'profit_loss_pct': profit_loss_pct,
             'exit_reason': exit_reason,
-            'exit_value': exit_value  # Add exit value for correct capital management
+            'exit_value': exit_value,  # Add exit value for correct capital management
+            'entry_atr': position.get('entry_atr'),
+            'dynamic_stop_loss': position.get('dynamic_stop_loss'),
+            'dynamic_take_profit': position.get('dynamic_take_profit'),
+            'used_dynamic_stops': position.get('use_dynamic_stops', False)
         }
+
+        return trade
 
     def _optimize_strategy_on_insample(
         self,

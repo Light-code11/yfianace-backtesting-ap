@@ -17,6 +17,160 @@ class LiveSignalGenerator:
     _yf_lock = threading.Lock()
 
     @staticmethod
+    def _confidence_to_score(confidence: str) -> float:
+        """Convert confidence label to a normalized score used for scaling."""
+        return {
+            "HIGH": 1.0,
+            "MEDIUM": 0.66,
+            "LOW": 0.33
+        }.get((confidence or "LOW").upper(), 0.33)
+
+    @staticmethod
+    def _score_to_confidence(score: float) -> str:
+        """Convert scaled confidence score back to label."""
+        if score >= 0.8:
+            return "HIGH"
+        if score >= 0.45:
+            return "MEDIUM"
+        return "LOW"
+
+    @staticmethod
+    def _evaluate_higher_timeframe_alignment(ticker: str, signal_direction: str) -> Dict[str, Any]:
+        """
+        Evaluate weekly trend/momentum alignment against daily signal direction.
+
+        Returns:
+            Dict containing multiplier (1.0/0.5/0.0), alignment status, and diagnostics.
+        """
+        with LiveSignalGenerator._yf_lock:
+            weekly = yf.download(
+                ticker,
+                period="1y",
+                interval="1wk",
+                progress=False,
+                auto_adjust=True
+            )
+
+        if weekly is None or weekly.empty:
+            return {
+                "multiplier": 0.5,
+                "alignment": "NEUTRAL",
+                "weekly_bias": "UNKNOWN",
+                "reason": "No weekly data available"
+            }
+
+        if isinstance(weekly.columns, pd.MultiIndex):
+            weekly.columns = weekly.columns.get_level_values(0)
+
+        required_cols = {"Close", "High", "Low"}
+        if not required_cols.issubset(set(weekly.columns)):
+            return {
+                "multiplier": 0.5,
+                "alignment": "NEUTRAL",
+                "weekly_bias": "UNKNOWN",
+                "reason": "Weekly OHLC data missing required columns"
+            }
+
+        close = weekly["Close"]
+        high = weekly["High"]
+        low = weekly["Low"]
+
+        sma20 = TechnicalIndicators.sma(close, 20)
+        sma50 = TechnicalIndicators.sma(close, 50)
+        rsi14 = TechnicalIndicators.rsi(close, 14)
+        macd_line, macd_signal, _ = TechnicalIndicators.macd(close)
+
+        latest = {
+            "sma20": float(sma20.iloc[-1]) if not pd.isna(sma20.iloc[-1]) else None,
+            "sma50": float(sma50.iloc[-1]) if not pd.isna(sma50.iloc[-1]) else None,
+            "rsi14": float(rsi14.iloc[-1]) if not pd.isna(rsi14.iloc[-1]) else None,
+            "macd": float(macd_line.iloc[-1]) if not pd.isna(macd_line.iloc[-1]) else None,
+            "macd_signal": float(macd_signal.iloc[-1]) if not pd.isna(macd_signal.iloc[-1]) else None
+        }
+
+        bullish_checks = 0
+        bearish_checks = 0
+        total_checks = 0
+
+        if latest["sma20"] is not None and latest["sma50"] is not None:
+            total_checks += 1
+            if latest["sma20"] > latest["sma50"]:
+                bullish_checks += 1
+            elif latest["sma20"] < latest["sma50"]:
+                bearish_checks += 1
+
+        if latest["rsi14"] is not None:
+            total_checks += 1
+            if latest["rsi14"] > 50:
+                bullish_checks += 1
+            elif latest["rsi14"] < 50:
+                bearish_checks += 1
+
+        if latest["macd"] is not None and latest["macd_signal"] is not None:
+            total_checks += 1
+            if latest["macd"] > latest["macd_signal"]:
+                bullish_checks += 1
+            elif latest["macd"] < latest["macd_signal"]:
+                bearish_checks += 1
+
+        if total_checks == 0:
+            return {
+                "multiplier": 0.5,
+                "alignment": "NEUTRAL",
+                "weekly_bias": "UNKNOWN",
+                "reason": "Insufficient weekly indicator data",
+                "weekly_indicators": latest
+            }
+
+        if bullish_checks > bearish_checks:
+            weekly_bias = "BULLISH"
+        elif bearish_checks > bullish_checks:
+            weekly_bias = "BEARISH"
+        else:
+            weekly_bias = "NEUTRAL"
+
+        direction = (signal_direction or "").upper()
+        desired_bias = "BULLISH" if direction == "BUY" else "BEARISH" if direction == "SELL" else "NEUTRAL"
+
+        if desired_bias == "NEUTRAL" or weekly_bias == "NEUTRAL":
+            multiplier = 0.5
+            alignment = "NEUTRAL"
+        elif weekly_bias == desired_bias:
+            multiplier = 1.0
+            alignment = "ALIGNED"
+        else:
+            multiplier = 0.0
+            alignment = "CONFLICT"
+
+        return {
+            "multiplier": multiplier,
+            "alignment": alignment,
+            "weekly_bias": weekly_bias,
+            "reason": (
+                f"Weekly bias {weekly_bias} vs daily {direction}"
+                if direction in {"BUY", "SELL"} else "No directional daily signal"
+            ),
+            "weekly_indicators": latest
+        }
+
+    @staticmethod
+    def confirm_with_higher_timeframe(ticker: str, signal_direction: str) -> float:
+        """
+        Confirm daily signal with weekly data and return confidence multiplier.
+
+        Multipliers:
+        - 1.0: weekly and daily agree
+        - 0.5: weekly neutral / insufficient
+        - 0.0: weekly conflicts with daily
+        """
+        try:
+            result = LiveSignalGenerator._evaluate_higher_timeframe_alignment(ticker, signal_direction)
+            return float(result.get("multiplier", 0.5))
+        except Exception:
+            # Degrade gracefully when weekly confirmation cannot be computed.
+            return 0.5
+
+    @staticmethod
     def generate_signals(strategy_config: Dict[str, Any], period: str = "3mo") -> Dict[str, Any]:
         """
         Generate live trading signals for a strategy
@@ -126,6 +280,24 @@ class LiveSignalGenerator:
             current_price=current_price
         )
 
+        htf_result = LiveSignalGenerator._evaluate_higher_timeframe_alignment(
+            ticker=ticker,
+            signal_direction=signal_info.get("signal", "HOLD")
+        )
+        htf_multiplier = float(htf_result.get("multiplier", 0.5))
+
+        base_confidence = signal_info.get("confidence", "LOW")
+        scaled_confidence_score = LiveSignalGenerator._confidence_to_score(base_confidence) * htf_multiplier
+        scaled_confidence = LiveSignalGenerator._score_to_confidence(scaled_confidence_score)
+
+        if signal_info.get("signal") in {"BUY", "SELL"}:
+            signal_info["confidence"] = scaled_confidence
+            signal_info["reasoning"] = (
+                f"{signal_info.get('reasoning', '')}. "
+                f"Higher timeframe: {htf_result.get('reason', 'N/A')} "
+                f"(multiplier={htf_multiplier:.2f}, confidence {base_confidence}->{scaled_confidence})"
+            ).strip()
+
         # Calculate risk management levels
         stop_loss_pct = risk_mgmt.get('stop_loss_pct', 5.0)
         take_profit_pct = risk_mgmt.get('take_profit_pct', 10.0)
@@ -153,7 +325,13 @@ class LiveSignalGenerator:
             "take_profit": take_profit,
             "position_size_pct": position_size_pct,
             "confidence": signal_info['confidence'],
+            "confidence_score": round(float(scaled_confidence_score), 4),
+            "base_confidence": base_confidence,
             "indicators": indicators,
+            "higher_timeframe_multiplier": htf_multiplier,
+            "higher_timeframe_alignment": htf_result.get("alignment"),
+            "higher_timeframe_bias": htf_result.get("weekly_bias"),
+            "higher_timeframe_indicators": htf_result.get("weekly_indicators", {}),
             "reasoning": signal_info['reasoning'],
             "last_updated": datetime.now().isoformat()
         }

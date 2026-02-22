@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from alpaca_client import AlpacaClient
 from market_scanner import MarketScanner
 from live_signal_generator import LiveSignalGenerator
+from backtesting_engine import TechnicalIndicators
 from database import (
     SessionLocal, Strategy, StrategyPerformance, LivePosition,
     TradeExecution, AutoTradingState
@@ -550,17 +551,72 @@ class AutonomousTradingEngine:
             })
 
         # Run market scanner
-        scan_results = MarketScanner.scan_market(
+        scan_results = MarketScanner.multi_timeframe_scan(
             strategies=strategy_configs,
             universe=None,  # Use default universe
             max_workers=10,
-            min_confidence=self.min_signal_confidence
+            min_confidence=self.min_signal_confidence,
+            require_alignment=True
         )
 
         all_signals = scan_results.get('all_signals', [])
 
         # Filter for BUY/SELL only (no HOLD)
         return [s for s in all_signals if s['signal'] in ['BUY', 'SELL']]
+
+    def _calculate_live_atr_stops(
+        self,
+        ticker: str,
+        signal_type: str,
+        multiplier: float = 2.0
+    ) -> Dict[str, Optional[float]]:
+        """
+        Calculate live ATR-based stop/take-profit levels.
+
+        Longs:
+            stop_loss = entry - ATR_14 * multiplier
+            take_profit = entry + ATR_14 * multiplier * 2
+        """
+        if signal_type != "BUY":
+            return {"atr_14": None, "entry_price": None, "stop_loss": None, "take_profit": None}
+
+        try:
+            with LiveSignalGenerator._yf_lock:
+                data = yf.download(
+                    ticker,
+                    period="3mo",
+                    interval="1d",
+                    auto_adjust=True,
+                    progress=False
+                )
+
+            if data is None or data.empty:
+                return {"atr_14": None, "entry_price": None, "stop_loss": None, "take_profit": None}
+
+            if isinstance(data.columns, pd.MultiIndex):
+                data.columns = data.columns.get_level_values(0)
+
+            if not {"High", "Low", "Close"}.issubset(set(data.columns)):
+                return {"atr_14": None, "entry_price": None, "stop_loss": None, "take_profit": None}
+
+            atr_series = TechnicalIndicators.atr(data["High"], data["Low"], data["Close"], period=14)
+            atr_value = atr_series.iloc[-1]
+            entry_price = float(data["Close"].iloc[-1])
+
+            if pd.isna(atr_value) or atr_value <= 0:
+                return {"atr_14": None, "entry_price": entry_price, "stop_loss": None, "take_profit": None}
+
+            atr_value = float(atr_value)
+            risk_distance = atr_value * float(multiplier)
+
+            return {
+                "atr_14": atr_value,
+                "entry_price": entry_price,
+                "stop_loss": max(0.01, entry_price - risk_distance),
+                "take_profit": entry_price + (risk_distance * 2.0)
+            }
+        except Exception:
+            return {"atr_14": None, "entry_price": None, "stop_loss": None, "take_profit": None}
 
     def _evaluate_signals(self, signals: List[Dict]) -> List[Dict]:
         """
@@ -671,6 +727,15 @@ class AutonomousTradingEngine:
             equity = float(account['account']['equity'])
             position_size_usd = equity * (signal['adjusted_position_size_pct'] / 100)
 
+            atr_multiplier = float(signal.get('atr_stop_multiplier', 2.0))
+            atr_stop_data = self._calculate_live_atr_stops(
+                ticker=signal['ticker'],
+                signal_type=signal['signal'],
+                multiplier=atr_multiplier
+            )
+            dynamic_stop_loss = atr_stop_data.get('stop_loss') or signal.get('stop_loss')
+            dynamic_take_profit = atr_stop_data.get('take_profit') or signal.get('take_profit')
+
             # Place order
             if signal['signal'] == 'BUY':
                 order = self.alpaca.place_order(
@@ -679,8 +744,8 @@ class AutonomousTradingEngine:
                     side='buy',
                     order_type='market',
                     time_in_force='day',
-                    take_profit=signal.get('take_profit'),
-                    stop_loss=signal.get('stop_loss')
+                    take_profit=dynamic_take_profit,
+                    stop_loss=dynamic_stop_loss
                 )
             else:  # SELL
                 # Check if we have a position to sell
@@ -711,7 +776,14 @@ class AutonomousTradingEngine:
                 decision_factors={
                     'quality_score': signal.get('quality_score'),
                     'confidence': signal.get('confidence'),
-                    'adjusted_position_size_pct': signal.get('adjusted_position_size_pct')
+                    'adjusted_position_size_pct': signal.get('adjusted_position_size_pct'),
+                    'atr_14': atr_stop_data.get('atr_14'),
+                    'atr_stop_multiplier': atr_multiplier,
+                    'atr_entry_price': atr_stop_data.get('entry_price'),
+                    'dynamic_stop_loss': dynamic_stop_loss,
+                    'dynamic_take_profit': dynamic_take_profit,
+                    'higher_timeframe_multiplier': signal.get('higher_timeframe_multiplier'),
+                    'higher_timeframe_alignment': signal.get('higher_timeframe_alignment')
                 }
             )
             self.db.add(execution)
