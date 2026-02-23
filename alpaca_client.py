@@ -25,6 +25,9 @@ class AlpacaClient:
         self.api_key = os.getenv('ALPACA_API_KEY')
         self.secret_key = os.getenv('ALPACA_SECRET_KEY')
         self.base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
+        connect_timeout = float(os.getenv('ALPACA_CONNECT_TIMEOUT', '5'))
+        read_timeout = float(os.getenv('ALPACA_READ_TIMEOUT', os.getenv('ALPACA_REQUEST_TIMEOUT', '20')))
+        self.timeout = (connect_timeout, read_timeout)
 
         if not self.api_key or self.api_key == 'your_paper_api_key_here':
             raise ValueError("Alpaca API key not configured. Set ALPACA_API_KEY in .env file")
@@ -39,7 +42,8 @@ class AlpacaClient:
         try:
             response = requests.get(
                 f"{self.base_url}/v2/account",
-                headers=self.headers
+                headers=self.headers,
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {
@@ -57,7 +61,8 @@ class AlpacaClient:
         try:
             response = requests.get(
                 f"{self.base_url}/v2/positions",
-                headers=self.headers
+                headers=self.headers,
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {
@@ -75,7 +80,8 @@ class AlpacaClient:
         try:
             response = requests.get(
                 f"{self.base_url}/v2/positions/{symbol}",
-                headers=self.headers
+                headers=self.headers,
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {
@@ -162,7 +168,8 @@ class AlpacaClient:
             response = requests.post(
                 f"{self.base_url}/v2/orders",
                 headers=self.headers,
-                json=order_data
+                json=order_data,
+                timeout=self.timeout
             )
             response.raise_for_status()
 
@@ -181,7 +188,8 @@ class AlpacaClient:
         try:
             response = requests.delete(
                 f"{self.base_url}/v2/orders/{order_id}",
-                headers=self.headers
+                headers=self.headers,
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {"success": True}
@@ -207,7 +215,8 @@ class AlpacaClient:
             response = requests.delete(
                 f"{self.base_url}/v2/positions/{symbol}",
                 headers=self.headers,
-                params=params
+                params=params,
+                timeout=self.timeout
             )
             response.raise_for_status()
 
@@ -232,7 +241,8 @@ class AlpacaClient:
             response = requests.get(
                 f"{self.base_url}/v2/orders",
                 headers=self.headers,
-                params={"status": status}
+                params={"status": status},
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {
@@ -250,7 +260,8 @@ class AlpacaClient:
         try:
             response = requests.get(
                 f"{self.base_url}/v2/clock",
-                headers=self.headers
+                headers=self.headers,
+                timeout=self.timeout
             )
             response.raise_for_status()
             return {

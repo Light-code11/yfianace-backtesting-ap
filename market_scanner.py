@@ -240,6 +240,7 @@ class MarketScanner:
                             sig['strategy_name'] = strategy.get('name', 'Unknown')
                             sig['strategy_type'] = strategy.get('strategy_type', 'unknown')
                             sig['strategy_id'] = strategy.get('id')
+                            sig['atr_stop_multiplier'] = strategy.get('atr_stop_multiplier', 2.0)
 
                             # Calculate quality score
                             sig['quality_score'] = MarketScanner._calculate_quality_score(sig, strategy)

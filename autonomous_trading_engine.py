@@ -25,7 +25,7 @@ from live_signal_generator import LiveSignalGenerator
 from backtesting_engine import TechnicalIndicators
 from database import (
     SessionLocal, Strategy, StrategyPerformance, LivePosition,
-    TradeExecution, AutoTradingState
+    TradeExecution, AutoTradingState, BacktestResult
 )
 
 # ML Models for intelligent trading
@@ -68,6 +68,7 @@ class AutonomousTradingEngine:
     def __init__(self, max_correlation: float = 0.7):
         self.alpaca = AlpacaClient()
         self.db = SessionLocal()
+        self._last_scan_results: Dict[str, Any] = {}
 
         # Configuration from environment
         self.auto_trading_enabled = os.getenv('AUTO_TRADING_ENABLED', 'false').lower() == 'true'
@@ -207,7 +208,9 @@ class AutonomousTradingEngine:
             "signals_generated": 0,
             "trades_executed": 0,
             "trades_rejected": 0,
-            "errors": []
+            "errors": [],
+            "executed_tickers": [],
+            "rejected_tickers": []
         }
 
         try:
@@ -251,6 +254,8 @@ class AutonomousTradingEngine:
             print("\n🔍 Scanning market for trading signals...")
             signals = self._generate_signals()
             results['signals_generated'] = len(signals)
+            results['stocks_scanned'] = self._last_scan_results.get('stocks_scanned', 0)
+            results['strategies_used'] = self._last_scan_results.get('strategies_used', 0)
             print(f"   Found {len(signals)} potential signals")
 
             # Step 4.5: Validate signals with ML (NEW - XGBoost Integration)
@@ -263,6 +268,7 @@ class AutonomousTradingEngine:
             # Step 5: Evaluate and filter signals
             print("\n🧠 Evaluating signals...")
             actionable_signals = self._evaluate_signals(signals)
+            results['actionable_signals'] = len(actionable_signals)
             print(f"   {len(actionable_signals)} signals passed evaluation")
 
             # Step 6: Execute trades
@@ -271,8 +277,10 @@ class AutonomousTradingEngine:
                 execution_result = self._execute_signal(signal)
                 if execution_result['success']:
                     results['trades_executed'] += 1
+                    results['executed_tickers'].append(signal.get('ticker'))
                 else:
                     results['trades_rejected'] += 1
+                    results['rejected_tickers'].append(signal.get('ticker'))
                     results['errors'].append(execution_result.get('error'))
 
             # Step 7: Update performance
@@ -548,12 +556,19 @@ class AutonomousTradingEngine:
 
         # Prepare strategy configs
         strategy_configs = []
+        universe = set()
         for strat in strategies:
+            tickers = strat.tickers if isinstance(strat.tickers, list) else []
+            universe.update([t for t in tickers if isinstance(t, str) and t])
             strategy_configs.append({
                 'id': strat.id,
                 'name': strat.name,
                 'strategy_type': strat.strategy_type,
                 'indicators': strat.indicators,
+                'atr_stop_multiplier': (
+                    (strat.entry_conditions or {}).get('atr_stop_multiplier', 2.0)
+                    if isinstance(strat.entry_conditions, dict) else 2.0
+                ),
                 'risk_management': {
                     'stop_loss_pct': strat.stop_loss_pct,
                     'take_profit_pct': strat.take_profit_pct,
@@ -564,11 +579,12 @@ class AutonomousTradingEngine:
         # Run market scanner
         scan_results = MarketScanner.multi_timeframe_scan(
             strategies=strategy_configs,
-            universe=None,  # Use default universe
+            universe=sorted(universe) if universe else None,
             max_workers=10,
             min_confidence=self.min_signal_confidence,
             require_alignment=True
         )
+        self._last_scan_results = scan_results
 
         all_signals = scan_results.get('all_signals', [])
 
@@ -681,6 +697,19 @@ class AutonomousTradingEngine:
                 signal['adjusted_position_size_pct'] = signal.get('position_size_pct', 25) * perf.allocation_weight
             else:
                 signal['adjusted_position_size_pct'] = signal.get('position_size_pct', 25)
+
+            # Optional Kelly cap from latest backtest if available.
+            strategy_id = signal.get('strategy_id')
+            if strategy_id:
+                latest_backtest = self.db.query(BacktestResult).filter(
+                    BacktestResult.strategy_id == strategy_id
+                ).order_by(BacktestResult.created_at.desc()).first()
+
+                if latest_backtest and latest_backtest.kelly_position_pct is not None:
+                    kelly_pct = float(latest_backtest.kelly_position_pct)
+                    if kelly_pct > 0:
+                        signal['kelly_position_pct'] = kelly_pct
+                        signal['adjusted_position_size_pct'] = min(signal['adjusted_position_size_pct'], kelly_pct)
 
             # NEW: Apply regime-based position sizing adjustment
             strategy_type = signal.get('strategy_type', 'unknown')
@@ -863,10 +892,10 @@ class AutonomousTradingEngine:
         # Update state
         state.is_enabled = self.auto_trading_enabled
         state.last_run_at = datetime.utcnow()
-        state.daily_trades = results.get('trades_executed', 0)
-        state.total_signals_generated += results.get('signals_generated', 0)
-        state.total_trades_executed += results.get('trades_executed', 0)
-        state.total_trades_rejected += results.get('trades_rejected', 0)
+        state.daily_trades = int(results.get('trades_executed', 0) or 0)
+        state.total_signals_generated = int(state.total_signals_generated or 0) + int(results.get('signals_generated', 0) or 0)
+        state.total_trades_executed = int(state.total_trades_executed or 0) + int(results.get('trades_executed', 0) or 0)
+        state.total_trades_rejected = int(state.total_trades_rejected or 0) + int(results.get('trades_rejected', 0) or 0)
 
         # Update portfolio values
         account = self.alpaca.get_account()
@@ -877,6 +906,49 @@ class AutonomousTradingEngine:
             state.buying_power = float(acc['buying_power'])
 
         self.db.commit()
+
+    def preview_daily_cycle(self) -> Dict[str, Any]:
+        """
+        Generate and evaluate signals without placing live orders.
+        """
+        preview = {
+            "success": False,
+            "timestamp": datetime.now().isoformat(),
+            "stocks_scanned": 0,
+            "signals_generated": 0,
+            "actionable_signals": 0,
+            "would_trade": [],
+            "errors": []
+        }
+
+        try:
+            self._sync_positions()
+            signals = self._generate_signals()
+            preview["stocks_scanned"] = self._last_scan_results.get("stocks_scanned", 0)
+            preview["signals_generated"] = len(signals)
+
+            if self.ml_predictor and self.use_ml_validation:
+                signals = self._validate_signals_with_ml(signals)
+
+            actionable = self._evaluate_signals(signals)
+            preview["actionable_signals"] = len(actionable)
+            preview["would_trade"] = [
+                {
+                    "ticker": s.get("ticker"),
+                    "signal": s.get("signal"),
+                    "confidence": s.get("confidence"),
+                    "quality_score": s.get("quality_score"),
+                    "position_size_pct": round(float(s.get("adjusted_position_size_pct", 0)), 2),
+                    "current_price": s.get("current_price"),
+                    "strategy_name": s.get("strategy_name")
+                }
+                for s in actionable
+            ]
+            preview["success"] = True
+            return preview
+        except Exception as e:
+            preview["errors"].append(str(e))
+            return preview
 
     def run_weekly_ml_retraining(self, tickers: Optional[List[str]] = None) -> Dict[str, Any]:
         """

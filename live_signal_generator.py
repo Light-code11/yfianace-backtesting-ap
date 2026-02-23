@@ -505,29 +505,42 @@ class LiveSignalGenerator:
         low_20 = close.iloc[-20:].min() if len(close) >= 20 else close.min()
 
         atr = indicators.get('ATR_14', 0)
-        sma_20 = indicators.get('SMA_20')
+        volume = data['Volume']
+        current_volume = float(volume.iloc[-1]) if len(volume) > 0 else 0.0
+        avg_volume_20 = float(volume.iloc[-20:].mean()) if len(volume) >= 20 else float(volume.mean())
+        volume_ratio = (current_volume / avg_volume_20) if avg_volume_20 > 0 else 0.0
 
         # Breakout above resistance
         if current_price >= high_20 * 0.995:  # Within 0.5% of high
-            if atr > 0:  # Confirm with volume/volatility
+            if atr > 0 and volume_ratio >= 1.2:  # Confirm with volume + volatility expansion
                 signal = 'BUY'
                 confidence = 'HIGH'
                 reasoning_parts.append(f"Breakout above 20-day high: Price={current_price:.2f}, High={high_20:.2f}")
-                reasoning_parts.append(f"ATR={atr:.2f} confirms volatility expansion")
+                reasoning_parts.append(f"ATR={atr:.2f}, Volume {volume_ratio:.2f}x confirms expansion")
             else:
                 signal = 'HOLD'
-                reasoning_parts.append(f"Near 20-day high but low volatility (wait for confirmation)")
+                reasoning_parts.append(
+                    f"Near 20-day high but confirmation weak (ATR={atr:.2f}, Volume {volume_ratio:.2f}x)"
+                )
 
         # Breakdown below support
         elif current_price <= low_20 * 1.005:  # Within 0.5% of low
-            signal = 'SELL'
-            confidence = 'MEDIUM'
-            reasoning_parts.append(f"Breakdown below 20-day low: Price={current_price:.2f}, Low={low_20:.2f}")
+            if volume_ratio >= 1.2:
+                signal = 'SELL'
+                confidence = 'HIGH'
+                reasoning_parts.append(f"Breakdown below 20-day low: Price={current_price:.2f}, Low={low_20:.2f}")
+                reasoning_parts.append(f"Volume {volume_ratio:.2f}x confirms bearish breakout")
+            else:
+                signal = 'HOLD'
+                reasoning_parts.append(f"Near 20-day low but volume only {volume_ratio:.2f}x (no confirmation)")
         else:
             signal = 'HOLD'
             distance_to_high = ((high_20 - current_price) / current_price) * 100
             distance_to_low = ((current_price - low_20) / low_20) * 100
-            reasoning_parts.append(f"In range: {distance_to_high:.1f}% from high, {distance_to_low:.1f}% above low")
+            reasoning_parts.append(
+                f"In range: {distance_to_high:.1f}% from high, {distance_to_low:.1f}% above low, "
+                f"Volume {volume_ratio:.2f}x"
+            )
 
         return {
             'signal': signal,
