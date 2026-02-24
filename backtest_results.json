@@ -1,0 +1,2296 @@
+{
+  "generated_at": "2026-02-24 22:44",
+  "elapsed_seconds": 290.1,
+  "config": {
+    "train_window": 252,
+    "test_window": 63,
+    "position_size": 10000.0,
+    "commission": 1.0,
+    "years_of_data": 3
+  },
+  "strategy_results": [
+    {
+      "strategy": "RSI Mean Reversion",
+      "strategy_type": "mean_reversion",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 203,
+          "win_rate": 0.3399,
+          "avg_return_pct": -1.4497,
+          "sharpe": -4.626,
+          "max_drawdown": -0.994,
+          "profit_factor": 0.6448,
+          "avg_duration_days": 16.8,
+          "total_pnl": -29834.69
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 210,
+          "win_rate": 0.4476,
+          "avg_return_pct": -0.0772,
+          "sharpe": -0.3026,
+          "max_drawdown": -0.888,
+          "profit_factor": 0.9727,
+          "avg_duration_days": 18.5,
+          "total_pnl": -2042.12
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 191,
+          "win_rate": 0.5445,
+          "avg_return_pct": 2.1371,
+          "sharpe": 6.4017,
+          "max_drawdown": -0.6079,
+          "profit_factor": 1.7391,
+          "avg_duration_days": 15.8,
+          "total_pnl": 40436.47
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 219,
+          "win_rate": 0.4292,
+          "avg_return_pct": -0.5897,
+          "sharpe": -2.1451,
+          "max_drawdown": -0.9775,
+          "profit_factor": 0.8484,
+          "avg_duration_days": 16.2,
+          "total_pnl": -13353.03
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 246,
+          "win_rate": 0.4472,
+          "avg_return_pct": 1.1925,
+          "sharpe": 1.2862,
+          "max_drawdown": -1.4226,
+          "profit_factor": 1.305,
+          "avg_duration_days": 11.1,
+          "total_pnl": 28844.52
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 202,
+          "win_rate": 0.302,
+          "avg_return_pct": -1.6668,
+          "sharpe": -5.0223,
+          "max_drawdown": -0.9957,
+          "profit_factor": 0.6001,
+          "avg_duration_days": 16.8,
+          "total_pnl": -34073.64
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 200,
+          "win_rate": 0.45,
+          "avg_return_pct": -0.0452,
+          "sharpe": -0.2463,
+          "max_drawdown": -0.9044,
+          "profit_factor": 0.9816,
+          "avg_duration_days": 18.1,
+          "total_pnl": -1304.47
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 219,
+          "win_rate": 0.4384,
+          "avg_return_pct": 0.2463,
+          "sharpe": 0.8412,
+          "max_drawdown": -0.7554,
+          "profit_factor": 1.068,
+          "avg_duration_days": 16.6,
+          "total_pnl": 4955.37
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1690,
+        "win_rate": 0.4249,
+        "avg_return_pct": -0.0177,
+        "sharpe": -0.0789,
+        "max_drawdown": -1.0051,
+        "profit_factor": 0.9898,
+        "avg_duration_days": 16.1,
+        "total_pnl": -6371.59
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 6908,
+        "win_rate": 0.4323,
+        "avg_return_pct": -0.0289,
+        "sharpe": -0.1104,
+        "max_drawdown": -1.0454,
+        "profit_factor": 0.9865,
+        "avg_duration_days": 18.0,
+        "total_pnl": -33772.95
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -0.1104,
+      "out_sample_sharpe": -0.0789
+    },
+    {
+      "strategy": "MACD Trend Following",
+      "strategy_type": "trend_following",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 127,
+          "win_rate": 0.3386,
+          "avg_return_pct": 0.1527,
+          "sharpe": 0.2269,
+          "max_drawdown": -0.9137,
+          "profit_factor": 1.0282,
+          "avg_duration_days": 19.7,
+          "total_pnl": 1685.8
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 113,
+          "win_rate": 0.3186,
+          "avg_return_pct": -0.5081,
+          "sharpe": -0.9322,
+          "max_drawdown": -0.8913,
+          "profit_factor": 0.8907,
+          "avg_duration_days": 23.2,
+          "total_pnl": -5967.82
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 89,
+          "win_rate": 0.2921,
+          "avg_return_pct": -0.6982,
+          "sharpe": -1.5745,
+          "max_drawdown": -0.8827,
+          "profit_factor": 0.8485,
+          "avg_duration_days": 20.4,
+          "total_pnl": -6392.22
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 133,
+          "win_rate": 0.3835,
+          "avg_return_pct": 1.3319,
+          "sharpe": 2.3617,
+          "max_drawdown": -0.8095,
+          "profit_factor": 1.287,
+          "avg_duration_days": 18.1,
+          "total_pnl": 17448.32
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 170,
+          "win_rate": 0.2118,
+          "avg_return_pct": -2.9938,
+          "sharpe": -4.2526,
+          "max_drawdown": -1.1487,
+          "profit_factor": 0.5125,
+          "avg_duration_days": 13.3,
+          "total_pnl": -51234.37
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 97,
+          "win_rate": 0.3402,
+          "avg_return_pct": 0.5318,
+          "sharpe": 1.1798,
+          "max_drawdown": -0.6187,
+          "profit_factor": 1.1231,
+          "avg_duration_days": 18.7,
+          "total_pnl": 4964.82
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 128,
+          "win_rate": 0.3516,
+          "avg_return_pct": 0.6621,
+          "sharpe": 1.2049,
+          "max_drawdown": -0.847,
+          "profit_factor": 1.1467,
+          "avg_duration_days": 20.3,
+          "total_pnl": 8218.44
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 129,
+          "win_rate": 0.2713,
+          "avg_return_pct": -1.2747,
+          "sharpe": -2.3093,
+          "max_drawdown": -0.9743,
+          "profit_factor": 0.7448,
+          "avg_duration_days": 20.1,
+          "total_pnl": -16701.67
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 986,
+        "win_rate": 0.3093,
+        "avg_return_pct": -0.4666,
+        "sharpe": -0.8209,
+        "max_drawdown": -1.001,
+        "profit_factor": 0.9009,
+        "avg_duration_days": 18.9,
+        "total_pnl": -47978.72
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 798,
+        "win_rate": 0.3396,
+        "avg_return_pct": 0.1037,
+        "sharpe": 0.1283,
+        "max_drawdown": -1.0003,
+        "profit_factor": 1.0178,
+        "avg_duration_days": 18.7,
+        "total_pnl": 6677.64
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 0.1283,
+      "out_sample_sharpe": -0.8209
+    },
+    {
+      "strategy": "SMA Momentum",
+      "strategy_type": "momentum",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 181,
+          "win_rate": 0.3867,
+          "avg_return_pct": 0.5707,
+          "sharpe": 1.3513,
+          "max_drawdown": -0.7712,
+          "profit_factor": 1.1277,
+          "avg_duration_days": 20.7,
+          "total_pnl": 9967.12
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 183,
+          "win_rate": 0.2951,
+          "avg_return_pct": -1.034,
+          "sharpe": -2.7147,
+          "max_drawdown": -0.9772,
+          "profit_factor": 0.7719,
+          "avg_duration_days": 19.7,
+          "total_pnl": -19287.86
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 195,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.6666,
+          "sharpe": -1.6667,
+          "max_drawdown": -0.9843,
+          "profit_factor": 0.8441,
+          "avg_duration_days": 15.4,
+          "total_pnl": -13388.89
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 214,
+          "win_rate": 0.3551,
+          "avg_return_pct": 0.3581,
+          "sharpe": 0.7541,
+          "max_drawdown": -0.9915,
+          "profit_factor": 1.0793,
+          "avg_duration_days": 17.1,
+          "total_pnl": 7234.62
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 266,
+          "win_rate": 0.3421,
+          "avg_return_pct": -0.6591,
+          "sharpe": -0.8517,
+          "max_drawdown": -1.8119,
+          "profit_factor": 0.8651,
+          "avg_duration_days": 12.2,
+          "total_pnl": -18063.3
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 157,
+          "win_rate": 0.4204,
+          "avg_return_pct": 1.4759,
+          "sharpe": 3.4432,
+          "max_drawdown": -0.8116,
+          "profit_factor": 1.4007,
+          "avg_duration_days": 20.1,
+          "total_pnl": 22858.11
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 170,
+          "win_rate": 0.3353,
+          "avg_return_pct": 0.3086,
+          "sharpe": 0.7454,
+          "max_drawdown": -0.8537,
+          "profit_factor": 1.0747,
+          "avg_duration_days": 20.3,
+          "total_pnl": 4906.79
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 192,
+          "win_rate": 0.3073,
+          "avg_return_pct": -0.4295,
+          "sharpe": -1.4886,
+          "max_drawdown": -0.9385,
+          "profit_factor": 0.8923,
+          "avg_duration_days": 19.0,
+          "total_pnl": -8629.45
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1558,
+        "win_rate": 0.3453,
+        "avg_return_pct": -0.0724,
+        "sharpe": -0.1756,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.9787,
+        "avg_duration_days": 17.6,
+        "total_pnl": -14402.86
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 5119,
+        "win_rate": 0.3686,
+        "avg_return_pct": 0.1323,
+        "sharpe": 0.1888,
+        "max_drawdown": -1.0,
+        "profit_factor": 1.0263,
+        "avg_duration_days": 21.1,
+        "total_pnl": 57506.74
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 0.1888,
+      "out_sample_sharpe": -0.1756
+    },
+    {
+      "strategy": "Volume Breakout",
+      "strategy_type": "breakout",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 125,
+          "win_rate": 0.36,
+          "avg_return_pct": 0.6432,
+          "sharpe": 1.5322,
+          "max_drawdown": -0.6575,
+          "profit_factor": 1.173,
+          "avg_duration_days": 18.3,
+          "total_pnl": 7789.52
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 149,
+          "win_rate": 0.2752,
+          "avg_return_pct": -0.5316,
+          "sharpe": -1.3749,
+          "max_drawdown": -0.8881,
+          "profit_factor": 0.8637,
+          "avg_duration_days": 17.1,
+          "total_pnl": -8218.31
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 156,
+          "win_rate": 0.1987,
+          "avg_return_pct": -2.1658,
+          "sharpe": -6.4804,
+          "max_drawdown": -0.9864,
+          "profit_factor": 0.5313,
+          "avg_duration_days": 14.4,
+          "total_pnl": -34098.37
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 184,
+          "win_rate": 0.2554,
+          "avg_return_pct": -1.1504,
+          "sharpe": -3.4682,
+          "max_drawdown": -0.96,
+          "profit_factor": 0.7357,
+          "avg_duration_days": 15.4,
+          "total_pnl": -21535.14
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 205,
+          "win_rate": 0.3366,
+          "avg_return_pct": -0.7321,
+          "sharpe": -0.6723,
+          "max_drawdown": -4.4943,
+          "profit_factor": 0.8514,
+          "avg_duration_days": 12.0,
+          "total_pnl": -15417.55
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 152,
+          "win_rate": 0.3618,
+          "avg_return_pct": 0.1319,
+          "sharpe": 0.3329,
+          "max_drawdown": -0.7209,
+          "profit_factor": 1.0314,
+          "avg_duration_days": 16.9,
+          "total_pnl": 1700.22
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 147,
+          "win_rate": 0.2585,
+          "avg_return_pct": -0.5573,
+          "sharpe": -1.6199,
+          "max_drawdown": -0.8423,
+          "profit_factor": 0.8479,
+          "avg_duration_days": 16.4,
+          "total_pnl": -8486.57
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 173,
+          "win_rate": 0.2775,
+          "avg_return_pct": -1.0231,
+          "sharpe": -2.8205,
+          "max_drawdown": -0.9371,
+          "profit_factor": 0.7484,
+          "avg_duration_days": 16.1,
+          "total_pnl": -18044.85
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1291,
+        "win_rate": 0.2897,
+        "avg_return_pct": -0.726,
+        "sharpe": -1.2204,
+        "max_drawdown": -1.001,
+        "profit_factor": 0.8233,
+        "avg_duration_days": 15.6,
+        "total_pnl": -96311.06
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 5147,
+        "win_rate": 0.327,
+        "avg_return_pct": -0.0717,
+        "sharpe": -0.1608,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.9761,
+        "avg_duration_days": 18.9,
+        "total_pnl": -47173.04
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -0.1608,
+      "out_sample_sharpe": -1.2204
+    },
+    {
+      "strategy": "Bollinger Band Squeeze",
+      "strategy_type": "bb_squeeze",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 46,
+          "win_rate": 0.2609,
+          "avg_return_pct": -1.5377,
+          "sharpe": -4.6933,
+          "max_drawdown": -0.5601,
+          "profit_factor": 0.6217,
+          "avg_duration_days": 21.8,
+          "total_pnl": -7165.64
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 42,
+          "win_rate": 0.2143,
+          "avg_return_pct": -1.192,
+          "sharpe": -2.1258,
+          "max_drawdown": -0.6997,
+          "profit_factor": 0.754,
+          "avg_duration_days": 17.6,
+          "total_pnl": -5090.6
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 40,
+          "win_rate": 0.125,
+          "avg_return_pct": -3.5934,
+          "sharpe": -7.4073,
+          "max_drawdown": -0.8143,
+          "profit_factor": 0.3193,
+          "avg_duration_days": 11.7,
+          "total_pnl": -14453.55
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 51,
+          "win_rate": 0.3137,
+          "avg_return_pct": -1.3253,
+          "sharpe": -2.5645,
+          "max_drawdown": -0.6469,
+          "profit_factor": 0.7128,
+          "avg_duration_days": 17.4,
+          "total_pnl": -6860.86
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 30,
+          "win_rate": 0.3667,
+          "avg_return_pct": 0.7164,
+          "sharpe": 0.9554,
+          "max_drawdown": -0.5477,
+          "profit_factor": 1.1605,
+          "avg_duration_days": 12.7,
+          "total_pnl": 2089.22
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 46,
+          "win_rate": 0.413,
+          "avg_return_pct": 1.9816,
+          "sharpe": 4.1488,
+          "max_drawdown": -0.52,
+          "profit_factor": 1.6395,
+          "avg_duration_days": 17.6,
+          "total_pnl": 9023.4
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 48,
+          "win_rate": 0.1458,
+          "avg_return_pct": -2.7009,
+          "sharpe": -8.3436,
+          "max_drawdown": -0.7612,
+          "profit_factor": 0.3861,
+          "avg_duration_days": 17.2,
+          "total_pnl": -13060.17
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 42,
+          "win_rate": 0.2619,
+          "avg_return_pct": -1.3813,
+          "sharpe": -3.3556,
+          "max_drawdown": -0.6909,
+          "profit_factor": 0.6811,
+          "avg_duration_days": 13.3,
+          "total_pnl": -5885.59
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 345,
+        "win_rate": 0.2609,
+        "avg_return_pct": -1.1801,
+        "sharpe": -2.3762,
+        "max_drawdown": -0.9979,
+        "profit_factor": 0.7269,
+        "avg_duration_days": 16.4,
+        "total_pnl": -41403.79
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 1157,
+        "win_rate": 0.2947,
+        "avg_return_pct": -0.6142,
+        "sharpe": -1.19,
+        "max_drawdown": -1.0001,
+        "profit_factor": 0.8478,
+        "avg_duration_days": 22.1,
+        "total_pnl": -73374.4
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -1.19,
+      "out_sample_sharpe": -2.3762
+    },
+    {
+      "strategy": "VWAP Reversion",
+      "strategy_type": "vwap_reversion",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 234,
+          "win_rate": 0.3162,
+          "avg_return_pct": -0.9757,
+          "sharpe": -3.0967,
+          "max_drawdown": -0.9936,
+          "profit_factor": 0.7367,
+          "avg_duration_days": 14.0,
+          "total_pnl": -23299.22
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 171,
+          "win_rate": 0.386,
+          "avg_return_pct": -0.0997,
+          "sharpe": -0.3332,
+          "max_drawdown": -0.8712,
+          "profit_factor": 0.9642,
+          "avg_duration_days": 16.1,
+          "total_pnl": -2047.09
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 147,
+          "win_rate": 0.3741,
+          "avg_return_pct": 0.2823,
+          "sharpe": 0.7791,
+          "max_drawdown": -0.6278,
+          "profit_factor": 1.0845,
+          "avg_duration_days": 13.0,
+          "total_pnl": 3855.84
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 212,
+          "win_rate": 0.4009,
+          "avg_return_pct": -0.0453,
+          "sharpe": -0.1836,
+          "max_drawdown": -0.9862,
+          "profit_factor": 0.9812,
+          "avg_duration_days": 13.7,
+          "total_pnl": -1384.53
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 247,
+          "win_rate": 0.4413,
+          "avg_return_pct": 1.1109,
+          "sharpe": 1.2624,
+          "max_drawdown": -1.003,
+          "profit_factor": 1.3055,
+          "avg_duration_days": 8.7,
+          "total_pnl": 26945.28
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 195,
+          "win_rate": 0.2359,
+          "avg_return_pct": -1.8051,
+          "sharpe": -6.0837,
+          "max_drawdown": -0.9933,
+          "profit_factor": 0.5282,
+          "avg_duration_days": 14.6,
+          "total_pnl": -35590.31
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 186,
+          "win_rate": 0.4032,
+          "avg_return_pct": 0.3367,
+          "sharpe": 0.9458,
+          "max_drawdown": -0.7867,
+          "profit_factor": 1.1043,
+          "avg_duration_days": 15.6,
+          "total_pnl": 5890.0
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 205,
+          "win_rate": 0.361,
+          "avg_return_pct": -0.0721,
+          "sharpe": -0.327,
+          "max_drawdown": -0.8534,
+          "profit_factor": 0.9713,
+          "avg_duration_days": 12.4,
+          "total_pnl": -1888.0
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1597,
+        "win_rate": 0.3657,
+        "avg_return_pct": -0.1523,
+        "sharpe": -0.3514,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.95,
+        "avg_duration_days": 13.3,
+        "total_pnl": -27518.02
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 5797,
+        "win_rate": 0.369,
+        "avg_return_pct": -0.1053,
+        "sharpe": -0.2461,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.9634,
+        "avg_duration_days": 15.3,
+        "total_pnl": -72619.25
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -0.2461,
+      "out_sample_sharpe": -0.3514
+    },
+    {
+      "strategy": "Gap Fill",
+      "strategy_type": "gap_fill",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 276,
+          "win_rate": 0.4928,
+          "avg_return_pct": 0.7993,
+          "sharpe": 2.6737,
+          "max_drawdown": -0.823,
+          "profit_factor": 1.328,
+          "avg_duration_days": 6.9,
+          "total_pnl": 21508.93
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 203,
+          "win_rate": 0.3695,
+          "avg_return_pct": -0.9492,
+          "sharpe": -4.107,
+          "max_drawdown": -0.9536,
+          "profit_factor": 0.6986,
+          "avg_duration_days": 6.5,
+          "total_pnl": -19675.26
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 266,
+          "win_rate": 0.3722,
+          "avg_return_pct": -0.7362,
+          "sharpe": -2.7076,
+          "max_drawdown": -0.9856,
+          "profit_factor": 0.7627,
+          "avg_duration_days": 6.3,
+          "total_pnl": -20116.2
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 289,
+          "win_rate": 0.3945,
+          "avg_return_pct": -0.4755,
+          "sharpe": -1.8603,
+          "max_drawdown": -0.9762,
+          "profit_factor": 0.8459,
+          "avg_duration_days": 6.4,
+          "total_pnl": -14321.14
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 555,
+          "win_rate": 0.3586,
+          "avg_return_pct": -1.7221,
+          "sharpe": -3.1835,
+          "max_drawdown": -1.3786,
+          "profit_factor": 0.5363,
+          "avg_duration_days": 4.0,
+          "total_pnl": -96687.64
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 269,
+          "win_rate": 0.4981,
+          "avg_return_pct": 0.6859,
+          "sharpe": 2.859,
+          "max_drawdown": -0.8357,
+          "profit_factor": 1.2779,
+          "avg_duration_days": 7.6,
+          "total_pnl": 17911.5
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 191,
+          "win_rate": 0.3822,
+          "avg_return_pct": -0.4548,
+          "sharpe": -2.1398,
+          "max_drawdown": -0.8037,
+          "profit_factor": 0.8411,
+          "avg_duration_days": 8.3,
+          "total_pnl": -9069.3
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 267,
+          "win_rate": 0.3895,
+          "avg_return_pct": -0.3095,
+          "sharpe": -1.2033,
+          "max_drawdown": -0.9735,
+          "profit_factor": 0.8862,
+          "avg_duration_days": 6.3,
+          "total_pnl": -8798.26
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 2316,
+        "win_rate": 0.4033,
+        "avg_return_pct": -0.5381,
+        "sharpe": -1.3081,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.8195,
+        "avg_duration_days": 6.2,
+        "total_pnl": -129247.37
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 8965,
+        "win_rate": 0.4076,
+        "avg_return_pct": -0.4753,
+        "sharpe": -1.1709,
+        "max_drawdown": -1.0053,
+        "profit_factor": 0.8388,
+        "avg_duration_days": 6.9,
+        "total_pnl": -444027.85
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -1.1709,
+      "out_sample_sharpe": -1.3081
+    },
+    {
+      "strategy": "Earnings Momentum",
+      "strategy_type": "earnings_momentum",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 132,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.8946,
+          "sharpe": -2.2796,
+          "max_drawdown": -0.8844,
+          "profit_factor": 0.8016,
+          "avg_duration_days": 14.1,
+          "total_pnl": -12072.97
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 135,
+          "win_rate": 0.3407,
+          "avg_return_pct": -0.4374,
+          "sharpe": -0.9076,
+          "max_drawdown": -0.9343,
+          "profit_factor": 0.8974,
+          "avg_duration_days": 16.8,
+          "total_pnl": -6174.59
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 170,
+          "win_rate": 0.3588,
+          "avg_return_pct": -0.0244,
+          "sharpe": -0.1128,
+          "max_drawdown": -0.8063,
+          "profit_factor": 0.9888,
+          "avg_duration_days": 15.5,
+          "total_pnl": -755.1
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 166,
+          "win_rate": 0.3193,
+          "avg_return_pct": -0.313,
+          "sharpe": -0.8299,
+          "max_drawdown": -0.9375,
+          "profit_factor": 0.9334,
+          "avg_duration_days": 15.3,
+          "total_pnl": -5528.02
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 325,
+          "win_rate": 0.4646,
+          "avg_return_pct": 0.8941,
+          "sharpe": 1.5585,
+          "max_drawdown": -3.0718,
+          "profit_factor": 1.2213,
+          "avg_duration_days": 9.4,
+          "total_pnl": 28406.84
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 163,
+          "win_rate": 0.3681,
+          "avg_return_pct": -0.0462,
+          "sharpe": -0.1239,
+          "max_drawdown": -0.9993,
+          "profit_factor": 0.9857,
+          "avg_duration_days": 17.3,
+          "total_pnl": -1078.64
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 137,
+          "win_rate": 0.3577,
+          "avg_return_pct": -0.9072,
+          "sharpe": -2.239,
+          "max_drawdown": -0.9097,
+          "profit_factor": 0.7971,
+          "avg_duration_days": 16.7,
+          "total_pnl": -12702.43
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 164,
+          "win_rate": 0.3171,
+          "avg_return_pct": -0.5684,
+          "sharpe": -1.3369,
+          "max_drawdown": -0.9641,
+          "profit_factor": 0.874,
+          "avg_duration_days": 16.4,
+          "total_pnl": -9649.15
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1392,
+        "win_rate": 0.3707,
+        "avg_return_pct": -0.1205,
+        "sharpe": -0.2754,
+        "max_drawdown": -1.0144,
+        "profit_factor": 0.9682,
+        "avg_duration_days": 14.5,
+        "total_pnl": -19554.06
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 5111,
+        "win_rate": 0.3986,
+        "avg_return_pct": 0.607,
+        "sharpe": 1.0725,
+        "max_drawdown": -1.0762,
+        "profit_factor": 1.1387,
+        "avg_duration_days": 19.0,
+        "total_pnl": 300010.95
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 1.0725,
+      "out_sample_sharpe": -0.2754
+    },
+    {
+      "strategy": "Sector Rotation",
+      "strategy_type": "sector_rotation",
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 197,
+          "win_rate": 0.3553,
+          "avg_return_pct": -0.0533,
+          "sharpe": -0.1486,
+          "max_drawdown": -0.9839,
+          "profit_factor": 0.9814,
+          "avg_duration_days": 16.3,
+          "total_pnl": -1444.03
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 223,
+          "win_rate": 0.3318,
+          "avg_return_pct": -1.3308,
+          "sharpe": -4.0772,
+          "max_drawdown": -0.9905,
+          "profit_factor": 0.6795,
+          "avg_duration_days": 19.5,
+          "total_pnl": -30123.66
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 225,
+          "win_rate": 0.4044,
+          "avg_return_pct": -0.0542,
+          "sharpe": -0.2217,
+          "max_drawdown": -0.8155,
+          "profit_factor": 0.981,
+          "avg_duration_days": 15.7,
+          "total_pnl": -1668.29
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 230,
+          "win_rate": 0.3826,
+          "avg_return_pct": 0.0354,
+          "sharpe": 0.035,
+          "max_drawdown": -0.9597,
+          "profit_factor": 1.0038,
+          "avg_duration_days": 17.4,
+          "total_pnl": 354.88
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 284,
+          "win_rate": 0.2887,
+          "avg_return_pct": -1.7432,
+          "sharpe": -5.5585,
+          "max_drawdown": -0.9995,
+          "profit_factor": 0.6745,
+          "avg_duration_days": 13.0,
+          "total_pnl": -50074.43
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 168,
+          "win_rate": 0.3869,
+          "avg_return_pct": 0.4578,
+          "sharpe": 0.9112,
+          "max_drawdown": -0.8612,
+          "profit_factor": 1.1134,
+          "avg_duration_days": 18.9,
+          "total_pnl": 7355.7
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 167,
+          "win_rate": 0.2695,
+          "avg_return_pct": -1.4666,
+          "sharpe": -4.047,
+          "max_drawdown": -0.9871,
+          "profit_factor": 0.6672,
+          "avg_duration_days": 17.0,
+          "total_pnl": -24825.6
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 256,
+          "win_rate": 0.3555,
+          "avg_return_pct": -0.9103,
+          "sharpe": -4.1101,
+          "max_drawdown": -0.9716,
+          "profit_factor": 0.7492,
+          "avg_duration_days": 16.8,
+          "total_pnl": -23814.67
+        }
+      ],
+      "overall": {
+        "window": "Overall Out-of-Sample",
+        "trades": 1750,
+        "win_rate": 0.3463,
+        "avg_return_pct": -0.6899,
+        "sharpe": -1.8852,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.8321,
+        "avg_duration_days": 16.6,
+        "total_pnl": -124240.09
+      },
+      "in_sample": {
+        "window": "Overall In-Sample",
+        "trades": 6575,
+        "win_rate": 0.3576,
+        "avg_return_pct": -0.4008,
+        "sharpe": -1.0081,
+        "max_drawdown": -1.0,
+        "profit_factor": 0.8972,
+        "avg_duration_days": 19.8,
+        "total_pnl": -276679.75
+      },
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -1.0081,
+      "out_sample_sharpe": -1.8852
+    }
+  ],
+  "pair_results": [
+    {
+      "pair": "V/MA",
+      "ticker_a": "V",
+      "ticker_b": "MA",
+      "overall": {
+        "window": "Overall",
+        "trades": 12,
+        "win_rate": 0.25,
+        "avg_return_pct": -1.6937,
+        "sharpe": -4.4632,
+        "max_drawdown": -0.2069,
+        "profit_factor": 0.5596,
+        "avg_duration_days": 30.8,
+        "total_pnl": -2056.42
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 50,
+        "win_rate": 0.36,
+        "avg_return_pct": 0.3344,
+        "sharpe": 0.6809,
+        "max_drawdown": -0.4289,
+        "profit_factor": 1.1005,
+        "avg_duration_days": 40.2,
+        "total_pnl": 1571.96
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.3848,
+          "sharpe": 0.0,
+          "max_drawdown": -0.054,
+          "profit_factor": 0.0,
+          "avg_duration_days": 23.0,
+          "total_pnl": -540.48
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.0202,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0504,
+          "profit_factor": 0.0,
+          "avg_duration_days": 9.0,
+          "total_pnl": -504.02
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.2322,
+          "sharpe": -0.5206,
+          "max_drawdown": -0.0617,
+          "profit_factor": 0.9334,
+          "avg_duration_days": 32.3,
+          "total_pnl": -75.66
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.4817,
+          "sharpe": 0.0,
+          "max_drawdown": -0.055,
+          "profit_factor": 0.0,
+          "avg_duration_days": 18.0,
+          "total_pnl": -550.17
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 4,
+          "win_rate": 0.5,
+          "avg_return_pct": 1.6148,
+          "sharpe": 4.173,
+          "max_drawdown": -0.0884,
+          "profit_factor": 1.6975,
+          "avg_duration_days": 30.0,
+          "total_pnl": 637.93
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.1157,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0514,
+          "profit_factor": 0.0,
+          "avg_duration_days": 18.0,
+          "total_pnl": -513.57
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.0845,
+          "sharpe": 0.0,
+          "max_drawdown": -0.051,
+          "profit_factor": 0.0,
+          "avg_duration_days": 85.0,
+          "total_pnl": -510.45
+        }
+      ],
+      "cointegration_stable": false,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 0.6809,
+      "out_sample_sharpe": -4.4632
+    },
+    {
+      "pair": "GOOGL/META",
+      "ticker_a": "GOOGL",
+      "ticker_b": "META",
+      "overall": {
+        "window": "Overall",
+        "trades": 30,
+        "win_rate": 0.3,
+        "avg_return_pct": -1.4451,
+        "sharpe": -2.7126,
+        "max_drawdown": -0.5916,
+        "profit_factor": 0.7095,
+        "avg_duration_days": 18.3,
+        "total_pnl": -4395.22
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 89,
+        "win_rate": 0.2921,
+        "avg_return_pct": -1.7208,
+        "sharpe": -2.9652,
+        "max_drawdown": -0.9686,
+        "profit_factor": 0.6618,
+        "avg_duration_days": 22.5,
+        "total_pnl": -15493.43
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 6,
+          "win_rate": 0.0,
+          "avg_return_pct": -9.0887,
+          "sharpe": -31.8507,
+          "max_drawdown": -0.4406,
+          "profit_factor": 0.0,
+          "avg_duration_days": 10.5,
+          "total_pnl": -5465.25
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.0545,
+          "sharpe": 4.0276,
+          "max_drawdown": -0.0598,
+          "profit_factor": 1.6799,
+          "avg_duration_days": 14.5,
+          "total_pnl": 406.9
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 3,
+          "win_rate": 0.0,
+          "avg_return_pct": -7.1539,
+          "sharpe": -102.1413,
+          "max_drawdown": -0.2003,
+          "profit_factor": 0.0,
+          "avg_duration_days": 26.7,
+          "total_pnl": -2152.17
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 4.2867,
+          "sharpe": 6.851,
+          "max_drawdown": -0.0562,
+          "profit_factor": 2.5185,
+          "avg_duration_days": 30.0,
+          "total_pnl": 853.33
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 8,
+          "win_rate": 0.375,
+          "avg_return_pct": 0.331,
+          "sharpe": 0.732,
+          "max_drawdown": -0.181,
+          "profit_factor": 1.0732,
+          "avg_duration_days": 10.8,
+          "total_pnl": 248.76
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.315,
+          "sharpe": 4.5883,
+          "max_drawdown": -0.0565,
+          "profit_factor": 1.8131,
+          "avg_duration_days": 33.0,
+          "total_pnl": 459.01
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 3,
+          "win_rate": 0.6667,
+          "avg_return_pct": 6.5569,
+          "sharpe": 10.3938,
+          "max_drawdown": -0.0615,
+          "profit_factor": 4.1871,
+          "avg_duration_days": 37.0,
+          "total_pnl": 1961.08
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 4,
+          "win_rate": 0.25,
+          "avg_return_pct": -1.7472,
+          "sharpe": -3.9036,
+          "max_drawdown": -0.1671,
+          "profit_factor": 0.6013,
+          "avg_duration_days": 13.8,
+          "total_pnl": -706.87
+        }
+      ],
+      "cointegration_stable": false,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -2.9652,
+      "out_sample_sharpe": -2.7126
+    },
+    {
+      "pair": "XOM/CVX",
+      "ticker_a": "XOM",
+      "ticker_b": "CVX",
+      "overall": {
+        "window": "Overall",
+        "trades": 13,
+        "win_rate": 0.2308,
+        "avg_return_pct": -1.6909,
+        "sharpe": -3.9781,
+        "max_drawdown": -0.2579,
+        "profit_factor": 0.5915,
+        "avg_duration_days": 30.8,
+        "total_pnl": -2224.18
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 51,
+        "win_rate": 0.3725,
+        "avg_return_pct": 0.1558,
+        "sharpe": 0.2873,
+        "max_drawdown": -0.4538,
+        "profit_factor": 1.0405,
+        "avg_duration_days": 42.0,
+        "total_pnl": 692.67
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.5475,
+          "sharpe": 5.1927,
+          "max_drawdown": -0.052,
+          "profit_factor": 1.9722,
+          "avg_duration_days": 30.5,
+          "total_pnl": 505.5
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.4367,
+          "sharpe": -391.6673,
+          "max_drawdown": -0.1062,
+          "profit_factor": 0.0,
+          "avg_duration_days": 33.5,
+          "total_pnl": -1091.34
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": 0.2322,
+          "sharpe": 0.4167,
+          "max_drawdown": -0.1071,
+          "profit_factor": 1.0578,
+          "avg_duration_days": 31.0,
+          "total_pnl": 63.67
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.7929,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0581,
+          "profit_factor": 0.0,
+          "avg_duration_days": 6.0,
+          "total_pnl": -581.29
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.6222,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0564,
+          "profit_factor": 0.0,
+          "avg_duration_days": 10.0,
+          "total_pnl": -564.22
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.5569,
+          "sharpe": 5.1854,
+          "max_drawdown": -0.0523,
+          "profit_factor": 1.9702,
+          "avg_duration_days": 37.0,
+          "total_pnl": 507.38
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.2995,
+          "sharpe": -307.6488,
+          "max_drawdown": -0.1036,
+          "profit_factor": 0.0,
+          "avg_duration_days": 45.0,
+          "total_pnl": -1063.89
+        }
+      ],
+      "cointegration_stable": true,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 0.2873,
+      "out_sample_sharpe": -3.9781
+    },
+    {
+      "pair": "COST/WMT",
+      "ticker_a": "COST",
+      "ticker_b": "WMT",
+      "overall": {
+        "window": "Overall",
+        "trades": 16,
+        "win_rate": 0.3125,
+        "avg_return_pct": -0.6624,
+        "sharpe": -1.4822,
+        "max_drawdown": -0.2362,
+        "profit_factor": 0.8229,
+        "avg_duration_days": 21.3,
+        "total_pnl": -1091.88
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 52,
+        "win_rate": 0.3846,
+        "avg_return_pct": 0.3839,
+        "sharpe": 0.6642,
+        "max_drawdown": -0.5336,
+        "profit_factor": 1.0981,
+        "avg_duration_days": 44.3,
+        "total_pnl": 1892.54
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.5432,
+          "sharpe": -1.1703,
+          "max_drawdown": -0.0647,
+          "profit_factor": 0.8582,
+          "avg_duration_days": 22.3,
+          "total_pnl": -168.97
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.5303,
+          "sharpe": 5.174,
+          "max_drawdown": -0.0519,
+          "profit_factor": 1.967,
+          "avg_duration_days": 26.5,
+          "total_pnl": 502.06
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.47,
+          "sharpe": -1.047,
+          "max_drawdown": -0.1115,
+          "profit_factor": 0.872,
+          "avg_duration_days": 15.7,
+          "total_pnl": -146.99
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.3192,
+          "sharpe": 4.7639,
+          "max_drawdown": -0.0536,
+          "profit_factor": 1.8575,
+          "avg_duration_days": 27.5,
+          "total_pnl": 459.83
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.6902,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0571,
+          "profit_factor": 0.0,
+          "avg_duration_days": 19.0,
+          "total_pnl": -571.02
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 5,
+          "win_rate": 0.2,
+          "avg_return_pct": -2.3136,
+          "sharpe": -5.8464,
+          "max_drawdown": -0.16,
+          "profit_factor": 0.4691,
+          "avg_duration_days": 20.0,
+          "total_pnl": -1166.78
+        }
+      ],
+      "cointegration_stable": false,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 0.6642,
+      "out_sample_sharpe": -1.4822
+    },
+    {
+      "pair": "JPM/BAC",
+      "ticker_a": "JPM",
+      "ticker_b": "BAC",
+      "overall": {
+        "window": "Overall",
+        "trades": 14,
+        "win_rate": 0.2857,
+        "avg_return_pct": -1.1788,
+        "sharpe": -2.5981,
+        "max_drawdown": -0.3219,
+        "profit_factor": 0.7405,
+        "avg_duration_days": 32.8,
+        "total_pnl": -1678.33
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 73,
+        "win_rate": 0.3014,
+        "avg_return_pct": -0.695,
+        "sharpe": -1.2897,
+        "max_drawdown": -0.7901,
+        "profit_factor": 0.8361,
+        "avg_duration_days": 35.9,
+        "total_pnl": -5219.19
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.8901,
+          "sharpe": -1.8436,
+          "max_drawdown": -0.0756,
+          "profit_factor": 0.7871,
+          "avg_duration_days": 26.0,
+          "total_pnl": -273.04
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": 0.4289,
+          "sharpe": 0.7289,
+          "max_drawdown": -0.1141,
+          "profit_factor": 1.1043,
+          "avg_duration_days": 43.0,
+          "total_pnl": 122.66
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -7.1678,
+          "sharpe": -63.5551,
+          "max_drawdown": -0.1389,
+          "profit_factor": 0.0,
+          "avg_duration_days": 41.5,
+          "total_pnl": -1437.57
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.4394,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0546,
+          "profit_factor": 0.0,
+          "avg_duration_days": 72.0,
+          "total_pnl": -545.94
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 4,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.7228,
+          "sharpe": 7.2307,
+          "max_drawdown": -0.0597,
+          "profit_factor": 1.7713,
+          "avg_duration_days": 18.8,
+          "total_pnl": 1081.1
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -6.2355,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0626,
+          "profit_factor": 0.0,
+          "avg_duration_days": 22.0,
+          "total_pnl": -625.55
+        }
+      ],
+      "cointegration_stable": false,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -1.2897,
+      "out_sample_sharpe": -2.5981
+    },
+    {
+      "pair": "AMD/INTC",
+      "ticker_a": "AMD",
+      "ticker_b": "INTC",
+      "overall": {
+        "window": "Overall",
+        "trades": 27,
+        "win_rate": 0.3704,
+        "avg_return_pct": 0.2133,
+        "sharpe": 0.276,
+        "max_drawdown": -0.4372,
+        "profit_factor": 1.0389,
+        "avg_duration_days": 17.4,
+        "total_pnl": 521.95
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 112,
+        "win_rate": 0.3125,
+        "avg_return_pct": -0.8884,
+        "sharpe": -1.3374,
+        "max_drawdown": -0.9485,
+        "profit_factor": 0.8212,
+        "avg_duration_days": 14.6,
+        "total_pnl": -10173.69
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -1.8437,
+          "sharpe": -3.3964,
+          "max_drawdown": -0.0829,
+          "profit_factor": 0.6515,
+          "avg_duration_days": 38.0,
+          "total_pnl": -559.13
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.0205,
+          "sharpe": 3.6263,
+          "max_drawdown": -0.0676,
+          "profit_factor": 1.5921,
+          "avg_duration_days": 12.5,
+          "total_pnl": 400.12
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 4,
+          "win_rate": 0.5,
+          "avg_return_pct": 6.956,
+          "sharpe": 7.7065,
+          "max_drawdown": -0.0599,
+          "profit_factor": 3.3606,
+          "avg_duration_days": 9.8,
+          "total_pnl": 2774.38
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 4.6357,
+          "sharpe": 7.369,
+          "max_drawdown": -0.0533,
+          "profit_factor": 2.7327,
+          "avg_duration_days": 22.5,
+          "total_pnl": 923.14
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 6,
+          "win_rate": 0.3333,
+          "avg_return_pct": -1.7184,
+          "sharpe": -2.7971,
+          "max_drawdown": -0.1658,
+          "profit_factor": 0.6987,
+          "avg_duration_days": 11.2,
+          "total_pnl": -1043.04
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 5,
+          "win_rate": 0.0,
+          "avg_return_pct": -7.0301,
+          "sharpe": -37.3542,
+          "max_drawdown": -0.311,
+          "profit_factor": 0.0,
+          "avg_duration_days": 20.0,
+          "total_pnl": -3525.06
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 5,
+          "win_rate": 0.6,
+          "avg_return_pct": 3.1231,
+          "sharpe": 3.888,
+          "max_drawdown": -0.2293,
+          "profit_factor": 1.6391,
+          "avg_duration_days": 15.8,
+          "total_pnl": 1551.54
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 0,
+          "win_rate": 0,
+          "avg_return_pct": 0,
+          "sharpe": 0,
+          "max_drawdown": 0,
+          "profit_factor": 0,
+          "avg_duration_days": 0,
+          "total_pnl": 0
+        }
+      ],
+      "cointegration_stable": true,
+      "overfit_risk": "LOW",
+      "in_sample_sharpe": -1.3374,
+      "out_sample_sharpe": 0.276
+    },
+    {
+      "pair": "AAPL/MSFT",
+      "ticker_a": "AAPL",
+      "ticker_b": "MSFT",
+      "overall": {
+        "window": "Overall",
+        "trades": 18,
+        "win_rate": 0.3333,
+        "avg_return_pct": -1.065,
+        "sharpe": -2.337,
+        "max_drawdown": -0.2332,
+        "profit_factor": 0.7331,
+        "avg_duration_days": 21.8,
+        "total_pnl": -1952.92
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 66,
+        "win_rate": 0.4242,
+        "avg_return_pct": 0.6459,
+        "sharpe": 1.1737,
+        "max_drawdown": -0.6106,
+        "profit_factor": 1.1829,
+        "avg_duration_days": 31.8,
+        "total_pnl": 4131.03
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.1835,
+          "sharpe": 0.0,
+          "max_drawdown": -0.052,
+          "profit_factor": 0.0,
+          "avg_duration_days": 22.0,
+          "total_pnl": -520.35
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -6.9229,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0694,
+          "profit_factor": 0.0,
+          "avg_duration_days": 9.0,
+          "total_pnl": -694.29
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.8553,
+          "sharpe": -131.1935,
+          "max_drawdown": -0.1141,
+          "profit_factor": 0.0,
+          "avg_duration_days": 18.0,
+          "total_pnl": -1175.07
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 2,
+          "win_rate": 1.0,
+          "avg_return_pct": 7.1663,
+          "sharpe": 32.1681,
+          "max_drawdown": 0.0,
+          "profit_factor": Infinity,
+          "avg_duration_days": 23.0,
+          "total_pnl": 1429.26
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.3632,
+          "sharpe": 4.5009,
+          "max_drawdown": -0.0592,
+          "profit_factor": 1.7915,
+          "avg_duration_days": 14.5,
+          "total_pnl": 468.63
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 3,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.9411,
+          "sharpe": -161.5293,
+          "max_drawdown": -0.1684,
+          "profit_factor": 0.0,
+          "avg_duration_days": 14.0,
+          "total_pnl": -1788.33
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 3,
+          "win_rate": 0.6667,
+          "avg_return_pct": 3.9624,
+          "sharpe": 7.5453,
+          "max_drawdown": -0.0686,
+          "profit_factor": 2.7246,
+          "avg_duration_days": 19.7,
+          "total_pnl": 1182.73
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 4,
+          "win_rate": 0.25,
+          "avg_return_pct": -2.1188,
+          "sharpe": -4.8022,
+          "max_drawdown": -0.1109,
+          "profit_factor": 0.5402,
+          "avg_duration_days": 37.2,
+          "total_pnl": -855.5
+        }
+      ],
+      "cointegration_stable": true,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 1.1737,
+      "out_sample_sharpe": -2.337
+    },
+    {
+      "pair": "LMT/RTX",
+      "ticker_a": "LMT",
+      "ticker_b": "RTX",
+      "overall": {
+        "window": "Overall",
+        "trades": 17,
+        "win_rate": 0.2941,
+        "avg_return_pct": -0.9044,
+        "sharpe": -2.0692,
+        "max_drawdown": -0.2361,
+        "profit_factor": 0.7774,
+        "avg_duration_days": 35.6,
+        "total_pnl": -1571.56
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 54,
+        "win_rate": 0.4074,
+        "avg_return_pct": -0.2931,
+        "sharpe": -0.6379,
+        "max_drawdown": -0.657,
+        "profit_factor": 0.9139,
+        "avg_duration_days": 42.4,
+        "total_pnl": -1690.8
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 1.5869,
+          "sharpe": 3.2787,
+          "max_drawdown": -0.0602,
+          "profit_factor": 1.5206,
+          "avg_duration_days": 65.5,
+          "total_pnl": 313.38
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.4865,
+          "sharpe": 4.4481,
+          "max_drawdown": -0.0634,
+          "profit_factor": 1.7786,
+          "avg_duration_days": 30.0,
+          "total_pnl": 493.29
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.4291,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0545,
+          "profit_factor": 0.0,
+          "avg_duration_days": 30.0,
+          "total_pnl": -544.91
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.5937,
+          "sharpe": -228.3387,
+          "max_drawdown": -0.1091,
+          "profit_factor": 0.0,
+          "avg_duration_days": 39.0,
+          "total_pnl": -1122.74
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": 0.6266,
+          "sharpe": 1.1233,
+          "max_drawdown": -0.0547,
+          "profit_factor": 1.1668,
+          "avg_duration_days": 27.7,
+          "total_pnl": 181.97
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 1,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.1686,
+          "sharpe": 0.0,
+          "max_drawdown": -0.0519,
+          "profit_factor": 0.0,
+          "avg_duration_days": 3.0,
+          "total_pnl": -518.86
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 1.9063,
+          "sharpe": 3.296,
+          "max_drawdown": -0.072,
+          "profit_factor": 1.5241,
+          "avg_duration_days": 47.5,
+          "total_pnl": 377.26
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 4,
+          "win_rate": 0.25,
+          "avg_return_pct": -1.8574,
+          "sharpe": -6.7377,
+          "max_drawdown": -0.1282,
+          "profit_factor": 0.589,
+          "avg_duration_days": 31.2,
+          "total_pnl": -750.95
+        }
+      ],
+      "cointegration_stable": true,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": -0.6379,
+      "out_sample_sharpe": -2.0692
+    },
+    {
+      "pair": "CRWD/PANW",
+      "ticker_a": "CRWD",
+      "ticker_b": "PANW",
+      "overall": {
+        "window": "Overall",
+        "trades": 27,
+        "win_rate": 0.4074,
+        "avg_return_pct": 0.8012,
+        "sharpe": 1.2616,
+        "max_drawdown": -0.3205,
+        "profit_factor": 1.1705,
+        "avg_duration_days": 16.7,
+        "total_pnl": 2109.22
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 105,
+        "win_rate": 0.4095,
+        "avg_return_pct": 0.2927,
+        "sharpe": 0.4318,
+        "max_drawdown": -0.8223,
+        "profit_factor": 1.0579,
+        "avg_duration_days": 19.4,
+        "total_pnl": 2863.17
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 6,
+          "win_rate": 0.5,
+          "avg_return_pct": -0.7584,
+          "sharpe": -1.3255,
+          "max_drawdown": -0.1667,
+          "profit_factor": 0.8866,
+          "avg_duration_days": 12.8,
+          "total_pnl": -467.03
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 2,
+          "win_rate": 1.0,
+          "avg_return_pct": 14.432,
+          "sharpe": 55.1012,
+          "max_drawdown": 0.0,
+          "profit_factor": Infinity,
+          "avg_duration_days": 28.0,
+          "total_pnl": 2882.39
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.688,
+          "sharpe": -1.2792,
+          "max_drawdown": -0.0707,
+          "profit_factor": 0.8465,
+          "avg_duration_days": 8.7,
+          "total_pnl": -212.39
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 3,
+          "win_rate": 0.0,
+          "avg_return_pct": -5.726,
+          "sharpe": -125.0954,
+          "max_drawdown": -0.1627,
+          "profit_factor": 0.0,
+          "avg_duration_days": 21.7,
+          "total_pnl": -1723.8
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 6,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.8708,
+          "sharpe": 4.8074,
+          "max_drawdown": -0.1267,
+          "profit_factor": 1.8761,
+          "avg_duration_days": 8.5,
+          "total_pnl": 1710.45
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 2,
+          "win_rate": 0.0,
+          "avg_return_pct": -7.1909,
+          "sharpe": -564.8522,
+          "max_drawdown": -0.139,
+          "profit_factor": 0.0,
+          "avg_duration_days": 47.5,
+          "total_pnl": -1442.18
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": 3.072,
+          "sharpe": 4.0295,
+          "max_drawdown": -0.106,
+          "profit_factor": 1.8401,
+          "avg_duration_days": 17.3,
+          "total_pnl": 915.6
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 2.2509,
+          "sharpe": 4.0031,
+          "max_drawdown": -0.0662,
+          "profit_factor": 1.6744,
+          "avg_duration_days": 14.0,
+          "total_pnl": 446.18
+        }
+      ],
+      "cointegration_stable": false,
+      "overfit_risk": "LOW",
+      "in_sample_sharpe": 0.4318,
+      "out_sample_sharpe": 1.2616
+    },
+    {
+      "pair": "DDOG/NET",
+      "ticker_a": "DDOG",
+      "ticker_b": "NET",
+      "overall": {
+        "window": "Overall",
+        "trades": 30,
+        "win_rate": 0.3667,
+        "avg_return_pct": 0.8977,
+        "sharpe": 1.5341,
+        "max_drawdown": -0.384,
+        "profit_factor": 1.2141,
+        "avg_duration_days": 16.1,
+        "total_pnl": 2633.21
+      },
+      "in_sample": {
+        "window": "In-Sample",
+        "trades": 98,
+        "win_rate": 0.4898,
+        "avg_return_pct": 2.5488,
+        "sharpe": 4.5832,
+        "max_drawdown": -0.7487,
+        "profit_factor": 1.7543,
+        "avg_duration_days": 15.3,
+        "total_pnl": 24782.27
+      },
+      "window_results": [
+        {
+          "window": "W1 2024-01-29\u00e2\u2020\u20192024-04-26",
+          "trades": 4,
+          "win_rate": 0.5,
+          "avg_return_pct": 8.8892,
+          "sharpe": 12.9429,
+          "max_drawdown": -0.0539,
+          "profit_factor": 7.0534,
+          "avg_duration_days": 14.0,
+          "total_pnl": 3547.69
+        },
+        {
+          "window": "W2 2024-04-29\u00e2\u2020\u20192024-07-29",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 1.3546,
+          "sharpe": 2.1221,
+          "max_drawdown": -0.0865,
+          "profit_factor": 1.3086,
+          "avg_duration_days": 27.5,
+          "total_pnl": 266.92
+        },
+        {
+          "window": "W3 2024-07-30\u00e2\u2020\u20192024-10-25",
+          "trades": 2,
+          "win_rate": 0.5,
+          "avg_return_pct": 4.2973,
+          "sharpe": 6.7235,
+          "max_drawdown": -0.0582,
+          "profit_factor": 2.4694,
+          "avg_duration_days": 40.0,
+          "total_pnl": 855.46
+        },
+        {
+          "window": "W4 2024-10-28\u00e2\u2020\u20192025-01-29",
+          "trades": 6,
+          "win_rate": 0.5,
+          "avg_return_pct": 0.6713,
+          "sharpe": 1.5783,
+          "max_drawdown": -0.0903,
+          "profit_factor": 1.1429,
+          "avg_duration_days": 11.5,
+          "total_pnl": 390.8
+        },
+        {
+          "window": "W5 2025-01-30\u00e2\u2020\u20192025-04-30",
+          "trades": 5,
+          "win_rate": 0.2,
+          "avg_return_pct": -3.2711,
+          "sharpe": -15.8426,
+          "max_drawdown": -0.1804,
+          "profit_factor": 0.4049,
+          "avg_duration_days": 7.4,
+          "total_pnl": -1645.55
+        },
+        {
+          "window": "W6 2025-05-01\u00e2\u2020\u20192025-07-31",
+          "trades": 4,
+          "win_rate": 0.25,
+          "avg_return_pct": -1.6913,
+          "sharpe": -3.7212,
+          "max_drawdown": -0.1667,
+          "profit_factor": 0.6128,
+          "avg_duration_days": 17.2,
+          "total_pnl": -684.53
+        },
+        {
+          "window": "W7 2025-08-01\u00e2\u2020\u20192025-10-29",
+          "trades": 3,
+          "win_rate": 0.3333,
+          "avg_return_pct": -0.0183,
+          "sharpe": -0.0679,
+          "max_drawdown": -0.1233,
+          "profit_factor": 0.991,
+          "avg_duration_days": 29.7,
+          "total_pnl": -11.5
+        },
+        {
+          "window": "W8 2025-10-30\u00e2\u2020\u20192026-01-30",
+          "trades": 4,
+          "win_rate": 0.25,
+          "avg_return_pct": -0.1952,
+          "sharpe": -0.3563,
+          "max_drawdown": -0.1182,
+          "profit_factor": 0.95,
+          "avg_duration_days": 6.8,
+          "total_pnl": -86.08
+        }
+      ],
+      "cointegration_stable": true,
+      "overfit_risk": "HIGH",
+      "in_sample_sharpe": 4.5832,
+      "out_sample_sharpe": 1.5341
+    }
+  ]
+}
