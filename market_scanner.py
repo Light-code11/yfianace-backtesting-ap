@@ -225,6 +225,10 @@ class MarketScanner:
 
         for strategy in strategies:
             try:
+                # Pair trading is handled separately via _generate_pair_signals(); skip here
+                if strategy.get('strategy_type') == 'pair_trading':
+                    continue
+
                 # Generate signal for this ticker with this strategy
                 strategy_config = {
                     **strategy,

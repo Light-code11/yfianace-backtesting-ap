@@ -12,7 +12,7 @@ import yfinance as yf
 from dotenv import load_dotenv
 
 from database import SessionLocal, Strategy, init_db
-from trading_config import STRATEGIES, TICKER_UNIVERSE, RISK_PARAMS, ALPACA_CONFIG
+from trading_config import STRATEGIES, TICKER_UNIVERSE, RISK_PARAMS, ALPACA_CONFIG, PAIRS, PAIR_TRADING_PARAMS
 
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
@@ -49,10 +49,20 @@ def configure_yfinance_cache() -> None:
 
 def _strategy_to_db_payload(strategy_cfg):
     risk = strategy_cfg.get("risk_management", {})
+    strategy_type = strategy_cfg.get("strategy_type", "unknown")
+    # Pair trading strategy manages its own tickers via PAIRS config; don't override with universe.
+    raw_tickers = strategy_cfg.get("tickers")
+    if raw_tickers is None:
+        tickers = TICKER_UNIVERSE
+    elif not raw_tickers and strategy_type == "pair_trading":
+        # Pair trading uses PAIRS, not TICKER_UNIVERSE — keep empty
+        tickers = []
+    else:
+        tickers = raw_tickers or TICKER_UNIVERSE
     return {
         "description": strategy_cfg.get("description", ""),
-        "tickers": strategy_cfg.get("tickers") or TICKER_UNIVERSE,
-        "strategy_type": strategy_cfg.get("strategy_type", "unknown"),
+        "tickers": tickers,
+        "strategy_type": strategy_type,
         "indicators": strategy_cfg.get("indicators", []),
         "entry_conditions": {
             "atr_stop_multiplier": float(strategy_cfg.get("atr_stop_multiplier", 2.0))
@@ -158,24 +168,42 @@ def verify_alpaca_and_market_open() -> dict:
 
 def print_signal_preview(preview: dict) -> None:
     print("\n=== Dry Run Summary ===")
-    print(f"Success: {preview.get('success', False)}")
-    print(f"Stocks scanned: {preview.get('stocks_scanned', 0)}")
+    print(f"Success:           {preview.get('success', False)}")
+    print(f"Ticker universe:   {len(TICKER_UNIVERSE)} tickers")
+    print(f"Pair configs:      {len(PAIRS)} pairs")
+    print(f"Strategy count:    {len(STRATEGIES)} strategies configured")
+    print(f"Stocks scanned:    {preview.get('stocks_scanned', 0)}")
     print(f"Signals generated: {preview.get('signals_generated', 0)}")
-    print(f"Actionable signals: {preview.get('actionable_signals', 0)}")
+    print(f"Actionable signals:{preview.get('actionable_signals', 0)}")
 
     candidates = preview.get("would_trade", [])
-    if candidates:
-        print("Would trade:")
-        for item in candidates[:20]:
+    regular = [c for c in candidates if not c.get("is_pair_trade")]
+    pair_cands = [c for c in candidates if c.get("is_pair_trade")]
+
+    if regular:
+        print("\nWould trade (directional):")
+        for item in regular[:20]:
             print(
-                f"  {item.get('signal')} {item.get('ticker')} | "
-                f"Conf={item.get('confidence')} | "
-                f"Size={item.get('position_size_pct', 0):.2f}% | "
+                f"  {item.get('signal'):4s} {item.get('ticker'):6s} | "
+                f"Conf={item.get('confidence'):6s} | "
+                f"Size={item.get('position_size_pct', 0):.1f}% | "
                 f"Price=${item.get('current_price')} | "
                 f"Strategy={item.get('strategy_name')}"
             )
     else:
-        print("Would trade: none")
+        print("Would trade (directional): none")
+
+    if pair_cands:
+        print("\nWould trade (pair legs):")
+        for item in pair_cands[:20]:
+            print(
+                f"  {item.get('signal'):4s} {item.get('ticker'):6s} | "
+                f"Pair={item.get('pair_ticker_a')}/{item.get('pair_ticker_b')} | "
+                f"Z={item.get('pair_zscore', 0):.2f} | "
+                f"Conf={item.get('confidence')}"
+            )
+    else:
+        print("Would trade (pair legs): none (no pairs met z-score threshold)")
 
     for err in preview.get("errors", []):
         print(f"Error: {err}")
@@ -187,8 +215,11 @@ def main() -> int:
     args = parser.parse_args()
 
     print("=== Daily Trading Cycle ===")
-    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Mode: {'DRY RUN' if args.dry_run else 'LIVE PAPER TRADING'}")
+    print(f"Time:       {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Mode:       {'DRY RUN' if args.dry_run else 'LIVE PAPER TRADING'}")
+    print(f"Tickers:    {len(TICKER_UNIVERSE)}")
+    print(f"Strategies: {len(STRATEGIES)}")
+    print(f"Pairs:      {len(PAIRS)}")
 
     init_db()
     apply_runtime_config()

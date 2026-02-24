@@ -227,10 +227,26 @@ class AdvancedIndicators:
         """Bollinger Bands (Upper, Middle, Lower)"""
         if PANDAS_TA_AVAILABLE:
             bb = ta.bbands(df[column], length=period, std=std_dev)
+            # pandas_ta column naming can vary between versions:
+            #   BBU_20_2.0  (float std) vs BBU_20_2  (int std)
+            # Dynamically locate columns by prefix to be version-agnostic.
+            bb_cols = list(bb.columns)
+            upper_col = next((c for c in bb_cols if c.startswith('BBU_')), None)
+            middle_col = next((c for c in bb_cols if c.startswith('BBM_')), None)
+            lower_col = next((c for c in bb_cols if c.startswith('BBL_')), None)
+            if upper_col and middle_col and lower_col:
+                return {
+                    'BB_Upper': bb[upper_col],
+                    'BB_Middle': bb[middle_col],
+                    'BB_Lower': bb[lower_col],
+                }
+            # Fallback: compute manually if pandas_ta result is unexpected
+            middle = df[column].rolling(window=period).mean()
+            std = df[column].rolling(window=period).std()
             return {
-                'BB_Upper': bb[f'BBU_{period}_{std_dev}'],
-                'BB_Middle': bb[f'BBM_{period}_{std_dev}'],
-                'BB_Lower': bb[f'BBL_{period}_{std_dev}']
+                'BB_Upper': middle + (std * std_dev),
+                'BB_Middle': middle,
+                'BB_Lower': middle - (std * std_dev),
             }
         else:
             middle = df[column].rolling(window=period).mean()

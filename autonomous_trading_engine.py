@@ -543,6 +543,143 @@ class AutonomousTradingEngine:
         regime_boosts = alignments.get(regime, {})
         return regime_boosts.get(strategy_type, 1.0)
 
+    def _generate_pair_signals(self) -> List[Dict]:
+        """
+        Generate pair trading signals for all configured pairs.
+
+        Each pair produces up to 2 signals (one per leg: BUY leg_A + SELL leg_B or vice-versa).
+        Uses PairTradingStrategy z-score logic from pair_trading_strategy.py.
+        """
+        try:
+            from trading_config import PAIRS, PAIR_TRADING_PARAMS
+            from pair_trading_strategy import PairTradingStrategy, PairTradingStatistics
+        except ImportError as e:
+            print(f"   ⚠️  Pair trading imports failed: {e}")
+            return []
+
+        params = PAIR_TRADING_PARAMS
+        pair_signals: List[Dict] = []
+
+        for ticker_a, ticker_b in PAIRS:
+            try:
+                # Download 6 months for robust cointegration testing
+                with LiveSignalGenerator._yf_lock:
+                    raw_a = yf.download(ticker_a, period="6mo", progress=False, auto_adjust=True)
+                with LiveSignalGenerator._yf_lock:
+                    raw_b = yf.download(ticker_b, period="6mo", progress=False, auto_adjust=True)
+
+                if raw_a.empty or raw_b.empty:
+                    continue
+
+                # Flatten MultiIndex columns if needed
+                if isinstance(raw_a.columns, pd.MultiIndex):
+                    raw_a.columns = raw_a.columns.get_level_values(0)
+                if isinstance(raw_b.columns, pd.MultiIndex):
+                    raw_b.columns = raw_b.columns.get_level_values(0)
+
+                prices_a = raw_a['Close'].squeeze()
+                prices_b = raw_b['Close'].squeeze()
+
+                # Align and limit to lookback window
+                common_idx = prices_a.index.intersection(prices_b.index)
+                lookback = params.get('lookback_days', 60)
+                prices_a = prices_a.loc[common_idx].tail(lookback)
+                prices_b = prices_b.loc[common_idx].tail(lookback)
+
+                if len(prices_a) < 30:
+                    continue
+
+                # Correlation pre-filter
+                corr = float(prices_a.corr(prices_b))
+                if abs(corr) < params.get('min_correlation', 0.7):
+                    print(f"   ⏭️  Pair {ticker_a}/{ticker_b}: correlation={corr:.2f} < threshold — skipped")
+                    continue
+
+                # Cointegration test
+                stats = PairTradingStatistics()
+                coint_result = stats.engle_granger_test(prices_a, prices_b)
+
+                # Skip only clearly non-cointegrated pairs
+                p_val_limit = params.get('cointegration_pvalue', 0.05) * 3
+                if not coint_result.is_cointegrated and coint_result.p_value > p_val_limit:
+                    continue
+
+                # Get current z-score and signal
+                strategy = PairTradingStrategy(
+                    entry_threshold=params.get('zscore_entry', 2.0),
+                    exit_threshold=params.get('zscore_exit', 0.5),
+                    stop_loss_threshold=params.get('zscore_stop', 3.5),
+                )
+                current = strategy.get_current_signal(prices_a, prices_b)
+                pair_sig = current.get('signal', 'HOLD')
+                zscore = float(current.get('zscore', 0.0))
+
+                if pair_sig not in ('LONG_SPREAD', 'SHORT_SPREAD'):
+                    continue
+
+                # Translate spread signal to individual leg signals
+                # LONG_SPREAD  → BUY ticker_a, SELL ticker_b  (spread too low)
+                # SHORT_SPREAD → SELL ticker_a, BUY ticker_b  (spread too high)
+                leg_a_dir = 'BUY' if pair_sig == 'LONG_SPREAD' else 'SELL'
+                leg_b_dir = 'SELL' if pair_sig == 'LONG_SPREAD' else 'BUY'
+
+                price_a = float(prices_a.iloc[-1])
+                price_b = float(prices_b.iloc[-1])
+                confidence = 'HIGH' if abs(zscore) >= 2.5 else 'MEDIUM'
+                quality = round(50 + min(abs(zscore) * 10, 30), 1)
+
+                pair_meta = {
+                    'strategy_name': 'cfg_pair_trading',
+                    'strategy_type': 'pair_trading',
+                    'confidence': confidence,
+                    'quality_score': quality,
+                    'pair_ticker_a': ticker_a,
+                    'pair_ticker_b': ticker_b,
+                    'pair_zscore': zscore,
+                    'pair_signal': pair_sig,
+                    'hedge_ratio': coint_result.hedge_ratio,
+                    'correlation': corr,
+                    'cointegration_pvalue': coint_result.p_value,
+                    'position_size_pct': params.get('max_position_pct', 0.10) * 100,
+                    'is_pair_trade': True,
+                }
+
+                pair_signals.append({
+                    **pair_meta,
+                    'ticker': ticker_a,
+                    'signal': leg_a_dir,
+                    'current_price': price_a,
+                    'entry_price': price_a,
+                    'pair_leg': 'A',
+                    'reasoning': (
+                        f"Pair {ticker_a}/{ticker_b}: {pair_sig} "
+                        f"(z={zscore:.2f}, corr={corr:.2f}, coint_p={coint_result.p_value:.3f}) "
+                        f"→ {leg_a_dir} {ticker_a}"
+                    ),
+                })
+                pair_signals.append({
+                    **pair_meta,
+                    'ticker': ticker_b,
+                    'signal': leg_b_dir,
+                    'current_price': price_b,
+                    'entry_price': price_b,
+                    'pair_leg': 'B',
+                    'reasoning': (
+                        f"Pair {ticker_a}/{ticker_b}: {pair_sig} "
+                        f"(z={zscore:.2f}) → {leg_b_dir} {ticker_b}"
+                    ),
+                })
+                print(
+                    f"   📊 Pair {ticker_a}/{ticker_b}: {pair_sig} "
+                    f"z={zscore:.2f} corr={corr:.2f} coint_p={coint_result.p_value:.3f}"
+                )
+
+            except Exception as exc:
+                print(f"   ⚠️  Pair {ticker_a}/{ticker_b} error: {str(exc)[:80]}")
+                continue
+
+        return pair_signals
+
     def _generate_signals(self) -> List[Dict]:
         """Generate trading signals from all active strategies"""
         # Get active strategies
@@ -576,6 +713,14 @@ class AutonomousTradingEngine:
                 }
             })
 
+        # Pre-warm sector ETF / SPY cache to avoid download contention during parallel scan
+        try:
+            print("   📡 Pre-warming sector ETF cache (SPY + sector ETFs)...")
+            LiveSignalGenerator.prewarm_sector_cache(period="3mo")
+            print("   ✅ Sector cache ready")
+        except Exception as exc:
+            print(f"   ⚠️  Sector cache pre-warm failed (non-fatal): {str(exc)[:80]}")
+
         # Run market scanner
         scan_results = MarketScanner.multi_timeframe_scan(
             strategies=strategy_configs,
@@ -587,6 +732,18 @@ class AutonomousTradingEngine:
         self._last_scan_results = scan_results
 
         all_signals = scan_results.get('all_signals', [])
+
+        # ── Pair trading signals (generated separately) ──────────────────────
+        try:
+            print("\n   🔗 Generating pair trading signals...")
+            pair_sigs = self._generate_pair_signals()
+            if pair_sigs:
+                all_signals.extend(pair_sigs)
+                print(f"   Added {len(pair_sigs)} pair trading signals ({len(pair_sigs)//2} pairs)")
+            else:
+                print("   No pair trading signals at current z-score thresholds")
+        except Exception as exc:
+            print(f"   ⚠️  Pair signal generation failed: {str(exc)[:120]}")
 
         # Filter for BUY/SELL only (no HOLD)
         return [s for s in all_signals if s['signal'] in ['BUY', 'SELL']]
@@ -728,26 +885,28 @@ class AutonomousTradingEngine:
             )
 
             # Correlation risk check against existing open positions (60-day returns)
-            corr_check = self._evaluate_correlation_risk(signal['ticker'], lookback_days=60)
-            if not corr_check.get('can_trade', True):
-                print(
-                    f"      ⚠️  {signal['ticker']}: skipped due to high correlation "
-                    f"({corr_check.get('max_correlation', 0):.2f}) with "
-                    f"{corr_check.get('against_ticker', 'existing position')}"
-                )
-                continue
+            # Skip correlation gating for pair trades — both legs are intentionally correlated.
+            if not signal.get('is_pair_trade'):
+                corr_check = self._evaluate_correlation_risk(signal['ticker'], lookback_days=60)
+                if not corr_check.get('can_trade', True):
+                    print(
+                        f"      ⚠️  {signal['ticker']}: skipped due to high correlation "
+                        f"({corr_check.get('max_correlation', 0):.2f}) with "
+                        f"{corr_check.get('against_ticker', 'existing position')}"
+                    )
+                    continue
 
-            corr_multiplier = corr_check.get('size_multiplier', 1.0)
-            if corr_multiplier < 1.0:
-                signal['adjusted_position_size_pct'] *= corr_multiplier
-                signal['correlation_multiplier'] = corr_multiplier
-                signal['max_observed_correlation'] = corr_check.get('max_correlation')
-                signal['correlated_with'] = corr_check.get('against_ticker')
-                print(
-                    f"      📉 {signal['ticker']}: reducing size {corr_multiplier:.2f}x "
-                    f"due to correlation {corr_check.get('max_correlation', 0):.2f} with "
-                    f"{corr_check.get('against_ticker', 'existing position')}"
-                )
+                corr_multiplier = corr_check.get('size_multiplier', 1.0)
+                if corr_multiplier < 1.0:
+                    signal['adjusted_position_size_pct'] *= corr_multiplier
+                    signal['correlation_multiplier'] = corr_multiplier
+                    signal['max_observed_correlation'] = corr_check.get('max_correlation')
+                    signal['correlated_with'] = corr_check.get('against_ticker')
+                    print(
+                        f"      📉 {signal['ticker']}: reducing size {corr_multiplier:.2f}x "
+                        f"due to correlation {corr_check.get('max_correlation', 0):.2f} with "
+                        f"{corr_check.get('against_ticker', 'existing position')}"
+                    )
 
             actionable.append(signal)
 
@@ -788,12 +947,21 @@ class AutonomousTradingEngine:
                     stop_loss=dynamic_stop_loss
                 )
             else:  # SELL
-                # Check if we have a position to sell
-                pos = self.alpaca.get_position(signal['ticker'])
-                if not pos['success'] or not pos['position']:
-                    return {"success": False, "error": "No position to sell"}
-
-                order = self.alpaca.close_position(signal['ticker'])
+                if signal.get('is_pair_trade'):
+                    # Pair trade short-sell leg — place a market short
+                    order = self.alpaca.place_order(
+                        symbol=signal['ticker'],
+                        notional=position_size_usd,
+                        side='sell',
+                        order_type='market',
+                        time_in_force='day',
+                    )
+                else:
+                    # Normal close of existing long position
+                    pos = self.alpaca.get_position(signal['ticker'])
+                    if not pos['success'] or not pos['position']:
+                        return {"success": False, "error": "No position to sell"}
+                    order = self.alpaca.close_position(signal['ticker'])
 
             if not order['success']:
                 return {"success": False, "error": order['error']}

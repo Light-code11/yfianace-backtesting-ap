@@ -16,6 +16,53 @@ class LiveSignalGenerator:
     # Thread lock for yfinance downloads (fixes parallel download data mixing bug)
     _yf_lock = threading.Lock()
 
+    # ── Sector ETF caches (refreshed once per calendar day) ──────────────────
+    _sector_etf_cache: Dict[str, "pd.Series"] = {}
+    _sector_spy_cache: Optional["pd.Series"] = None
+    _sector_cache_date: Optional[str] = None
+    _sector_cache_lock = threading.Lock()  # separate lock for sector cache management
+
+    # ── Weekly (HTF) data cache — avoids re-downloading per strategy ──────────
+    _weekly_data_cache: Dict[str, "pd.DataFrame"] = {}
+    _weekly_cache_date: Optional[str] = None
+    _weekly_cache_lock = threading.Lock()
+
+    # ── Daily ticker data cache (keyed by ticker:period) ─────────────────────
+    _daily_data_cache: Dict[str, "pd.DataFrame"] = {}
+    _daily_cache_date: Optional[str] = None
+    _daily_cache_lock = threading.Lock()
+
+    # Ticker → sector ETF mapping
+    SECTOR_ETF_MAP: Dict[str, str] = {
+        # Technology / Semiconductors → XLK
+        "AAPL": "XLK", "MSFT": "XLK", "NVDA": "XLK", "AMD": "XLK", "INTC": "XLK",
+        "AVGO": "XLK", "MRVL": "XLK", "ARM": "XLK", "QCOM": "XLK", "LRCX": "XLK",
+        "KLAC": "XLK", "ASML": "XLK", "CRM": "XLK", "SMCI": "XLK", "PLTR": "XLK",
+        "CRWD": "XLK", "NET": "XLK", "DDOG": "XLK", "ZS": "XLK", "PANW": "XLK",
+        "SHOP": "XLK",
+        # Communication Services → XLC
+        "GOOGL": "XLC", "META": "XLC", "NFLX": "XLC", "DIS": "XLC", "MELI": "XLC",
+        # Consumer Discretionary → XLY
+        "AMZN": "XLY", "TSLA": "XLY", "HD": "XLY", "NKE": "XLY", "LULU": "XLY",
+        "DECK": "XLY",
+        # Consumer Staples → XLP
+        "WMT": "XLP", "PG": "XLP", "COST": "XLP", "TGT": "XLP", "SBUX": "XLP",
+        "MCD": "XLP",
+        # Financials → XLF
+        "JPM": "XLF", "V": "XLF", "MA": "XLF", "BAC": "XLF", "WFC": "XLF",
+        "PYPL": "XLF", "XYZ": "XLF", "COIN": "XLF", "AFRM": "XLF", "SOFI": "XLF",
+        "NU": "XLF",
+        # Healthcare → XLV
+        "UNH": "XLV", "JNJ": "XLV", "MRNA": "XLV", "REGN": "XLV", "ABBV": "XLV",
+        "LLY": "XLV", "TMO": "XLV", "ISRG": "XLV", "DXCM": "XLV",
+        # Energy → XLE
+        "XOM": "XLE", "CVX": "XLE", "SLB": "XLE", "EOG": "XLE", "OXY": "XLE",
+        "MPC": "XLE",
+        # Industrials → XLI
+        "CAT": "XLI", "DE": "XLI", "GE": "XLI", "HON": "XLI", "RTX": "XLI",
+        "LMT": "XLI",
+    }
+
     @staticmethod
     def _confidence_to_score(confidence: str) -> float:
         """Convert confidence label to a normalized score used for scaling."""
@@ -42,14 +89,30 @@ class LiveSignalGenerator:
         Returns:
             Dict containing multiplier (1.0/0.5/0.0), alignment status, and diagnostics.
         """
-        with LiveSignalGenerator._yf_lock:
-            weekly = yf.download(
-                ticker,
-                period="1y",
-                interval="1wk",
-                progress=False,
-                auto_adjust=True
-            )
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Fast path: use cached weekly data if available
+        if (LiveSignalGenerator._weekly_cache_date == today
+                and ticker in LiveSignalGenerator._weekly_data_cache):
+            weekly = LiveSignalGenerator._weekly_data_cache[ticker]
+        else:
+            with LiveSignalGenerator._weekly_cache_lock:
+                if LiveSignalGenerator._weekly_cache_date != today:
+                    LiveSignalGenerator._weekly_data_cache = {}
+                    LiveSignalGenerator._weekly_cache_date = today
+
+                if ticker not in LiveSignalGenerator._weekly_data_cache:
+                    with LiveSignalGenerator._yf_lock:
+                        downloaded = yf.download(
+                            ticker,
+                            period="1y",
+                            interval="1wk",
+                            progress=False,
+                            auto_adjust=True
+                        )
+                    LiveSignalGenerator._weekly_data_cache[ticker] = downloaded
+
+            weekly = LiveSignalGenerator._weekly_data_cache.get(ticker)
 
         if weekly is None or weekly.empty:
             return {
@@ -244,12 +307,24 @@ class LiveSignalGenerator:
                 "error": "Invalid ticker parameter"
             }
 
-        # Fetch recent data for THIS SPECIFIC ticker only
-        # Use thread lock to prevent yfinance data mixing in parallel downloads
-        with LiveSignalGenerator._yf_lock:
-            data = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+        # Fetch recent data — use cache if already downloaded today for this period
+        today = datetime.now().strftime("%Y-%m-%d")
+        cache_key = f"{ticker}:{period}"
+        if (LiveSignalGenerator._daily_cache_date == today
+                and cache_key in LiveSignalGenerator._daily_data_cache):
+            data = LiveSignalGenerator._daily_data_cache[cache_key]
+        else:
+            with LiveSignalGenerator._daily_cache_lock:
+                if LiveSignalGenerator._daily_cache_date != today:
+                    LiveSignalGenerator._daily_data_cache = {}
+                    LiveSignalGenerator._daily_cache_date = today
+                if cache_key not in LiveSignalGenerator._daily_data_cache:
+                    with LiveSignalGenerator._yf_lock:
+                        downloaded = yf.download(ticker, period=period, progress=False, auto_adjust=True)
+                    LiveSignalGenerator._daily_data_cache[cache_key] = downloaded
+            data = LiveSignalGenerator._daily_data_cache.get(cache_key)
 
-        if data.empty:
+        if data is None or data.empty:
             return {
                 "ticker": ticker,
                 "signal": "ERROR",
@@ -277,7 +352,8 @@ class LiveSignalGenerator:
             strategy_type=strategy_type,
             data=data,
             indicators=indicators,
-            current_price=current_price
+            current_price=current_price,
+            ticker=ticker
         )
 
         htf_result = LiveSignalGenerator._evaluate_higher_timeframe_alignment(
@@ -379,6 +455,28 @@ class LiveSignalGenerator:
                 atr = TechnicalIndicators.atr(high, low, close, period)
                 indicators[f'ATR_{period}'] = round(float(atr.iloc[-1]), 2)
 
+            elif name == 'VWAP':
+                period = ind.get('period', 20)
+                if 'Volume' in data.columns:
+                    typical_price = (high + low + close) / 3
+                    vol = data['Volume']
+                    vwap_num = (typical_price * vol).rolling(period).sum()
+                    vwap_den = vol.rolling(period).sum()
+                    vwap = (vwap_num / vwap_den).replace([np.inf, -np.inf], np.nan)
+                    vwap_val = float(vwap.iloc[-1]) if not pd.isna(vwap.iloc[-1]) else float(close.iloc[-1])
+                    indicators['VWAP'] = round(vwap_val, 2)
+
+                    # Price deviation std vs rolling VWAP
+                    dev = typical_price - vwap
+                    dev_std = dev.rolling(period).std()
+                    dev_std_val = float(dev_std.iloc[-1]) if not pd.isna(dev_std.iloc[-1]) else 0.0
+                    indicators['VWAP_Std'] = round(dev_std_val, 4)
+
+                    cur_tp = float(typical_price.iloc[-1])
+                    indicators['VWAP_ZScore'] = round(
+                        (cur_tp - vwap_val) / dev_std_val if dev_std_val != 0 else 0.0, 3
+                    )
+
         # Always include current price
         indicators['Price'] = round(float(close.iloc[-1]), 2)
 
@@ -389,7 +487,8 @@ class LiveSignalGenerator:
         strategy_type: str,
         data: pd.DataFrame,
         indicators: Dict[str, float],
-        current_price: float
+        current_price: float,
+        ticker: str = ""
     ) -> Dict[str, Any]:
         """Determine BUY/SELL/HOLD signal based on strategy type"""
 
@@ -403,6 +502,23 @@ class LiveSignalGenerator:
             return LiveSignalGenerator._breakout_signal(indicators, data, current_price)
         elif strategy_type == 'trend_following':
             return LiveSignalGenerator._trend_following_signal(indicators, close)
+        elif strategy_type == 'bb_squeeze':
+            return LiveSignalGenerator._bb_squeeze_signal(indicators, close, data)
+        elif strategy_type == 'vwap_reversion':
+            return LiveSignalGenerator._vwap_reversion_signal(indicators, close)
+        elif strategy_type == 'gap_fill':
+            return LiveSignalGenerator._gap_fill_signal(indicators, data, current_price)
+        elif strategy_type == 'earnings_momentum':
+            return LiveSignalGenerator._earnings_momentum_signal(indicators, close, data)
+        elif strategy_type == 'sector_rotation':
+            return LiveSignalGenerator._sector_rotation_signal(indicators, close, data, ticker)
+        elif strategy_type == 'pair_trading':
+            # Pair trading signals are generated separately in the engine
+            return {
+                'signal': 'HOLD',
+                'confidence': 'LOW',
+                'reasoning': 'Pair trading handled separately via _generate_pair_signals()'
+            }
         else:
             return {
                 'signal': 'HOLD',
@@ -591,4 +707,410 @@ class LiveSignalGenerator:
             'signal': signal,
             'confidence': confidence,
             'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'Insufficient data for signal'
+        }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # NEW STRATEGY SIGNAL HANDLERS (Strategies 5-9)
+    # ═══════════════════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _bb_squeeze_signal(indicators: Dict, close: pd.Series, data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Bollinger Band Squeeze breakout strategy.
+
+        Identifies low-volatility squeeze periods (bandwidth in lowest 20th percentile)
+        and fires on the breakout direction.
+        """
+        bb_upper = indicators.get('BB_Upper')
+        bb_lower = indicators.get('BB_Lower')
+        bb_middle = indicators.get('BB_Middle')
+        price = indicators.get('Price')
+        rsi = indicators.get('RSI_14', 50)
+
+        reasoning_parts: List[str] = []
+        signal = 'HOLD'
+        confidence = 'MEDIUM'
+
+        if not all([bb_upper, bb_lower, bb_middle, price]):
+            return {'signal': 'HOLD', 'confidence': 'LOW', 'reasoning': 'Insufficient BB data for squeeze analysis'}
+
+        # Current bandwidth
+        bandwidth = (bb_upper - bb_lower) / bb_middle
+
+        # Historical bandwidths to define "squeeze"
+        try:
+            upper_ser, middle_ser, lower_ser = TechnicalIndicators.bollinger_bands(close)
+            bw_series = ((upper_ser - lower_ser) / middle_ser).dropna()
+            lookback = min(50, len(bw_series))
+            squeeze_threshold = float(bw_series.iloc[-lookback:].quantile(0.20))
+        except Exception:
+            squeeze_threshold = bandwidth * 1.0   # no history → never squeeze
+
+        in_squeeze = bandwidth <= squeeze_threshold
+
+        if in_squeeze:
+            if price > bb_upper and rsi > 50:
+                signal = 'BUY'
+                confidence = 'HIGH' if rsi < 70 else 'MEDIUM'
+                reasoning_parts.append(
+                    f"BB Squeeze breakout UP: Price={price:.2f} > BB_Upper={bb_upper:.2f}"
+                )
+                reasoning_parts.append(
+                    f"Bandwidth={bandwidth:.4f} ≤ squeeze threshold={squeeze_threshold:.4f}, RSI={rsi:.1f}"
+                )
+            elif price < bb_lower and rsi < 50:
+                signal = 'SELL'
+                confidence = 'HIGH' if rsi > 30 else 'MEDIUM'
+                reasoning_parts.append(
+                    f"BB Squeeze breakout DOWN: Price={price:.2f} < BB_Lower={bb_lower:.2f}"
+                )
+                reasoning_parts.append(
+                    f"Bandwidth={bandwidth:.4f} ≤ squeeze threshold={squeeze_threshold:.4f}, RSI={rsi:.1f}"
+                )
+            else:
+                reasoning_parts.append(
+                    f"In BB squeeze (BW={bandwidth:.4f} ≤ {squeeze_threshold:.4f}) — awaiting breakout"
+                )
+        else:
+            reasoning_parts.append(
+                f"No squeeze: BW={bandwidth:.4f} > threshold={squeeze_threshold:.4f}"
+            )
+
+        return {
+            'signal': signal,
+            'confidence': confidence,
+            'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'No BB squeeze signal'
+        }
+
+    @staticmethod
+    def _vwap_reversion_signal(indicators: Dict, close: pd.Series) -> Dict[str, Any]:
+        """
+        VWAP mean reversion signal.
+
+        Fades price when it is >2 standard deviations from the rolling VWAP.
+        """
+        vwap = indicators.get('VWAP')
+        vwap_zscore = indicators.get('VWAP_ZScore')
+        price = indicators.get('Price')
+        rsi = indicators.get('RSI_14', 50)
+
+        reasoning_parts: List[str] = []
+        signal = 'HOLD'
+        confidence = 'MEDIUM'
+
+        if vwap is None or vwap_zscore is None:
+            return {
+                'signal': 'HOLD',
+                'confidence': 'LOW',
+                'reasoning': 'VWAP indicator unavailable (Volume data may be missing)'
+            }
+
+        if vwap_zscore < -2.0 and rsi < 40:
+            signal = 'BUY'
+            confidence = 'HIGH' if vwap_zscore < -2.5 else 'MEDIUM'
+            reasoning_parts.append(f"Price well below rolling VWAP (z={vwap_zscore:.2f})")
+            reasoning_parts.append(f"RSI={rsi:.1f} confirms oversold vs VWAP={vwap:.2f}")
+        elif vwap_zscore > 2.0 and rsi > 60:
+            signal = 'SELL'
+            confidence = 'HIGH' if vwap_zscore > 2.5 else 'MEDIUM'
+            reasoning_parts.append(f"Price well above rolling VWAP (z={vwap_zscore:.2f})")
+            reasoning_parts.append(f"RSI={rsi:.1f} confirms overbought vs VWAP={vwap:.2f}")
+        else:
+            reasoning_parts.append(
+                f"VWAP z={vwap_zscore:.2f} (no extreme deviation), RSI={rsi:.1f}, VWAP={vwap:.2f}"
+            )
+
+        return {
+            'signal': signal,
+            'confidence': confidence,
+            'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'No VWAP reversion signal'
+        }
+
+    @staticmethod
+    def _gap_fill_signal(indicators: Dict, data: pd.DataFrame, current_price: float) -> Dict[str, Any]:
+        """
+        Overnight gap fade strategy.
+
+        Detects gaps >2% from previous close and fades them expecting a 50% fill.
+        """
+        reasoning_parts: List[str] = []
+        signal = 'HOLD'
+        confidence = 'MEDIUM'
+
+        if 'Open' not in data.columns or len(data) < 2:
+            return {'signal': 'HOLD', 'confidence': 'LOW', 'reasoning': 'Open price data unavailable for gap detection'}
+
+        today_open = float(data['Open'].iloc[-1])
+        prev_close = float(data['Close'].iloc[-2])
+
+        if prev_close == 0:
+            return {'signal': 'HOLD', 'confidence': 'LOW', 'reasoning': 'Invalid previous close price'}
+
+        gap_pct = (today_open - prev_close) / prev_close * 100
+        rsi = indicators.get('RSI_14', 50)
+        gap_threshold = 2.0
+
+        if gap_pct >= gap_threshold:
+            # Gap up → fade down toward previous close
+            if current_price > prev_close:
+                signal = 'SELL'
+                confidence = 'HIGH' if gap_pct >= 4.0 else 'MEDIUM'
+                fill_target = prev_close + (today_open - prev_close) * 0.5
+                reasoning_parts.append(
+                    f"Gap UP {gap_pct:.1f}%: Open={today_open:.2f} vs Prev Close={prev_close:.2f}"
+                )
+                reasoning_parts.append(f"Fading gap — 50% fill target ≈ {fill_target:.2f}")
+        elif gap_pct <= -gap_threshold:
+            # Gap down → fade up toward previous close
+            if current_price < prev_close:
+                signal = 'BUY'
+                confidence = 'HIGH' if gap_pct <= -4.0 else 'MEDIUM'
+                fill_target = prev_close + (today_open - prev_close) * 0.5
+                reasoning_parts.append(
+                    f"Gap DOWN {gap_pct:.1f}%: Open={today_open:.2f} vs Prev Close={prev_close:.2f}"
+                )
+                reasoning_parts.append(f"Fading gap — 50% fill target ≈ {fill_target:.2f}")
+        else:
+            reasoning_parts.append(f"No significant gap: {gap_pct:.2f}% (threshold ±{gap_threshold}%)")
+
+        return {
+            'signal': signal,
+            'confidence': confidence,
+            'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'No gap detected'
+        }
+
+    @staticmethod
+    def _earnings_momentum_signal(indicators: Dict, close: pd.Series, data: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Post-Earnings Announcement Drift (PEAD) momentum strategy.
+
+        After a ≥5% single-day move in the last 20 trading days (earnings proxy),
+        rides the momentum in the direction of the surprise.
+        """
+        reasoning_parts: List[str] = []
+        signal = 'HOLD'
+        confidence = 'MEDIUM'
+
+        if len(close) < 25:
+            return {'signal': 'HOLD', 'confidence': 'LOW', 'reasoning': 'Insufficient history for PEAD analysis'}
+
+        # Detect earnings-like moves in recent history (last 20 days, excluding today)
+        recent_returns = close.pct_change().iloc[-21:-1]
+        earnings_threshold = 0.05
+
+        large_moves = recent_returns[abs(recent_returns) >= earnings_threshold]
+
+        if large_moves.empty:
+            return {
+                'signal': 'HOLD',
+                'confidence': 'LOW',
+                'reasoning': 'No earnings-like move (≥5%) detected in last 20 days'
+            }
+
+        # Focus on the most recent large move
+        latest_move = float(large_moves.iloc[-1])
+        move_idx = list(recent_returns.index).index(large_moves.index[-1])
+        days_since_move = len(recent_returns) - move_idx
+
+        rsi = indicators.get('RSI_14', 50)
+        sma_20 = indicators.get('SMA_20')
+        price = indicators.get('Price')
+
+        if latest_move > earnings_threshold:
+            # Positive surprise — PEAD long
+            if rsi < 75:
+                signal = 'BUY'
+                confidence = 'HIGH' if latest_move > 0.10 else 'MEDIUM'
+                reasoning_parts.append(
+                    f"PEAD: +{latest_move*100:.1f}% earnings move {days_since_move} days ago"
+                )
+                reasoning_parts.append(f"Positive drift expected, RSI={rsi:.1f}")
+        elif latest_move < -earnings_threshold:
+            # Negative surprise — PEAD short
+            if rsi > 25:
+                signal = 'SELL'
+                confidence = 'HIGH' if latest_move < -0.10 else 'MEDIUM'
+                reasoning_parts.append(
+                    f"PEAD: {latest_move*100:.1f}% earnings move {days_since_move} days ago"
+                )
+                reasoning_parts.append(f"Negative drift expected, RSI={rsi:.1f}")
+
+        return {
+            'signal': signal,
+            'confidence': confidence,
+            'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'PEAD analysis complete — no strong signal'
+        }
+
+    @staticmethod
+    def prewarm_sector_cache(period: str = "3mo") -> None:
+        """
+        Pre-download SPY and all unique sector ETFs into the cache.
+        Call this once before launching parallel scans to avoid download contention.
+        """
+        all_etfs = list(set(LiveSignalGenerator.SECTOR_ETF_MAP.values()))
+        symbols = ["SPY"] + all_etfs
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        with LiveSignalGenerator._sector_cache_lock:
+            if LiveSignalGenerator._sector_cache_date != today:
+                LiveSignalGenerator._sector_etf_cache = {}
+                LiveSignalGenerator._sector_spy_cache = None
+                LiveSignalGenerator._sector_cache_date = today
+
+            for sym in symbols:
+                if sym == "SPY" and LiveSignalGenerator._sector_spy_cache is not None:
+                    continue
+                if sym != "SPY" and sym in LiveSignalGenerator._sector_etf_cache:
+                    continue
+                try:
+                    with LiveSignalGenerator._yf_lock:
+                        raw = yf.download(sym, period=period, progress=False, auto_adjust=True)
+                    if not raw.empty:
+                        if isinstance(raw.columns, pd.MultiIndex):
+                            raw.columns = raw.columns.get_level_values(0)
+                        series = raw['Close'].squeeze()
+                        if sym == "SPY":
+                            LiveSignalGenerator._sector_spy_cache = series
+                        else:
+                            LiveSignalGenerator._sector_etf_cache[sym] = series
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _get_sector_etf_performance(sector_etf: str, period: str = "3mo") -> Optional[float]:
+        """
+        Return rolling 20-day return of sector_etf relative to SPY (cached per day).
+        Positive = sector outperforming; Negative = underperforming.
+        Uses _sector_cache_lock (separate from _yf_lock) to avoid scan deadlocks.
+        """
+        today = datetime.now().strftime("%Y-%m-%d")
+
+        # Fast path: return cached value without locking
+        if (LiveSignalGenerator._sector_cache_date == today
+                and sector_etf in LiveSignalGenerator._sector_etf_cache
+                and LiveSignalGenerator._sector_spy_cache is not None):
+            etf_close = LiveSignalGenerator._sector_etf_cache[sector_etf]
+            spy_close = LiveSignalGenerator._sector_spy_cache
+        else:
+            # Slow path: acquire cache lock and ensure downloads
+            with LiveSignalGenerator._sector_cache_lock:
+                if LiveSignalGenerator._sector_cache_date != today:
+                    LiveSignalGenerator._sector_etf_cache = {}
+                    LiveSignalGenerator._sector_spy_cache = None
+                    LiveSignalGenerator._sector_cache_date = today
+
+                if sector_etf not in LiveSignalGenerator._sector_etf_cache:
+                    try:
+                        with LiveSignalGenerator._yf_lock:
+                            etf_raw = yf.download(sector_etf, period=period, progress=False, auto_adjust=True)
+                        if not etf_raw.empty:
+                            if isinstance(etf_raw.columns, pd.MultiIndex):
+                                etf_raw.columns = etf_raw.columns.get_level_values(0)
+                            LiveSignalGenerator._sector_etf_cache[sector_etf] = etf_raw['Close'].squeeze()
+                    except Exception:
+                        return None
+
+                if LiveSignalGenerator._sector_spy_cache is None:
+                    try:
+                        with LiveSignalGenerator._yf_lock:
+                            spy_raw = yf.download("SPY", period=period, progress=False, auto_adjust=True)
+                        if not spy_raw.empty:
+                            if isinstance(spy_raw.columns, pd.MultiIndex):
+                                spy_raw.columns = spy_raw.columns.get_level_values(0)
+                            LiveSignalGenerator._sector_spy_cache = spy_raw['Close'].squeeze()
+                    except Exception:
+                        return None
+
+            etf_close = LiveSignalGenerator._sector_etf_cache.get(sector_etf)
+            spy_close = LiveSignalGenerator._sector_spy_cache
+
+        if etf_close is None or spy_close is None:
+            return None
+
+        lookback = 20
+        if len(etf_close) < lookback + 1 or len(spy_close) < lookback + 1:
+            return None
+
+        etf_ret = float(etf_close.iloc[-1] / etf_close.iloc[-lookback - 1]) - 1.0
+        spy_ret = float(spy_close.iloc[-1] / spy_close.iloc[-lookback - 1]) - 1.0
+        return etf_ret - spy_ret
+
+    @staticmethod
+    def _sector_rotation_signal(
+        indicators: Dict,
+        close: pd.Series,
+        data: pd.DataFrame,
+        ticker: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Sector rotation signal using sector ETF relative strength vs SPY.
+
+        Strong sector (>+2% vs SPY 20d) + not overbought → BUY
+        Weak sector (<-2% vs SPY 20d) + not oversold → SELL
+        """
+        reasoning_parts: List[str] = []
+        signal = 'HOLD'
+        confidence = 'MEDIUM'
+
+        rsi = indicators.get('RSI_14', 50)
+        sma_20 = indicators.get('SMA_20')
+        price = indicators.get('Price')
+
+        sector_etf = LiveSignalGenerator.SECTOR_ETF_MAP.get(ticker)
+
+        if sector_etf is None:
+            # Fallback: simple momentum vs own SMA(20)
+            if sma_20 and price:
+                pct_from_sma = (price - sma_20) / sma_20 * 100
+                if pct_from_sma > 5 and rsi < 70:
+                    signal = 'BUY'
+                    confidence = 'MEDIUM'
+                    reasoning_parts.append(
+                        f"Relative strength: Price {pct_from_sma:.1f}% above SMA(20), RSI={rsi:.1f}"
+                    )
+                elif pct_from_sma < -5 and rsi > 30:
+                    signal = 'SELL'
+                    confidence = 'MEDIUM'
+                    reasoning_parts.append(
+                        f"Relative weakness: Price {pct_from_sma:.1f}% below SMA(20), RSI={rsi:.1f}"
+                    )
+                else:
+                    reasoning_parts.append(f"Sector unknown, no clear SMA momentum signal")
+            return {'signal': signal, 'confidence': confidence, 'reasoning': '. '.join(reasoning_parts)}
+
+        rel_perf = LiveSignalGenerator._get_sector_etf_performance(sector_etf)
+
+        if rel_perf is None:
+            return {
+                'signal': 'HOLD',
+                'confidence': 'LOW',
+                'reasoning': f'Could not fetch sector ETF ({sector_etf}) data'
+            }
+
+        price_above_sma = (price is None or sma_20 is None or price > sma_20)
+        price_below_sma = (price is None or sma_20 is None or price < sma_20)
+
+        if rel_perf > 0.02 and rsi < 70 and price_above_sma:
+            signal = 'BUY'
+            confidence = 'HIGH' if rel_perf > 0.04 else 'MEDIUM'
+            reasoning_parts.append(
+                f"Strong sector {sector_etf}: +{rel_perf*100:.1f}% vs SPY (20d)"
+            )
+            reasoning_parts.append(f"RSI={rsi:.1f}, price above SMA(20)")
+        elif rel_perf < -0.02 and rsi > 30 and price_below_sma:
+            signal = 'SELL'
+            confidence = 'HIGH' if rel_perf < -0.04 else 'MEDIUM'
+            reasoning_parts.append(
+                f"Weak sector {sector_etf}: {rel_perf*100:.1f}% vs SPY (20d)"
+            )
+            reasoning_parts.append(f"RSI={rsi:.1f}, price below SMA(20)")
+        else:
+            reasoning_parts.append(
+                f"Sector {sector_etf}: {rel_perf*100:.2f}% vs SPY — insufficient divergence for signal"
+            )
+
+        return {
+            'signal': signal,
+            'confidence': confidence,
+            'reasoning': '. '.join(reasoning_parts) if reasoning_parts else 'No sector rotation signal'
         }
