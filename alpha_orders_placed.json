@@ -1,0 +1,357 @@
+{
+  "timestamp": "1772142082.994448",
+  "orders": [
+    {
+      "ticker": "GOOGL",
+      "strategy": "low_vol_momentum",
+      "notional": 4182.35,
+      "price": 307.38,
+      "stop_loss": 290.11,
+      "take_profit": 333.28,
+      "atr": 8.63,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum",
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "LMT",
+      "strategy": "low_vol_momentum",
+      "notional": 4182.35,
+      "price": 641.63,
+      "stop_loss": 609.95,
+      "take_profit": 689.15,
+      "atr": 15.84,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum",
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "JNJ",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 243.47,
+      "stop_loss": 236.28,
+      "take_profit": 254.25,
+      "atr": 3.59,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "FDX",
+      "strategy": "low_vol_momentum",
+      "notional": 4182.35,
+      "price": 387.68,
+      "stop_loss": 369.17,
+      "take_profit": 415.44,
+      "atr": 9.25,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum",
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "ROST",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 203.5,
+      "stop_loss": 196.22,
+      "take_profit": 214.42,
+      "atr": 3.64,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "TMO",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 520.12,
+      "stop_loss": 493.52,
+      "take_profit": 560.02,
+      "atr": 13.3,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "RTX",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 197.63,
+      "stop_loss": 188.51,
+      "take_profit": 211.31,
+      "atr": 4.56,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "MS",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 177.49,
+      "stop_loss": 164.58,
+      "take_profit": 196.86,
+      "atr": 6.45,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "GS",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 929.0,
+      "stop_loss": 865.27,
+      "take_profit": 1024.6,
+      "atr": 31.87,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "GILD",
+      "strategy": "low_vol_momentum",
+      "notional": 1997.54,
+      "price": 143.77,
+      "stop_loss": 135.46,
+      "take_profit": 156.24,
+      "atr": 4.15,
+      "hold_days": 21,
+      "strategies": [
+        "low_vol_momentum"
+      ]
+    },
+    {
+      "ticker": "NU",
+      "strategy": "short_term_reversal",
+      "notional": 3121.16,
+      "price": 15.06,
+      "stop_loss": 13.96,
+      "take_profit": 16.53,
+      "atr": 0.73,
+      "hold_days": 10,
+      "strategies": [
+        "short_term_reversal"
+      ]
+    },
+    {
+      "ticker": "MELI",
+      "strategy": "short_term_reversal",
+      "notional": 3121.16,
+      "price": 1740.88,
+      "stop_loss": 1598.6,
+      "take_profit": 1930.59,
+      "atr": 94.85,
+      "hold_days": 10,
+      "strategies": [
+        "short_term_reversal"
+      ]
+    },
+    {
+      "ticker": "CRWD",
+      "strategy": "short_term_reversal",
+      "notional": 3121.16,
+      "price": 381.1,
+      "stop_loss": 346.23,
+      "take_profit": 427.6,
+      "atr": 23.25,
+      "hold_days": 10,
+      "strategies": [
+        "short_term_reversal"
+      ]
+    },
+    {
+      "ticker": "NET",
+      "strategy": "short_term_reversal",
+      "notional": 3121.16,
+      "price": 174.66,
+      "stop_loss": 155.16,
+      "take_profit": 200.66,
+      "atr": 13.0,
+      "hold_days": 10,
+      "strategies": [
+        "short_term_reversal"
+      ]
+    },
+    {
+      "ticker": "NEM",
+      "strategy": "cross_sectional_momentum",
+      "notional": 2184.81,
+      "price": 127.47,
+      "stop_loss": 116.44,
+      "take_profit": 144.02,
+      "atr": 5.52,
+      "hold_days": 21,
+      "strategies": [
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "FCX",
+      "strategy": "cross_sectional_momentum",
+      "notional": 2184.81,
+      "price": 68.38,
+      "stop_loss": 62.84,
+      "take_profit": 76.69,
+      "atr": 2.77,
+      "hold_days": 21,
+      "strategies": [
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "SLB",
+      "strategy": "cross_sectional_momentum",
+      "notional": 2184.81,
+      "price": 51.49,
+      "stop_loss": 48.49,
+      "take_profit": 55.99,
+      "atr": 1.5,
+      "hold_days": 21,
+      "strategies": [
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "LLY",
+      "strategy": "cross_sectional_momentum",
+      "notional": 2184.81,
+      "price": 1022.02,
+      "stop_loss": 954.7,
+      "take_profit": 1122.99,
+      "atr": 33.66,
+      "hold_days": 21,
+      "strategies": [
+        "cross_sectional_momentum"
+      ]
+    },
+    {
+      "ticker": "UPS",
+      "strategy": "cross_sectional_momentum",
+      "notional": 2184.81,
+      "price": 116.63,
+      "stop_loss": 111.55,
+      "take_profit": 124.25,
+      "atr": 2.54,
+      "hold_days": 21,
+      "strategies": [
+        "cross_sectional_momentum"
+      ]
+    }
+  ],
+  "results": {
+    "placed": [
+      {
+        "ticker": "GOOGL",
+        "order_id": "48a2ab53-f43e-4a19-b8d2-d4c682f9e764",
+        "notional": 4182.35
+      },
+      {
+        "ticker": "LMT",
+        "order_id": "b61da26b-ebb2-4a81-92ec-9b7dd12a819f",
+        "notional": 4182.35
+      },
+      {
+        "ticker": "JNJ",
+        "order_id": "4bce0bc7-9805-48df-843c-bc192168e519",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "FDX",
+        "order_id": "fe22717d-1132-4be2-9226-4c6599b73610",
+        "notional": 4182.35
+      },
+      {
+        "ticker": "ROST",
+        "order_id": "90629e42-eeea-4698-8746-bcdeb3a561bb",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "TMO",
+        "order_id": "92b3d664-581c-4e85-bba3-496cc2c7df8c",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "RTX",
+        "order_id": "74d9985a-e973-4b00-81a4-10dceb2cd1f7",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "MS",
+        "order_id": "1ecf553c-b8c6-4ec5-bb78-312f6a3a40d5",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "GS",
+        "order_id": "2d20987b-bcf7-4d04-a2de-4819e3e72399",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "GILD",
+        "order_id": "a9c69328-ddf6-4c63-9fda-f0a85d5ffeda",
+        "notional": 1997.54
+      },
+      {
+        "ticker": "NU",
+        "order_id": "c40dac8f-17aa-4e07-92bc-39da404a61ac",
+        "notional": 3121.16
+      },
+      {
+        "ticker": "MELI",
+        "order_id": "b2f49743-f6c1-413e-b1b9-81225b97645f",
+        "notional": 3121.16
+      },
+      {
+        "ticker": "CRWD",
+        "order_id": "73422c23-5918-4667-9ff2-ba2f733bcf91",
+        "notional": 3121.16
+      },
+      {
+        "ticker": "NET",
+        "order_id": "18c258f7-4f15-4088-b46e-8d56677e9963",
+        "notional": 3121.16
+      },
+      {
+        "ticker": "NEM",
+        "order_id": "ea27ce92-5bf6-4eff-91c3-d99401d237c6",
+        "notional": 2184.81
+      },
+      {
+        "ticker": "FCX",
+        "order_id": "8a325b0c-26b0-4f7a-b9c0-9db9c423d3cb",
+        "notional": 2184.81
+      },
+      {
+        "ticker": "SLB",
+        "order_id": "733c81da-28c2-46b0-a2da-fbdafc3ccf00",
+        "notional": 2184.81
+      },
+      {
+        "ticker": "LLY",
+        "order_id": "ff3366b8-fbc6-410c-b312-1841af6f94be",
+        "notional": 2184.81
+      },
+      {
+        "ticker": "UPS",
+        "order_id": "cbdcfecb-9c42-4f59-8d44-f8ad0491df34",
+        "notional": 2184.81
+      }
+    ],
+    "failed": [],
+    "stops": [],
+    "targets": []
+  }
+}
