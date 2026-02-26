@@ -358,6 +358,27 @@ class StrategyPerformance(Base):
     next_evaluation_at = Column(DateTime, nullable=True)
 
 
+class StrategyResearch(Base):
+    """Research and validation logs for optimized and AI-generated strategies."""
+    __tablename__ = "strategy_research"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    strategy_name = Column(String, index=True)
+    source = Column(String)  # optimizer or ai_generated
+    params_json = Column(Text)
+    backtest_sharpe = Column(Float, nullable=True)
+    backtest_return_pct = Column(Float, nullable=True)
+    backtest_win_rate = Column(Float, nullable=True)
+    backtest_max_dd = Column(Float, nullable=True)
+    backtest_trade_count = Column(Integer, nullable=True)
+    walk_forward_sharpe = Column(Float, nullable=True)
+    walk_forward_return_pct = Column(Float, nullable=True)
+    is_deployed = Column(Boolean, default=False)
+    deployment_date = Column(DateTime, nullable=True)
+    notes = Column(Text, nullable=True)
+
+
 class AutoTradingState(Base):
     """Autonomous trading system state"""
     __tablename__ = "auto_trading_state"

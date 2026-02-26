@@ -629,3 +629,9 @@ ALPACA_CONFIG = {
     "connect_timeout_sec": 5,
     "read_timeout_sec": 20,
 }
+
+# AUTO-GENERATED OPTIMIZER PARAMS START
+OPTIMIZED_STRATEGY_PARAMS = {
+    "trend_momentum": {}
+}
+# AUTO-GENERATED OPTIMIZER PARAMS END

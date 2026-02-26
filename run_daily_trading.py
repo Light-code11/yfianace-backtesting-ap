@@ -5,6 +5,7 @@ Called by cron with: python run_daily_trading.py
 import argparse
 import os
 import sys
+import subprocess
 from datetime import datetime
 
 import requests
@@ -275,6 +276,36 @@ def snapshot_portfolio(notes: str = "") -> dict:
         db.close()
 
 
+def run_weekly_strategy_pipeline() -> None:
+    """
+    Run weekly strategy optimization/discovery on Sundays.
+    Non-fatal: trading cycle continues if pipeline fails.
+    """
+    if datetime.now().weekday() != 6:  # Sunday
+        return
+
+    print("\n=== Weekly Strategy Pipeline (Sunday) ===")
+    python_exe = sys.executable
+    steps = [
+        [python_exe, "strategy_optimizer.py"],
+        [python_exe, "strategy_discovery.py"],
+    ]
+    for cmd in steps:
+        try:
+            print(f"Running: {' '.join(cmd)}")
+            proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=3600)
+            if proc.stdout:
+                print(proc.stdout.strip())
+            if proc.returncode != 0:
+                print(f"Warning: {' '.join(cmd)} exited with code {proc.returncode}")
+                if proc.stderr:
+                    print(proc.stderr.strip())
+            else:
+                print(f"Completed: {' '.join(cmd)}")
+        except Exception as exc:
+            print(f"Warning: failed running {' '.join(cmd)}: {exc}")
+
+
 def print_signal_preview(preview: dict) -> None:
     print("\n=== Dry Run Summary ===")
     print(f"Success:           {preview.get('success', False)}")
@@ -486,6 +517,8 @@ def main() -> int:
     init_db()
     apply_runtime_config()
     configure_yfinance_cache()
+    if not args.check_exits:
+        run_weekly_strategy_pipeline()
 
     # ── Insider cache warm (EDGAR Form 4 — equity tickers only, not crypto) ─────────
     print("\n📋 Pre-fetching insider signals (EDGAR Form 4 — equity only)…")
