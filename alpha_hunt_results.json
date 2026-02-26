@@ -1,0 +1,909 @@
+{
+  "generated_at": "2026-02-27T02:05:04.861957",
+  "strategies": {
+    "momentum_3mo_top10": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 63,
+        "top_pct": 0.1,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 44.293536279720215,
+        "sharpe": 1.1955061879600208,
+        "win_rate": 73.68421052631578,
+        "trades": 19
+      },
+      "test": {
+        "return": 43.47221313145655,
+        "sharpe": 3.5363773571934893,
+        "win_rate": 71.42857142857143,
+        "trades": 7
+      }
+    },
+    "momentum_3mo_top20": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 63,
+        "top_pct": 0.2,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 43.845770692309195,
+        "sharpe": 1.403441882076205,
+        "win_rate": 63.1578947368421,
+        "trades": 19
+      },
+      "test": {
+        "return": 24.7351480600543,
+        "sharpe": 2.9215453555010815,
+        "win_rate": 71.42857142857143,
+        "trades": 7
+      }
+    },
+    "momentum_3mo_top30": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 63,
+        "top_pct": 0.3,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 51.22035707477577,
+        "sharpe": 1.7143924316270145,
+        "win_rate": 68.42105263157895,
+        "trades": 19
+      },
+      "test": {
+        "return": 19.168118056394956,
+        "sharpe": 2.3682768998387087,
+        "win_rate": 57.14285714285714,
+        "trades": 7
+      }
+    },
+    "momentum_6mo_top10": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 126,
+        "top_pct": 0.1,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 55.69865807007079,
+        "sharpe": 1.4329917908950098,
+        "win_rate": 68.75,
+        "trades": 16
+      },
+      "test": {
+        "return": 9.536066586203983,
+        "sharpe": 1.3193735026512179,
+        "win_rate": 50.0,
+        "trades": 4
+      }
+    },
+    "momentum_6mo_top20": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 126,
+        "top_pct": 0.2,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 81.03746518230479,
+        "sharpe": 2.327899525261128,
+        "win_rate": 75.0,
+        "trades": 16
+      },
+      "test": {
+        "return": 3.940781507105373,
+        "sharpe": 0.7091731140286355,
+        "win_rate": 75.0,
+        "trades": 4
+      }
+    },
+    "momentum_6mo_top30": {
+      "strategy": "cross_sectional_momentum",
+      "params": {
+        "lookback": 126,
+        "top_pct": 0.3,
+        "hold": 21,
+        "skip_recent": 21
+      },
+      "train": {
+        "return": 81.30257625272215,
+        "sharpe": 2.739346359808717,
+        "win_rate": 81.25,
+        "trades": 16
+      },
+      "test": {
+        "return": 4.493194973766479,
+        "sharpe": 0.978829290782847,
+        "win_rate": 50.0,
+        "trades": 4
+      }
+    },
+    "reversal_L3_H3_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 3,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 113.38228624129769,
+        "sharpe": 1.2503016362498556,
+        "win_rate": 60.8433734939759,
+        "trades": 166
+      },
+      "test": {
+        "return": 44.40036569289645,
+        "sharpe": 0.9759650589572725,
+        "win_rate": 61.72839506172839,
+        "trades": 81
+      }
+    },
+    "reversal_L3_H3_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 3,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 108.66752926751353,
+        "sharpe": 1.3817347599992682,
+        "win_rate": 58.43373493975904,
+        "trades": 166
+      },
+      "test": {
+        "return": 48.04878221464675,
+        "sharpe": 1.1156209426930372,
+        "win_rate": 65.4320987654321,
+        "trades": 81
+      }
+    },
+    "reversal_L3_H3_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 3,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 105.72191088307706,
+        "sharpe": 1.4852322930641493,
+        "win_rate": 59.036144578313255,
+        "trades": 166
+      },
+      "test": {
+        "return": 29.109147767195953,
+        "sharpe": 0.7939826561315723,
+        "win_rate": 62.96296296296296,
+        "trades": 81
+      }
+    },
+    "reversal_L3_H5_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 5,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 173.74909968468856,
+        "sharpe": 1.9706173258942552,
+        "win_rate": 59.0,
+        "trades": 100
+      },
+      "test": {
+        "return": 2.8116409079821603,
+        "sharpe": 0.24603423485844023,
+        "win_rate": 55.10204081632652,
+        "trades": 49
+      }
+    },
+    "reversal_L3_H5_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 5,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 110.28691113835775,
+        "sharpe": 1.7786687508641716,
+        "win_rate": 59.0,
+        "trades": 100
+      },
+      "test": {
+        "return": 9.933490853715243,
+        "sharpe": 0.5269512315438551,
+        "win_rate": 55.10204081632652,
+        "trades": 49
+      }
+    },
+    "reversal_L3_H5_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 5,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 98.65036568026918,
+        "sharpe": 1.7585336323512546,
+        "win_rate": 62.0,
+        "trades": 100
+      },
+      "test": {
+        "return": 17.080065956867173,
+        "sharpe": 0.8282699558853677,
+        "win_rate": 59.183673469387756,
+        "trades": 49
+      }
+    },
+    "reversal_L3_H10_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 10,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 219.24175701380082,
+        "sharpe": 2.202994894190006,
+        "win_rate": 68.0,
+        "trades": 50
+      },
+      "test": {
+        "return": 5.3694836153636905,
+        "sharpe": 0.35170689759559176,
+        "win_rate": 58.333333333333336,
+        "trades": 24
+      }
+    },
+    "reversal_L3_H10_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 10,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 130.09522990481878,
+        "sharpe": 1.93619091872425,
+        "win_rate": 68.0,
+        "trades": 50
+      },
+      "test": {
+        "return": 8.328660577859214,
+        "sharpe": 0.4608037497369584,
+        "win_rate": 54.166666666666664,
+        "trades": 24
+      }
+    },
+    "reversal_L3_H10_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 3,
+        "hold": 10,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 122.85776872259859,
+        "sharpe": 2.1327270517605204,
+        "win_rate": 70.0,
+        "trades": 50
+      },
+      "test": {
+        "return": 18.99390693583818,
+        "sharpe": 0.9144067091862271,
+        "win_rate": 62.5,
+        "trades": 24
+      }
+    },
+    "reversal_L5_H3_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 3,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 52.82494153257451,
+        "sharpe": 0.6695708956201781,
+        "win_rate": 54.21686746987952,
+        "trades": 166
+      },
+      "test": {
+        "return": 88.81276139977734,
+        "sharpe": 1.7933162475591113,
+        "win_rate": 59.25925925925925,
+        "trades": 81
+      }
+    },
+    "reversal_L5_H3_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 3,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 67.37329916136761,
+        "sharpe": 0.9078277166301363,
+        "win_rate": 56.024096385542165,
+        "trades": 166
+      },
+      "test": {
+        "return": 58.29244379789951,
+        "sharpe": 1.4789256566540483,
+        "win_rate": 61.72839506172839,
+        "trades": 81
+      }
+    },
+    "reversal_L5_H3_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 3,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 70.33356431236233,
+        "sharpe": 1.0611982218957094,
+        "win_rate": 59.63855421686747,
+        "trades": 166
+      },
+      "test": {
+        "return": 45.00093772593892,
+        "sharpe": 1.230009086955895,
+        "win_rate": 61.72839506172839,
+        "trades": 81
+      }
+    },
+    "reversal_L5_H5_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 5,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 72.45779284918869,
+        "sharpe": 1.0310906897302137,
+        "win_rate": 55.55555555555556,
+        "trades": 99
+      },
+      "test": {
+        "return": 36.14351944458467,
+        "sharpe": 1.323470789369686,
+        "win_rate": 64.58333333333334,
+        "trades": 48
+      }
+    },
+    "reversal_L5_H5_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 5,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 75.94295923112881,
+        "sharpe": 1.218420716907454,
+        "win_rate": 58.58585858585859,
+        "trades": 99
+      },
+      "test": {
+        "return": 36.624259526487116,
+        "sharpe": 1.3492888134836956,
+        "win_rate": 56.25,
+        "trades": 48
+      }
+    },
+    "reversal_L5_H5_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 5,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 65.71900662280925,
+        "sharpe": 1.2450685468867202,
+        "win_rate": 59.59595959595959,
+        "trades": 99
+      },
+      "test": {
+        "return": 18.194692962311265,
+        "sharpe": 0.836999963256037,
+        "win_rate": 47.91666666666667,
+        "trades": 48
+      }
+    },
+    "reversal_L5_H10_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 10,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 108.92258329651447,
+        "sharpe": 1.4530960494431946,
+        "win_rate": 57.14285714285714,
+        "trades": 49
+      },
+      "test": {
+        "return": 98.15743422958015,
+        "sharpe": 2.3283326924938876,
+        "win_rate": 62.5,
+        "trades": 24
+      }
+    },
+    "reversal_L5_H10_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 10,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 115.55608836871976,
+        "sharpe": 1.8970324206206925,
+        "win_rate": 63.26530612244898,
+        "trades": 49
+      },
+      "test": {
+        "return": 78.04643814260233,
+        "sharpe": 2.1418324432876763,
+        "win_rate": 70.83333333333334,
+        "trades": 24
+      }
+    },
+    "reversal_L5_H10_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 5,
+        "hold": 10,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 103.46183882915341,
+        "sharpe": 1.9405435542399523,
+        "win_rate": 65.3061224489796,
+        "trades": 49
+      },
+      "test": {
+        "return": 43.796732851601746,
+        "sharpe": 1.5078002086639517,
+        "win_rate": 66.66666666666666,
+        "trades": 24
+      }
+    },
+    "reversal_L10_H3_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 3,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 132.1885295514863,
+        "sharpe": 1.2412484991839332,
+        "win_rate": 54.87804878048781,
+        "trades": 164
+      },
+      "test": {
+        "return": 35.734443974807405,
+        "sharpe": 1.01691248579641,
+        "win_rate": 60.75949367088608,
+        "trades": 79
+      }
+    },
+    "reversal_L10_H3_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 3,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 103.21283669651504,
+        "sharpe": 1.26697165649333,
+        "win_rate": 59.756097560975604,
+        "trades": 164
+      },
+      "test": {
+        "return": 42.8118050573292,
+        "sharpe": 1.2290242361419945,
+        "win_rate": 63.29113924050633,
+        "trades": 79
+      }
+    },
+    "reversal_L10_H3_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 3,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 95.77726587625912,
+        "sharpe": 1.3257952678855345,
+        "win_rate": 59.14634146341463,
+        "trades": 164
+      },
+      "test": {
+        "return": 24.07843642213283,
+        "sharpe": 0.8272456518883693,
+        "win_rate": 59.49367088607595,
+        "trades": 79
+      }
+    },
+    "reversal_L10_H5_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 5,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 159.07534073887462,
+        "sharpe": 1.9455841634324285,
+        "win_rate": 63.26530612244898,
+        "trades": 98
+      },
+      "test": {
+        "return": 35.20124823590536,
+        "sharpe": 1.372366349501216,
+        "win_rate": 68.08510638297872,
+        "trades": 47
+      }
+    },
+    "reversal_L10_H5_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 5,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 143.11760750334236,
+        "sharpe": 2.0533777197731395,
+        "win_rate": 63.26530612244898,
+        "trades": 98
+      },
+      "test": {
+        "return": 33.18972945451593,
+        "sharpe": 1.4232298279140034,
+        "win_rate": 74.46808510638297,
+        "trades": 47
+      }
+    },
+    "reversal_L10_H5_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 5,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 123.5049104379934,
+        "sharpe": 2.0427308493821017,
+        "win_rate": 65.3061224489796,
+        "trades": 98
+      },
+      "test": {
+        "return": 26.632309461046933,
+        "sharpe": 1.2252225711492921,
+        "win_rate": 61.702127659574465,
+        "trades": 47
+      }
+    },
+    "reversal_L10_H10_bot5": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 10,
+        "bottom_pct": 0.05
+      },
+      "train": {
+        "return": 111.44886713919604,
+        "sharpe": 1.498534996708534,
+        "win_rate": 63.26530612244898,
+        "trades": 49
+      },
+      "test": {
+        "return": 7.232395921959567,
+        "sharpe": 0.4870376452750684,
+        "win_rate": 56.52173913043478,
+        "trades": 23
+      }
+    },
+    "reversal_L10_H10_bot10": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 10,
+        "bottom_pct": 0.1
+      },
+      "train": {
+        "return": 95.586522686505,
+        "sharpe": 1.652059776495891,
+        "win_rate": 63.26530612244898,
+        "trades": 49
+      },
+      "test": {
+        "return": 7.3803476902572385,
+        "sharpe": 0.506181517115664,
+        "win_rate": 60.86956521739131,
+        "trades": 23
+      }
+    },
+    "reversal_L10_H10_bot15": {
+      "strategy": "short_term_reversal",
+      "params": {
+        "lookback": 10,
+        "hold": 10,
+        "bottom_pct": 0.15
+      },
+      "train": {
+        "return": 105.09333052612608,
+        "sharpe": 1.9924115126318476,
+        "win_rate": 67.3469387755102,
+        "trades": 49
+      },
+      "test": {
+        "return": 8.905354989997294,
+        "sharpe": 0.6154452887088397,
+        "win_rate": 56.52173913043478,
+        "trades": 23
+      }
+    },
+    "dual_momentum_3mo": {
+      "strategy": "dual_momentum",
+      "params": {
+        "lookback": 63
+      },
+      "train": {
+        "return": 53.31093697590301,
+        "sharpe": 1.2660947274566872,
+        "win_rate": 70.0,
+        "trades": 20
+      },
+      "test": {
+        "return": 34.72813188081165,
+        "sharpe": 2.9683706120316646,
+        "win_rate": 75.0,
+        "trades": 8
+      }
+    },
+    "dual_momentum_6mo": {
+      "strategy": "dual_momentum",
+      "params": {
+        "lookback": 126
+      },
+      "train": {
+        "return": 77.68393738744986,
+        "sharpe": 1.8900385507177568,
+        "win_rate": 76.47058823529412,
+        "trades": 17
+      },
+      "test": {
+        "return": 16.61508138015524,
+        "sharpe": 1.6875253481243746,
+        "win_rate": 60.0,
+        "trades": 5
+      }
+    },
+    "low_vol_mom_3mo_n5": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 63,
+        "n_stocks": 5,
+        "hold": 21
+      },
+      "train": {
+        "return": 26.9232562702741,
+        "sharpe": 0.9523061701820684,
+        "win_rate": 65.0,
+        "trades": 20
+      },
+      "test": {
+        "return": 20.59212490742901,
+        "sharpe": 2.535188624383684,
+        "win_rate": 75.0,
+        "trades": 8
+      }
+    },
+    "low_vol_mom_6mo_n5": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 126,
+        "n_stocks": 5,
+        "hold": 21
+      },
+      "train": {
+        "return": 37.04430932723823,
+        "sharpe": 1.792607294816885,
+        "win_rate": 76.47058823529412,
+        "trades": 17
+      },
+      "test": {
+        "return": 22.67473886161082,
+        "sharpe": 3.9857248374217304,
+        "win_rate": 80.0,
+        "trades": 5
+      }
+    },
+    "low_vol_mom_3mo_n10": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 63,
+        "n_stocks": 10,
+        "hold": 21
+      },
+      "train": {
+        "return": 34.38978799271635,
+        "sharpe": 1.43825739584448,
+        "win_rate": 70.0,
+        "trades": 20
+      },
+      "test": {
+        "return": 24.059312337530248,
+        "sharpe": 3.632903273823992,
+        "win_rate": 75.0,
+        "trades": 8
+      }
+    },
+    "low_vol_mom_6mo_n10": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 126,
+        "n_stocks": 10,
+        "hold": 21
+      },
+      "train": {
+        "return": 45.97359325926747,
+        "sharpe": 2.2597541239921153,
+        "win_rate": 82.35294117647058,
+        "trades": 17
+      },
+      "test": {
+        "return": 20.047637185500243,
+        "sharpe": 6.485956295631563,
+        "win_rate": 100.0,
+        "trades": 5
+      }
+    },
+    "low_vol_mom_3mo_n15": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 63,
+        "n_stocks": 15,
+        "hold": 21
+      },
+      "train": {
+        "return": 46.44282054306241,
+        "sharpe": 2.0053731368502103,
+        "win_rate": 75.0,
+        "trades": 20
+      },
+      "test": {
+        "return": 23.36192280202858,
+        "sharpe": 3.9017323245212205,
+        "win_rate": 87.5,
+        "trades": 8
+      }
+    },
+    "low_vol_mom_6mo_n15": {
+      "strategy": "low_vol_momentum",
+      "params": {
+        "vol_lookback": 60,
+        "mom_lookback": 126,
+        "n_stocks": 15,
+        "hold": 21
+      },
+      "train": {
+        "return": 48.773963003165946,
+        "sharpe": 2.4030394754634874,
+        "win_rate": 82.35294117647058,
+        "trades": 17
+      },
+      "test": {
+        "return": 18.40988753013506,
+        "sharpe": 6.903366553290562,
+        "win_rate": 100.0,
+        "trades": 5
+      }
+    },
+    "bb_squeeze_h5": {
+      "strategy": "bb_squeeze_breakout",
+      "params": {
+        "bb_period": 20,
+        "hold": 5
+      },
+      "train": {
+        "return": 346.9413242710206,
+        "sharpe": 0.9519815435189898,
+        "win_rate": 56.79012345679012,
+        "trades": 243
+      },
+      "test": {
+        "return": 32.08873068438456,
+        "sharpe": 0.6712238394223854,
+        "win_rate": 49.18032786885246,
+        "trades": 61
+      }
+    },
+    "bb_squeeze_h10": {
+      "strategy": "bb_squeeze_breakout",
+      "params": {
+        "bb_period": 20,
+        "hold": 10
+      },
+      "train": {
+        "return": 647.2071384263056,
+        "sharpe": 0.7533832546799001,
+        "win_rate": 54.58515283842795,
+        "trades": 229
+      },
+      "test": {
+        "return": 7.435932702212744,
+        "sharpe": 0.2664549619328727,
+        "win_rate": 45.614035087719294,
+        "trades": 57
+      }
+    },
+    "bb_squeeze_h15": {
+      "strategy": "bb_squeeze_breakout",
+      "params": {
+        "bb_period": 20,
+        "hold": 15
+      },
+      "train": {
+        "return": 1087.9213809664498,
+        "sharpe": 0.6896471099400178,
+        "win_rate": 60.550458715596335,
+        "trades": 218
+      },
+      "test": {
+        "return": 35.208548237868634,
+        "sharpe": 0.43396409073192344,
+        "win_rate": 60.0,
+        "trades": 55
+      }
+    },
+    "bb_squeeze_h20": {
+      "strategy": "bb_squeeze_breakout",
+      "params": {
+        "bb_period": 20,
+        "hold": 20
+      },
+      "train": {
+        "return": 1670.7896774865326,
+        "sharpe": 0.6386650752859945,
+        "win_rate": 60.28708133971292,
+        "trades": 209
+      },
+      "test": {
+        "return": 65.52398817834127,
+        "sharpe": 0.46965874205215224,
+        "win_rate": 50.90909090909091,
+        "trades": 55
+      }
+    }
+  }
+}

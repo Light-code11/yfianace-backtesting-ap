@@ -2,6 +2,81 @@
   "trend_momentum": {
     "error": "No parameter set met minimum trade/profitability constraints.",
     "tickers_profitable": [],
-    "tickers_unprofitable": []
+    "tickers_unprofitable": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "AVGO",
+      "CRM",
+      "GOOGL",
+      "META",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ]
+  },
+  "mean_reversion_rsi2": {
+    "error": "No parameter set met minimum trade/profitability constraints.",
+    "tickers_profitable": [],
+    "tickers_unprofitable": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "AVGO",
+      "CRM",
+      "GOOGL",
+      "META",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ]
+  },
+  "breakout_momentum": {
+    "error": "No parameter set met minimum trade/profitability constraints.",
+    "tickers_profitable": [],
+    "tickers_unprofitable": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "AVGO",
+      "CRM",
+      "GOOGL",
+      "META",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ]
+  },
+  "vix_adaptive_momentum": {
+    "error": "No parameter set met minimum trade/profitability constraints.",
+    "tickers_profitable": [],
+    "tickers_unprofitable": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "AVGO",
+      "CRM",
+      "GOOGL",
+      "META",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ]
+  },
+  "overnight_anomaly": {
+    "error": "No parameter set met minimum trade/profitability constraints.",
+    "tickers_profitable": [],
+    "tickers_unprofitable": [
+      "AAPL",
+      "AMD",
+      "AMZN",
+      "AVGO",
+      "CRM",
+      "GOOGL",
+      "META",
+      "MSFT",
+      "NVDA",
+      "TSLA"
+    ]
   }
 }
