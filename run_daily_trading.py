@@ -11,7 +11,8 @@ import requests
 import yfinance as yf
 from dotenv import load_dotenv
 
-from database import SessionLocal, Strategy, init_db
+from alpaca_client import AlpacaClient
+from database import SessionLocal, Strategy, PortfolioSnapshot, AutoTradingState, init_db
 from trading_config import (
     STRATEGIES, TICKER_UNIVERSE, RISK_PARAMS, ALPACA_CONFIG,
     PAIRS, PAIR_TRADING_PARAMS,
@@ -229,6 +230,49 @@ def verify_alpaca_and_market_open() -> dict:
         }
     except Exception as exc:
         return {"success": False, "error": str(exc)}
+
+
+def snapshot_portfolio(notes: str = "") -> dict:
+    """Save current portfolio state for equity-curve tracking."""
+    db = SessionLocal()
+    try:
+        client = AlpacaClient()
+        account = client.get_account()
+        if not account.get("success"):
+            return {"success": False, "error": account.get("error", "account fetch failed")}
+
+        positions = client.get_positions()
+        pos_count = len(positions.get("positions", [])) if positions.get("success") else 0
+
+        acc = account["account"]
+        equity = float(acc.get("equity", 0) or 0)
+        last_equity = float(acc.get("last_equity", 0) or 0)
+        daily_pnl = equity - last_equity
+        daily_pnl_pct = ((daily_pnl / last_equity) * 100) if last_equity > 0 else 0.0
+
+        state = db.query(AutoTradingState).first()
+        regime = None
+        if state and isinstance(state.recent_activity, list):
+            regime = state.recent_activity[0] if state.recent_activity else None
+
+        row = PortfolioSnapshot(
+            equity=equity,
+            cash=float(acc.get("cash", 0) or 0),
+            buying_power=float(acc.get("buying_power", 0) or 0),
+            num_positions=pos_count,
+            daily_pnl=daily_pnl,
+            daily_pnl_pct=daily_pnl_pct,
+            regime=regime if isinstance(regime, str) else None,
+            notes=notes or None,
+        )
+        db.add(row)
+        db.commit()
+        return {"success": True, "snapshot_id": row.id}
+    except Exception as exc:
+        db.rollback()
+        return {"success": False, "error": str(exc)}
+    finally:
+        db.close()
 
 
 def print_signal_preview(preview: dict) -> None:
@@ -564,6 +608,12 @@ def main() -> int:
         for err in results.get("errors", []):
             if err:
                 print(f"  - {err}")
+
+        snap = snapshot_portfolio(notes=f"daily_cycle success={results.get('success', False)}")
+        if snap.get("success"):
+            print(f"Portfolio snapshot saved: id={snap.get('snapshot_id')}")
+        else:
+            print(f"Warning: portfolio snapshot failed: {snap.get('error')}")
 
         return 0 if results.get("success") else 1
     finally:

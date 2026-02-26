@@ -1,7 +1,7 @@
 """
 Database models and configuration for AI Trading Platform
 """
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, Boolean, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, Boolean, Text, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -276,6 +276,44 @@ class TradeExecution(Base):
     # Why this decision was made
     decision_reasoning = Column(Text)
     decision_factors = Column(JSON)
+
+
+class TradeJustification(Base):
+    """Audit log of executed and rejected trade decisions with readable rationale."""
+    __tablename__ = "trade_justifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    trade_execution_id = Column(Integer, ForeignKey("trade_executions.id"), nullable=True, index=True)
+    ticker = Column(String, index=True, nullable=False)
+    action = Column(String, nullable=False)  # BUY, SELL, REJECT
+    strategy_name = Column(String, nullable=True)
+    justification = Column(Text, nullable=False)
+    conviction_score = Column(Float, nullable=True)
+    kelly_pct = Column(Float, nullable=True)
+    regime = Column(String, nullable=True)
+    earnings_days_away = Column(Integer, nullable=True)
+    rsi = Column(Float, nullable=True)
+    sma50_position = Column(String, nullable=True)  # above / below
+    confluence_count = Column(Integer, nullable=True)
+    rejection_reason = Column(Text, nullable=True)
+    decision_factors_json = Column(Text, nullable=True)
+
+
+class PortfolioSnapshot(Base):
+    """Portfolio point-in-time snapshot for equity curve and P&L analytics."""
+    __tablename__ = "portfolio_snapshots"
+
+    id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    equity = Column(Float, nullable=True)
+    cash = Column(Float, nullable=True)
+    buying_power = Column(Float, nullable=True)
+    num_positions = Column(Integer, nullable=True)
+    daily_pnl = Column(Float, nullable=True)
+    daily_pnl_pct = Column(Float, nullable=True)
+    regime = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
 
 
 class StrategyPerformance(Base):
