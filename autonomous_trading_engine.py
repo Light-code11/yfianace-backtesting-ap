@@ -27,6 +27,7 @@ from database import (
     SessionLocal, Strategy, StrategyPerformance, LivePosition,
     TradeExecution, AutoTradingState, BacktestResult
 )
+from trade_justifier import log_trade_decision
 
 # ML Models for intelligent trading
 try:
@@ -155,6 +156,9 @@ class AutonomousTradingEngine:
         self._returns_cache: Dict[str, pd.Series] = {}
         self._kelly_cache: Dict[str, Dict[str, float]] = {}
         self._earnings_days_cache: Dict[str, Optional[int]] = {}
+        self._backtest_cache: Dict[str, pd.DataFrame] = {}
+        self._backtest_validation_cache: Dict[str, Dict[str, Any]] = {}
+        self._backtest_gate_stats: Dict[str, int] = {"passed": 0, "rejected": 0, "skipped": 0}
 
         # ML Configuration
         self.use_ml_validation = os.getenv('USE_ML_VALIDATION', 'true').lower() == 'true'
@@ -301,6 +305,9 @@ class AutonomousTradingEngine:
             "executed_tickers": [],
             "rejected_tickers": []
         }
+        self._backtest_cache.clear()
+        self._backtest_validation_cache.clear()
+        self._backtest_gate_stats = {"passed": 0, "rejected": 0, "skipped": 0}
 
         try:
             # Step 1: Check if enabled
@@ -432,6 +439,14 @@ class AutonomousTradingEngine:
             print(f"   Signals: {results['signals_generated']}")
             print(f"   Executed: {results['trades_executed']}")
             print(f"   Rejected: {results['trades_rejected']}")
+            results["backtest_gate_passed"] = self._backtest_gate_stats.get("passed", 0)
+            results["backtest_gate_rejected"] = self._backtest_gate_stats.get("rejected", 0)
+            results["backtest_gate_skipped"] = self._backtest_gate_stats.get("skipped", 0)
+            print(
+                f"   Backtest gate: {results['backtest_gate_passed']} passed, "
+                f"{results['backtest_gate_rejected']} rejected, "
+                f"{results['backtest_gate_skipped']} skipped"
+            )
 
         except Exception as e:
             results['error'] = str(e)
@@ -1559,6 +1574,192 @@ class AutonomousTradingEngine:
             "position_size_pct": position_size_pct,
         }
 
+    def _backtest_validate(
+        self,
+        ticker: str,
+        strategy_name: str,
+        strategy_type: str,
+        signal_type: str,
+    ) -> Dict[str, Any]:
+        """Quick 6-month backtest gate to validate strategy/ticker before execution."""
+        strategy_key = (strategy_type or strategy_name or "").strip().lower()
+        signal_key = (signal_type or "").strip().upper()
+        cache_key = f"{ticker}_{strategy_key}_{signal_key}"
+        if cache_key in self._backtest_validation_cache:
+            return dict(self._backtest_validation_cache[cache_key])
+
+        try:
+            if strategy_key in {"earnings_catalyst", "pair_trading"}:
+                result = {"pass": True, "reason": "event_driven_skip", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            yf_ticker = to_yfinance_ticker(ticker)
+            if yf_ticker in self._backtest_cache:
+                hist = self._backtest_cache[yf_ticker]
+            else:
+                hist = yf.Ticker(yf_ticker).history(period="2y", interval="1d", auto_adjust=True)
+                self._backtest_cache[yf_ticker] = hist
+
+            if hist is None or hist.empty:
+                result = {"pass": True, "reason": "insufficient_data", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            if isinstance(hist.columns, pd.MultiIndex):
+                hist.columns = hist.columns.get_level_values(0)
+
+            required_cols = {"Close", "Open", "High", "Low"}
+            if not required_cols.issubset(set(hist.columns)):
+                result = {"pass": True, "reason": "insufficient_data", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
+            if len(df) < 200:
+                result = {"pass": True, "reason": "insufficient_data", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            close = df["Close"]
+            high = df["High"]
+            low = df["Low"]
+            open_px = df["Open"]
+
+            rsi2 = TechnicalIndicators.rsi(close, period=2)
+            sma_filter = close.rolling(200).mean()
+            if sma_filter.isna().all():
+                sma_filter = close.rolling(50).mean()
+
+            long_signal = pd.Series(False, index=df.index)
+            flat_signal = pd.Series(False, index=df.index)
+
+            if strategy_key == "trend_momentum":
+                ema20 = close.ewm(span=20, adjust=False).mean()
+                ema50 = close.ewm(span=50, adjust=False).mean()
+                long_signal = (ema20 > ema50) & (ema20.shift(1) <= ema50.shift(1))
+                flat_signal = (ema20 < ema50) & (ema20.shift(1) >= ema50.shift(1))
+            elif strategy_key == "mean_reversion_rsi2":
+                long_signal = (rsi2 < 10) & (close > sma_filter.fillna(-np.inf))
+                flat_signal = rsi2 > 90
+            elif strategy_key == "breakout_momentum":
+                prior_high_20 = high.rolling(20).max().shift(1)
+                prior_low_20 = low.rolling(20).min().shift(1)
+                long_signal = close > prior_high_20
+                flat_signal = close < prior_low_20
+            elif strategy_key == "vix_adaptive_momentum":
+                daily_ret = close.pct_change()
+                vol_proxy = daily_ret.rolling(20).std()
+                vol_median = float(np.nanmedian(vol_proxy.values))
+                mom_20 = close / close.shift(20) - 1
+                low_vol_regime = vol_proxy < vol_median
+                long_signal = (low_vol_regime & (mom_20 > 0)) | ((~low_vol_regime) & (rsi2 < 10))
+                flat_signal = (low_vol_regime & (mom_20 <= 0)) | ((~low_vol_regime) & (rsi2 > 70))
+            elif strategy_key == "overnight_anomaly":
+                overnight_returns = (open_px.shift(-1) - close) / close
+                overnight_returns = overnight_returns.dropna()
+                trade_count = int(len(overnight_returns))
+                if trade_count < 5:
+                    result = {
+                        "pass": True,
+                        "reason": f"insufficient_trades ({trade_count})",
+                        "trade_count": trade_count,
+                        "skipped": True,
+                    }
+                    self._backtest_validation_cache[cache_key] = result
+                    return dict(result)
+                strategy_returns = overnight_returns
+                trades_arr = overnight_returns.values
+            else:
+                result = {"pass": True, "reason": "unknown_strategy_skip", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            if strategy_key != "overnight_anomaly":
+                position = pd.Series(0, index=df.index, dtype=float)
+                in_pos = False
+                for idx in df.index:
+                    if not in_pos and bool(long_signal.loc[idx]):
+                        in_pos = True
+                    elif in_pos and bool(flat_signal.loc[idx]):
+                        in_pos = False
+                    position.loc[idx] = 1.0 if in_pos else 0.0
+
+                strategy_returns = position.shift(1).fillna(0.0) * close.pct_change().fillna(0.0)
+
+                trades: List[float] = []
+                entry_price: Optional[float] = None
+                for idx in df.index:
+                    if entry_price is None and bool(long_signal.loc[idx]):
+                        entry_price = float(close.loc[idx])
+                    elif entry_price is not None and bool(flat_signal.loc[idx]):
+                        exit_price = float(close.loc[idx])
+                        trades.append((exit_price - entry_price) / entry_price)
+                        entry_price = None
+                if entry_price is not None:
+                    final_exit = float(close.iloc[-1])
+                    trades.append((final_exit - entry_price) / entry_price)
+                trades_arr = np.array(trades, dtype=float)
+                trade_count = int(len(trades_arr))
+
+            if trade_count < 5:
+                result = {
+                    "pass": True,
+                    "reason": f"insufficient_trades ({trade_count})",
+                    "trade_count": trade_count,
+                    "skipped": True,
+                }
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            equity = (1.0 + strategy_returns).cumprod()
+            if equity.empty:
+                result = {"pass": True, "reason": "insufficient_data", "skipped": True}
+                self._backtest_validation_cache[cache_key] = result
+                return dict(result)
+
+            total_return = float(equity.iloc[-1] - 1.0)
+            win_rate = float(np.mean(trades_arr > 0)) if trade_count > 0 else 0.0
+
+            ret_std = float(strategy_returns.std())
+            sharpe = 0.0
+            if ret_std > 0:
+                sharpe = float((strategy_returns.mean() / ret_std) * np.sqrt(252))
+
+            peak = equity.cummax()
+            drawdown = (equity / peak) - 1.0
+            max_drawdown = float(drawdown.min())
+
+            metrics = {
+                "total_return_pct": round(total_return * 100, 2),
+                "sharpe_ratio": round(sharpe, 2),
+                "win_rate": round(win_rate * 100, 1),
+                "max_drawdown_pct": round(abs(max_drawdown) * 100, 2),
+                "trade_count": trade_count,
+                "skipped": False,
+            }
+
+            reasons: List[str] = []
+            if total_return <= 0:
+                reasons.append(f"negative return ({metrics['total_return_pct']}%)")
+            if sharpe <= 0.3:
+                reasons.append(f"low Sharpe ({metrics['sharpe_ratio']})")
+            if win_rate <= 0.35:
+                reasons.append(f"low win rate ({metrics['win_rate']}%)")
+            if trade_count < 10:
+                reasons.append(f"insufficient trades ({trade_count})")
+            if abs(max_drawdown) >= 0.25:
+                reasons.append(f"excessive drawdown ({metrics['max_drawdown_pct']}%)")
+
+            metrics["pass"] = len(reasons) == 0
+            metrics["reason"] = "all_checks_passed" if not reasons else "; ".join(reasons)
+            self._backtest_validation_cache[cache_key] = metrics
+            return dict(metrics)
+        except Exception as exc:
+            result = {"pass": True, "reason": f"backtest_error: {exc}", "skipped": True}
+            self._backtest_validation_cache[cache_key] = result
+            return dict(result)
+
     def _upsert_position_stop_price(self, ticker: str, stop_price: float) -> None:
         """Persist actual stop price on live position record."""
         pos = self.db.query(LivePosition).filter(
@@ -1884,6 +2085,33 @@ class AutonomousTradingEngine:
                 entry_checks = self._entry_gate_checks(signal)
                 if not entry_checks.get("allowed"):
                     reason = entry_checks.get("reason", "entry gate rejection")
+                    rejection_factors = {
+                        "strategy_name": signal.get("strategy_name"),
+                        "signal_type": signal.get("signal"),
+                        "confidence": signal.get("confidence"),
+                        "quality_score": signal.get("quality_score"),
+                        "conviction_score": entry_checks.get("conviction_score"),
+                        "confluence_count": entry_checks.get("confluence_count"),
+                        "position_size_pct": entry_checks.get("position_size_pct"),
+                        "kelly_fraction": entry_checks.get("kelly", {}).get("kelly_fraction"),
+                        "kelly_win_rate": entry_checks.get("kelly", {}).get("win_rate"),
+                        "kelly_avg_win": entry_checks.get("kelly", {}).get("avg_win"),
+                        "kelly_avg_loss": entry_checks.get("kelly", {}).get("avg_loss"),
+                        "kelly_sample_size": entry_checks.get("kelly", {}).get("sample_size"),
+                        "earnings_days_away": entry_checks.get("earnings_days_away"),
+                        "trend_price": entry_checks.get("trend", {}).get("price"),
+                        "trend_sma50": entry_checks.get("trend", {}).get("sma50"),
+                        "trend_rsi14": entry_checks.get("trend", {}).get("rsi14"),
+                        "macro_regime": signal.get("macro_regime_label"),
+                        "rejection_reason": reason,
+                    }
+                    log_trade_decision(
+                        ticker=signal.get("ticker"),
+                        action="REJECT",
+                        strategy_name=signal.get("strategy_name"),
+                        decision_factors=rejection_factors,
+                        rejection_reason=reason,
+                    )
                     print(f"   🚫 REJECT {signal.get('ticker')}: {reason}")
                     return {"success": False, "error": reason}
 
@@ -1895,10 +2123,86 @@ class AutonomousTradingEngine:
                         f"      📉 {signal.get('ticker')}: Kelly={kelly_fraction*100:.2f}% < 5% "
                         f"→ reducing size {old_size:.2f}% → {signal['adjusted_position_size_pct']:.2f}%"
                     )
+            bt_result: Dict[str, Any] = {"pass": True, "reason": "not_evaluated", "skipped": True}
+            if is_entry_order:
+                bt_result = self._backtest_validate(
+                    ticker=signal.get("ticker", ""),
+                    strategy_name=signal.get("strategy_name", ""),
+                    strategy_type=signal.get("strategy_type", ""),
+                    signal_type=signal.get("signal", ""),
+                )
+                if bt_result.get("skipped"):
+                    self._backtest_gate_stats["skipped"] = self._backtest_gate_stats.get("skipped", 0) + 1
+                    print(f"      ⏭️  {signal.get('ticker')}: backtest skipped ({bt_result.get('reason')})")
+                elif not bt_result.get("pass"):
+                    self._backtest_gate_stats["rejected"] = self._backtest_gate_stats.get("rejected", 0) + 1
+                    reason = f"Backtest failed: {bt_result.get('reason')}"
+                    print(f"   🚫 REJECT {signal.get('ticker')}: {reason}")
+                    print(
+                        f"      Backtest metrics: return={bt_result.get('total_return_pct')}%, "
+                        f"sharpe={bt_result.get('sharpe_ratio')}, "
+                        f"win_rate={bt_result.get('win_rate')}%, "
+                        f"drawdown={bt_result.get('max_drawdown_pct')}%, "
+                        f"trades={bt_result.get('trade_count')}"
+                    )
+                    rejection_factors = {
+                        "strategy_name": signal.get("strategy_name"),
+                        "signal_type": signal.get("signal"),
+                        "confidence": signal.get("confidence"),
+                        "quality_score": signal.get("quality_score"),
+                        "conviction_score": entry_checks.get("conviction_score"),
+                        "confluence_count": entry_checks.get("confluence_count"),
+                        "position_size_pct": entry_checks.get("position_size_pct"),
+                        "kelly_fraction": entry_checks.get("kelly", {}).get("kelly_fraction"),
+                        "kelly_win_rate": entry_checks.get("kelly", {}).get("win_rate"),
+                        "kelly_avg_win": entry_checks.get("kelly", {}).get("avg_win"),
+                        "kelly_avg_loss": entry_checks.get("kelly", {}).get("avg_loss"),
+                        "kelly_sample_size": entry_checks.get("kelly", {}).get("sample_size"),
+                        "earnings_days_away": entry_checks.get("earnings_days_away"),
+                        "trend_price": entry_checks.get("trend", {}).get("price"),
+                        "trend_sma50": entry_checks.get("trend", {}).get("sma50"),
+                        "trend_rsi14": entry_checks.get("trend", {}).get("rsi14"),
+                        "macro_regime": signal.get("macro_regime_label"),
+                        "backtest_validation": bt_result,
+                        "rejection_reason": reason,
+                    }
+                    log_trade_decision(
+                        ticker=signal.get("ticker"),
+                        action="REJECT",
+                        strategy_name=signal.get("strategy_name"),
+                        decision_factors=rejection_factors,
+                        rejection_reason=reason,
+                    )
+                    return {"success": False, "error": reason}
+                else:
+                    self._backtest_gate_stats["passed"] = self._backtest_gate_stats.get("passed", 0) + 1
+                    print(
+                        f"      ✅ {signal.get('ticker')}: backtest pass "
+                        f"(ret={bt_result.get('total_return_pct')}%, "
+                        f"sharpe={bt_result.get('sharpe_ratio')}, "
+                        f"win={bt_result.get('win_rate')}%, "
+                        f"dd={bt_result.get('max_drawdown_pct')}%, "
+                        f"trades={bt_result.get('trade_count')})"
+                    )
 
             # Get account to calculate position size
             account = self.alpaca.get_account()
             if not account['success']:
+                reason = "Failed to get account"
+                log_trade_decision(
+                    ticker=signal.get("ticker"),
+                    action="REJECT",
+                    strategy_name=signal.get("strategy_name"),
+                    decision_factors={
+                        "strategy_name": signal.get("strategy_name"),
+                        "signal_type": signal.get("signal"),
+                        "quality_score": signal.get("quality_score"),
+                        "conviction_score": signal.get("conviction_score"),
+                        "macro_regime": signal.get("macro_regime_label"),
+                        "rejection_reason": reason,
+                    },
+                    rejection_reason=reason,
+                )
                 return {"success": False, "error": "Failed to get account"}
 
             equity = float(account['account']['equity'])
@@ -1978,10 +2282,40 @@ class AutonomousTradingEngine:
                     # Normal close of existing long position (use market for reliability)
                     pos = self.alpaca.get_position(signal['ticker'])
                     if not pos['success'] or not pos['position']:
+                        reason = "No position to sell"
+                        log_trade_decision(
+                            ticker=signal.get("ticker"),
+                            action="REJECT",
+                            strategy_name=signal.get("strategy_name"),
+                            decision_factors={
+                                "strategy_name": signal.get("strategy_name"),
+                                "signal_type": signal.get("signal"),
+                                "quality_score": signal.get("quality_score"),
+                                "conviction_score": signal.get("conviction_score"),
+                                "macro_regime": signal.get("macro_regime_label"),
+                                "rejection_reason": reason,
+                            },
+                            rejection_reason=reason,
+                        )
                         return {"success": False, "error": "No position to sell"}
                     order = self.alpaca.close_position(signal['ticker'])
 
             if not order['success']:
+                reason = order.get('error', 'order placement failed')
+                log_trade_decision(
+                    ticker=signal.get("ticker"),
+                    action="REJECT",
+                    strategy_name=signal.get("strategy_name"),
+                    decision_factors={
+                        "strategy_name": signal.get("strategy_name"),
+                        "signal_type": signal.get("signal"),
+                        "quality_score": signal.get("quality_score"),
+                        "conviction_score": signal.get("conviction_score"),
+                        "macro_regime": signal.get("macro_regime_label"),
+                        "rejection_reason": reason,
+                    },
+                    rejection_reason=reason,
+                )
                 return {"success": False, "error": order['error']}
 
             # Log execution — capture actual order type and fill price
@@ -2011,6 +2345,78 @@ class AutonomousTradingEngine:
                         f"({stop_enforcement.get('error', 'unknown')})"
                     )
 
+            decision_factors = {
+                'strategy_name': signal.get('strategy_name'),
+                'quality_score': signal.get('quality_score'),
+                'confidence': signal.get('confidence'),
+                'adjusted_position_size_pct': signal.get('adjusted_position_size_pct'),
+                'atr_14': atr_stop_data.get('atr_14'),
+                'atr_stop_multiplier': atr_multiplier,
+                'atr_entry_price': atr_stop_data.get('entry_price'),
+                'dynamic_stop_loss': dynamic_stop_loss,
+                'dynamic_take_profit': dynamic_take_profit,
+                'asymmetric_exits': ASYMMETRIC_EXITS_AVAILABLE and atr_stop_data.get('atr_14') is not None,
+                'higher_timeframe_multiplier': signal.get('higher_timeframe_multiplier'),
+                'higher_timeframe_alignment': signal.get('higher_timeframe_alignment'),
+                # Conviction-based sizing
+                'conviction_score': signal.get('conviction_score'),
+                'conviction_tier': signal.get('conviction_tier'),
+                'conviction_breakdown': signal.get('conviction_breakdown'),
+                'min_conviction_score': self.min_conviction_score,
+                # Entry gate checks
+                'entry_gate_passed': True,
+                'kelly_fraction': entry_checks['kelly'].get('kelly_fraction'),
+                'kelly_win_rate': entry_checks['kelly'].get('win_rate'),
+                'kelly_avg_win': entry_checks['kelly'].get('avg_win'),
+                'kelly_avg_loss': entry_checks['kelly'].get('avg_loss'),
+                'kelly_sample_size': entry_checks['kelly'].get('sample_size'),
+                'earnings_days_away': entry_checks.get('earnings_days_away'),
+                'trend_price': entry_checks['trend'].get('price'),
+                'trend_sma50': entry_checks['trend'].get('sma50'),
+                'trend_rsi14': entry_checks['trend'].get('rsi14'),
+                # Insider amplifier metadata
+                'insider_bias': signal.get('insider_bias'),
+                'insider_stance': signal.get('insider_stance'),
+                'insider_notes': signal.get('insider_notes'),
+                'insider_swing': signal.get('insider_swing', False),
+                'holding_period_days': signal.get('holding_period_days'),
+                # Macro regime filter
+                'macro_regime': signal.get('macro_regime_label'),
+                'macro_exposure_mult': signal.get('macro_exposure_mult'),
+                'regime_stop_mult': self.market_regime.get('stop_mult') if self.market_regime else None,
+                'regime_direction_bias': self.market_regime.get('direction_bias') if self.market_regime else None,
+                'regime_vix': self.market_regime.get('vix') if self.market_regime else None,
+                'regime_yield_spread': self.market_regime.get('yield_spread') if self.market_regime else None,
+                # Limit order tracking
+                'actual_order_type': actual_order_type,
+                'actual_fill_price': actual_fill_price,
+                'slippage_pct': slippage,
+                # Crypto metadata
+                'is_crypto': signal.get('is_crypto', False),
+                'crypto_regime': signal.get('crypto_regime'),
+                'crypto_exposure': signal.get('crypto_exposure'),
+                # Confluence detection
+                'confluence_count': signal.get('confluence_count', 0),
+                'confirming_strategies': signal.get('confirming_strategies', []),
+                'high_confluence': signal.get('high_confluence', False),
+                # Volatility-tier scaling
+                'vol_tier': signal.get('vol_tier'),
+                'vol_multiplier': signal.get('vol_multiplier'),
+                'annualized_vol': signal.get('annualized_vol'),
+                # Stop-loss enforcement metadata
+                'standalone_stop_enforced': stop_enforcement.get('success', False),
+                'standalone_stop_error': stop_enforcement.get('error'),
+                'standalone_stop_protected_qty': stop_enforcement.get('protected_qty'),
+                'standalone_stop_unprotected_fractional_qty': stop_enforcement.get('unprotected_fractional_qty'),
+                'standalone_stop_order': stop_enforcement.get('stop_order'),
+                # Harmonised close-bot fields (atr_at_entry + initial_stop)
+                'atr_at_entry':  atr_stop_data.get('atr_14'),
+                'initial_stop':  dynamic_stop_loss,
+                'entry_price':   atr_stop_data.get('entry_price') or signal.get('current_price'),
+                # Backtest validation gate
+                'backtest_validation': bt_result,
+            }
+
             execution = TradeExecution(
                 ticker=signal['ticker'],
                 strategy_id=signal.get('strategy_id'),
@@ -2025,83 +2431,41 @@ class AutonomousTradingEngine:
                 alpaca_order_id=order['order']['id'],
                 alpaca_order_data=order['order'],
                 decision_reasoning=signal.get('reasoning'),
-                decision_factors={
-                    'quality_score': signal.get('quality_score'),
-                    'confidence': signal.get('confidence'),
-                    'adjusted_position_size_pct': signal.get('adjusted_position_size_pct'),
-                    'atr_14': atr_stop_data.get('atr_14'),
-                    'atr_stop_multiplier': atr_multiplier,
-                    'atr_entry_price': atr_stop_data.get('entry_price'),
-                    'dynamic_stop_loss': dynamic_stop_loss,
-                    'dynamic_take_profit': dynamic_take_profit,
-                    'asymmetric_exits': ASYMMETRIC_EXITS_AVAILABLE and atr_stop_data.get('atr_14') is not None,
-                    'higher_timeframe_multiplier': signal.get('higher_timeframe_multiplier'),
-                    'higher_timeframe_alignment': signal.get('higher_timeframe_alignment'),
-                    # Conviction-based sizing
-                    'conviction_score': signal.get('conviction_score'),
-                    'conviction_tier': signal.get('conviction_tier'),
-                    'conviction_breakdown': signal.get('conviction_breakdown'),
-                    'min_conviction_score': self.min_conviction_score,
-                    # Entry gate checks
-                    'entry_gate_passed': True,
-                    'kelly_fraction': entry_checks['kelly'].get('kelly_fraction'),
-                    'kelly_win_rate': entry_checks['kelly'].get('win_rate'),
-                    'kelly_avg_win': entry_checks['kelly'].get('avg_win'),
-                    'kelly_avg_loss': entry_checks['kelly'].get('avg_loss'),
-                    'kelly_sample_size': entry_checks['kelly'].get('sample_size'),
-                    'earnings_days_away': entry_checks.get('earnings_days_away'),
-                    'trend_price': entry_checks['trend'].get('price'),
-                    'trend_sma50': entry_checks['trend'].get('sma50'),
-                    'trend_rsi14': entry_checks['trend'].get('rsi14'),
-                    # Insider amplifier metadata
-                    'insider_bias': signal.get('insider_bias'),
-                    'insider_stance': signal.get('insider_stance'),
-                    'insider_notes': signal.get('insider_notes'),
-                    'insider_swing': signal.get('insider_swing', False),
-                    'holding_period_days': signal.get('holding_period_days'),
-                    # Macro regime filter
-                    'macro_regime': signal.get('macro_regime_label'),
-                    'macro_exposure_mult': signal.get('macro_exposure_mult'),
-                    'regime_stop_mult': self.market_regime.get('stop_mult') if self.market_regime else None,
-                    'regime_direction_bias': self.market_regime.get('direction_bias') if self.market_regime else None,
-                    'regime_vix': self.market_regime.get('vix') if self.market_regime else None,
-                    'regime_yield_spread': self.market_regime.get('yield_spread') if self.market_regime else None,
-                    # Limit order tracking
-                    'actual_order_type': actual_order_type,
-                    'actual_fill_price': actual_fill_price,
-                    'slippage_pct': slippage,
-                    # Crypto metadata
-                    'is_crypto': signal.get('is_crypto', False),
-                    'crypto_regime': signal.get('crypto_regime'),
-                    'crypto_exposure': signal.get('crypto_exposure'),
-                    # Confluence detection
-                    'confluence_count': signal.get('confluence_count', 0),
-                    'confirming_strategies': signal.get('confirming_strategies', []),
-                    'high_confluence': signal.get('high_confluence', False),
-                    # Volatility-tier scaling
-                    'vol_tier': signal.get('vol_tier'),
-                    'vol_multiplier': signal.get('vol_multiplier'),
-                    'annualized_vol': signal.get('annualized_vol'),
-                    # Stop-loss enforcement metadata
-                    'standalone_stop_enforced': stop_enforcement.get('success', False),
-                    'standalone_stop_error': stop_enforcement.get('error'),
-                    'standalone_stop_protected_qty': stop_enforcement.get('protected_qty'),
-                    'standalone_stop_unprotected_fractional_qty': stop_enforcement.get('unprotected_fractional_qty'),
-                    'standalone_stop_order': stop_enforcement.get('stop_order'),
-                    # Harmonised close-bot fields (atr_at_entry + initial_stop)
-                    'atr_at_entry':  atr_stop_data.get('atr_14'),
-                    'initial_stop':  dynamic_stop_loss,
-                    'entry_price':   atr_stop_data.get('entry_price') or signal.get('current_price'),
-                }
+                decision_factors=decision_factors
             )
             self.db.add(execution)
             self.db.commit()
+            self.db.refresh(execution)
+
+            log_trade_decision(
+                ticker=signal.get("ticker"),
+                action=signal.get("signal", "BUY"),
+                strategy_name=signal.get("strategy_name"),
+                decision_factors=decision_factors,
+                rejection_reason=None,
+                trade_execution_id=execution.id,
+            )
 
             print(f"   ✅ {signal['signal']} {signal['ticker']} @ ${signal.get('current_price')} (${position_size_usd:,.0f})")
 
             return {"success": True, "order": order['order']}
 
         except Exception as e:
+            reason = str(e)
+            log_trade_decision(
+                ticker=signal.get("ticker"),
+                action="REJECT",
+                strategy_name=signal.get("strategy_name"),
+                decision_factors={
+                    "strategy_name": signal.get("strategy_name"),
+                    "signal_type": signal.get("signal"),
+                    "quality_score": signal.get("quality_score"),
+                    "conviction_score": signal.get("conviction_score"),
+                    "macro_regime": signal.get("macro_regime_label"),
+                    "rejection_reason": reason,
+                },
+                rejection_reason=reason,
+            )
             return {"success": False, "error": str(e)}
 
     def _update_performance(self):
