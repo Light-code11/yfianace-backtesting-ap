@@ -5629,29 +5629,80 @@ elif page == "📋 Trade Log":
     st.header("📋 Trade Log & AI Justifications")
 
     try:
-        from trade_justifier import generate_justification, TradeJustification
-        from database import SessionLocal, TradeExecution
+        from database import SessionLocal, Base, engine
+
+        # Auto-create tables if they don't exist
+        Base.metadata.create_all(bind=engine)
 
         db = SessionLocal()
-        trades = db.query(TradeExecution).order_by(TradeExecution.created_at.desc()).limit(50).all()
+
+        # Raw SQL query to avoid model mismatch issues
+        from sqlalchemy import text
+        result = db.execute(text(
+            "SELECT created_at, ticker, side, signal_type, strategy_name, "
+            "filled_avg_price, filled_qty, order_status, decision_factors, decision_reasoning "
+            "FROM trade_executions ORDER BY created_at DESC LIMIT 50"
+        ))
+        trades = result.fetchall()
 
         if trades:
             rows = []
             for t in trades:
-                factors = json.loads(t.decision_factors) if t.decision_factors else {}
+                factors = {}
+                try:
+                    if t[8]:
+                        factors = json.loads(t[8]) if isinstance(t[8], str) else t[8]
+                except:
+                    pass
+
+                justification = t[9] or ""
+                if not justification and factors:
+                    try:
+                        from trade_justifier import generate_justification
+                        justification = generate_justification(factors, t[2] or "BUY", t[1] or "?")
+                    except:
+                        justification = str(factors)[:200]
+
                 rows.append({
-                    "Date": t.created_at,
-                    "Ticker": t.ticker,
-                    "Action": t.action,
-                    "Price": f"${t.price:.2f}" if t.price else "?",
-                    "Qty": t.quantity,
-                    "Strategy": t.strategy_name,
-                    "Conviction": factors.get("conviction_score", "?"),
-                    "Justification": generate_justification(factors, t.action or "BUY", t.ticker or "?"),
+                    "Date": t[0],
+                    "Ticker": t[1],
+                    "Side": t[2],
+                    "Signal": t[3],
+                    "Strategy": t[4],
+                    "Fill Price": f"${t[5]:.2f}" if t[5] else "-",
+                    "Qty": t[6],
+                    "Status": t[7],
+                    "Justification": justification[:300] if justification else "-",
                 })
             st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         else:
             st.info("No trades logged yet. Trades will appear here after the bot executes signals.")
+
+        # Also show trade justifications table if it has data
+        try:
+            tj_result = db.execute(text(
+                "SELECT created_at, ticker, action, strategy_name, justification, conviction_score, "
+                "kelly_pct, rejection_reason FROM trade_justifications ORDER BY created_at DESC LIMIT 50"
+            ))
+            justifications = tj_result.fetchall()
+            if justifications:
+                st.subheader("📝 Trade Justifications & Rejections")
+                tj_rows = []
+                for j in justifications:
+                    tj_rows.append({
+                        "Date": j[0],
+                        "Ticker": j[1],
+                        "Action": j[2],
+                        "Strategy": j[3],
+                        "Justification": j[4][:300] if j[4] else "-",
+                        "Conviction": j[5],
+                        "Kelly %": f"{j[6]:.1f}" if j[6] else "-",
+                        "Rejection": j[7] or "✅ Executed",
+                    })
+                st.dataframe(pd.DataFrame(tj_rows), use_container_width=True, hide_index=True)
+        except:
+            pass
+
         db.close()
     except Exception as e:
         st.warning(f"Trade log unavailable: {e}")
