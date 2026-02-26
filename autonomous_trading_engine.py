@@ -1598,7 +1598,7 @@ class AutonomousTradingEngine:
             if yf_ticker in self._backtest_cache:
                 hist = self._backtest_cache[yf_ticker]
             else:
-                hist = yf.Ticker(yf_ticker).history(period="6mo", interval="1d", auto_adjust=True)
+                hist = yf.Ticker(yf_ticker).history(period="2y", interval="1d", auto_adjust=True)
                 self._backtest_cache[yf_ticker] = hist
 
             if hist is None or hist.empty:
@@ -1616,7 +1616,7 @@ class AutonomousTradingEngine:
                 return dict(result)
 
             df = hist[["Open", "High", "Low", "Close"]].dropna().copy()
-            if len(df) < 60:
+            if len(df) < 200:
                 result = {"pass": True, "reason": "insufficient_data", "skipped": True}
                 self._backtest_validation_cache[cache_key] = result
                 return dict(result)
@@ -1746,7 +1746,7 @@ class AutonomousTradingEngine:
                 reasons.append(f"low Sharpe ({metrics['sharpe_ratio']})")
             if win_rate <= 0.35:
                 reasons.append(f"low win rate ({metrics['win_rate']}%)")
-            if trade_count < 5:
+            if trade_count < 10:
                 reasons.append(f"insufficient trades ({trade_count})")
             if abs(max_drawdown) >= 0.25:
                 reasons.append(f"excessive drawdown ({metrics['max_drawdown_pct']}%)")
