@@ -1,0 +1,7 @@
+{
+  "trend_momentum": {
+    "error": "No parameter set met minimum trade/profitability constraints.",
+    "tickers_profitable": [],
+    "tickers_unprofitable": []
+  }
+}
