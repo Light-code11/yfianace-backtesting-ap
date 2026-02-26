@@ -574,7 +574,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "📊 Pair Trading", "Paper Trading", "Portfolio Optimizer", "📈 Portfolio Correlation", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent"]
+    ["Dashboard", "Generate Strategies", "Backtest", "📡 Live Signals", "🔍 Market Scanner", "📊 Pair Trading", "Paper Trading", "Portfolio Optimizer", "📈 Portfolio Correlation", "🤖 ML Predictions", "📊 Market Regimes", "🎯 Complete Trading System", "AI Learning", "🤖 Autonomous Agent", "🔬 Strategy Research", "📋 Trade Log"]
 )
 
 st.sidebar.markdown("---")
@@ -5540,6 +5540,122 @@ elif page == "🤖 Autonomous Agent":
             **Result:** Over time, the AI gets better at generating winning strategies without any manual intervention!
             """)
 
+
+elif page == "🔬 Strategy Research":
+    st.header("🔬 Strategy Research — Alpha Hunt Results")
+
+    # Load alpha hunt results
+    alpha_path = os.path.join(os.path.dirname(__file__), "alpha_hunt_results.json")
+    ai_path = os.path.join(os.path.dirname(__file__), "ai_discovery_results.json")
+
+    if os.path.exists(alpha_path):
+        with open(alpha_path) as f:
+            alpha_data = json.load(f)
+
+        strategies = alpha_data.get("strategies", {})
+        st.caption(f"Generated: {alpha_data.get('generated_at', 'unknown')} | {len(strategies)} strategies passed walk-forward validation")
+
+        if strategies:
+            rows = []
+            for name, info in strategies.items():
+                train = info.get("train", {})
+                test = info.get("test", {})
+                rows.append({
+                    "Strategy": name,
+                    "Type": info.get("strategy", ""),
+                    "Train Return %": round(train.get("return", 0), 1),
+                    "Train Sharpe": round(train.get("sharpe", 0), 2),
+                    "Train Win %": round(train.get("win_rate", 0), 0),
+                    "Train Trades": train.get("trades", 0),
+                    "Test Return %": round(test.get("return", 0), 1),
+                    "Test Sharpe": round(test.get("sharpe", 0), 2),
+                    "Test Win %": round(test.get("win_rate", 0), 0),
+                    "Test Trades": test.get("trades", 0),
+                })
+
+            df = pd.DataFrame(rows).sort_values("Test Sharpe", ascending=False)
+
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Strategies Found", len(df))
+            col2.metric("Best Test Sharpe", f"{df['Test Sharpe'].max():.2f}")
+            col3.metric("Best Test Return", f"{df['Test Return %'].max():.1f}%")
+            col4.metric("Avg Test Win Rate", f"{df['Test Win %'].mean():.0f}%")
+
+            st.subheader("Top 10 Strategies (by Walk-Forward Sharpe)")
+            st.dataframe(df.head(10), use_container_width=True, hide_index=True)
+
+            # By strategy type
+            st.subheader("Performance by Strategy Type")
+            type_stats = df.groupby("Type").agg({
+                "Test Return %": "mean",
+                "Test Sharpe": "mean",
+                "Test Win %": "mean",
+                "Strategy": "count",
+            }).rename(columns={"Strategy": "Count"}).sort_values("Test Sharpe", ascending=False)
+            st.dataframe(type_stats, use_container_width=True)
+
+            with st.expander(f"All {len(df)} strategies"):
+                st.dataframe(df, use_container_width=True, hide_index=True)
+
+            # Best strategy detail
+            st.subheader("🏆 #1 Strategy Details")
+            best_name = df.iloc[0]["Strategy"]
+            st.json(strategies[best_name])
+    else:
+        st.warning("No alpha_hunt_results.json found. Run `python alpha_hunt.py` to generate.")
+
+    if os.path.exists(ai_path):
+        st.subheader("🤖 AI-Generated Strategies (GPT-4o)")
+        with open(ai_path) as f:
+            ai_data = json.load(f)
+        for r in ai_data.get("results", []):
+            status = "✅" if r.get("passed") else "❌"
+            metrics = r.get("full_metrics", {})
+            wf = r.get("walk_forward", {})
+            st.write(f"{status} **{r['name']}** — Backtest: {metrics.get('total_return_pct',0):.1f}% Sharpe={metrics.get('sharpe',0):.2f} | Walk-Forward: {wf.get('total_return_pct',0):.1f}% Sharpe={wf.get('sharpe',0):.2f}")
+
+    st.subheader("📝 Key Findings")
+    st.markdown("""
+    **Why old strategies failed:** Basic technical indicators (RSI, MACD, EMA crossovers) have no edge on liquid US equities. All 5 original strategies were unprofitable on every ticker tested.
+
+    **What works:**
+    - **Cross-sectional strategies** — ranking stocks against each other
+    - **Factor investing** — momentum + low volatility combo is the strongest
+    - **Short-term reversal** — weekly losers bouncing back
+    - **Walk-forward validation is essential** — caught 3 overfit AI strategies
+    """)
+
+elif page == "📋 Trade Log":
+    st.header("📋 Trade Log & AI Justifications")
+
+    try:
+        from trade_justifier import generate_justification, TradeJustification
+        from database import SessionLocal, TradeExecution
+
+        db = SessionLocal()
+        trades = db.query(TradeExecution).order_by(TradeExecution.created_at.desc()).limit(50).all()
+
+        if trades:
+            rows = []
+            for t in trades:
+                factors = json.loads(t.decision_factors) if t.decision_factors else {}
+                rows.append({
+                    "Date": t.created_at,
+                    "Ticker": t.ticker,
+                    "Action": t.action,
+                    "Price": f"${t.price:.2f}" if t.price else "?",
+                    "Qty": t.quantity,
+                    "Strategy": t.strategy_name,
+                    "Conviction": factors.get("conviction_score", "?"),
+                    "Justification": generate_justification(factors, t.action or "BUY", t.ticker or "?"),
+                })
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        else:
+            st.info("No trades logged yet. Trades will appear here after the bot executes signals.")
+        db.close()
+    except Exception as e:
+        st.warning(f"Trade log unavailable: {e}")
+        st.info("The trade justification system will log all future trades with AI-generated explanations for why each position was entered or rejected.")
 
 # Footer
 st.sidebar.markdown("---")
