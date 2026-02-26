@@ -25,5 +25,14 @@ platformdirs>=3.10.0
 websockets>=11.0.0
 protobuf>=4.24.0
 
+# Environment
+python-dotenv>=1.0.0
+
+# Data
+yfinance>=0.2.31
+
+# Database
+sqlalchemy>=2.0.0
+
 # Note: This is a minimal requirements file for Streamlit Cloud
 # For full local platform with AI features, use requirements-trading-platform.txt
