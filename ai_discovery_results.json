@@ -1,0 +1,215 @@
+{
+  "generated_at": "2026-02-26T14:56:29.332821",
+  "market_context": {
+    "macro_regime": "bull",
+    "vix": 18.13,
+    "sector_leaders": [
+      "XLE",
+      "XLP",
+      "XLI"
+    ],
+    "sector_performance_21d": {
+      "XLK": -0.0418,
+      "XLF": -0.008,
+      "XLE": 0.0966,
+      "XLV": 0.0148,
+      "XLI": 0.0604,
+      "XLC": 0.0009,
+      "XLP": 0.0748,
+      "XLY": -0.0416
+    },
+    "market_breadth": 0.4
+  },
+  "deployed_count": 0,
+  "results": [
+    {
+      "name": "Energy Sector Momentum",
+      "strategy_type": "momentum",
+      "passed": false,
+      "deployed_name": null,
+      "full_metrics": {
+        "sharpe": -0.2932,
+        "total_return_pct": -4.579,
+        "win_rate": 0.3103,
+        "max_drawdown": 21.2506,
+        "trade_count": 29
+      },
+      "walk_forward": {
+        "sharpe": 4.9976,
+        "total_return_pct": 15.9964
+      },
+      "tickers_evaluated": [
+        "XOM"
+      ]
+    },
+    {
+      "name": "Consumer Staples Breakout",
+      "strategy_type": "breakout",
+      "passed": false,
+      "deployed_name": null,
+      "full_metrics": {
+        "sharpe": 2.7196,
+        "total_return_pct": 23.7787,
+        "win_rate": 0.4271,
+        "max_drawdown": 16.3561,
+        "trade_count": 10
+      },
+      "walk_forward": {
+        "sharpe": -24.4902,
+        "total_return_pct": -0.4563
+      },
+      "tickers_evaluated": [
+        "NVDA",
+        "TSLA",
+        "MSFT",
+        "MU",
+        "AAPL",
+        "AMZN",
+        "GOOGL",
+        "META",
+        "AMD",
+        "AVGO",
+        "INTC",
+        "WMT",
+        "ORCL",
+        "NFLX",
+        "JPM",
+        "LLY",
+        "UNH",
+        "XOM",
+        "HOOD",
+        "V",
+        "LRCX",
+        "CRM",
+        "ASML",
+        "COIN",
+        "MA",
+        "GS",
+        "COST",
+        "JNJ",
+        "BAC",
+        "BKNG"
+      ]
+    },
+    {
+      "name": "Industrial Mean Reversion",
+      "strategy_type": "mean_reversion",
+      "passed": false,
+      "deployed_name": null,
+      "full_metrics": {
+        "sharpe": 9.3485,
+        "total_return_pct": 20.9372,
+        "win_rate": 0.7375,
+        "max_drawdown": 11.3231,
+        "trade_count": 8
+      },
+      "walk_forward": {
+        "sharpe": -15.034,
+        "total_return_pct": 1.1676
+      },
+      "tickers_evaluated": [
+        "NVDA",
+        "TSLA",
+        "MSFT",
+        "MU",
+        "AAPL",
+        "AMZN",
+        "GOOGL",
+        "META",
+        "AMD",
+        "AVGO",
+        "INTC",
+        "WMT",
+        "ORCL",
+        "NFLX",
+        "JPM",
+        "LLY",
+        "UNH",
+        "XOM",
+        "HOOD",
+        "V",
+        "LRCX",
+        "CRM",
+        "ASML",
+        "COIN",
+        "MA",
+        "GS",
+        "COST",
+        "JNJ",
+        "BAC",
+        "BKNG"
+      ]
+    },
+    {
+      "name": "Tech Sector VWAP Reversion",
+      "strategy_type": "vwap_reversion",
+      "passed": false,
+      "deployed_name": null,
+      "full_metrics": {
+        "sharpe": 27.6634,
+        "total_return_pct": 30.0165,
+        "win_rate": 0.9524,
+        "max_drawdown": 2.0333,
+        "trade_count": 7
+      },
+      "walk_forward": {
+        "sharpe": 36.1893,
+        "total_return_pct": 5.3693
+      },
+      "tickers_evaluated": [
+        "AAPL",
+        "MSFT",
+        "NVDA"
+      ]
+    },
+    {
+      "name": "Momentum Rotation in Leading Sectors",
+      "strategy_type": "sector_rotation",
+      "passed": false,
+      "deployed_name": null,
+      "full_metrics": {
+        "sharpe": 2.6181,
+        "total_return_pct": 38.3368,
+        "win_rate": 0.2744,
+        "max_drawdown": 19.7945,
+        "trade_count": 16
+      },
+      "walk_forward": {
+        "sharpe": -19.4778,
+        "total_return_pct": 1.5441
+      },
+      "tickers_evaluated": [
+        "NVDA",
+        "TSLA",
+        "MSFT",
+        "MU",
+        "AAPL",
+        "AMZN",
+        "GOOGL",
+        "META",
+        "AMD",
+        "AVGO",
+        "INTC",
+        "WMT",
+        "ORCL",
+        "NFLX",
+        "JPM",
+        "LLY",
+        "UNH",
+        "XOM",
+        "HOOD",
+        "V",
+        "LRCX",
+        "CRM",
+        "ASML",
+        "COIN",
+        "MA",
+        "GS",
+        "COST",
+        "JNJ",
+        "BAC",
+        "BKNG"
+      ]
+    }
+  ]
+}
